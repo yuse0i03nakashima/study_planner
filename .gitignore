@@ -1,0 +1,16 @@
+# 一時スクリプト
+fix_*.py
+debug_*.py
+register_*.py
+
+# キャッシュ
+__pycache__/
+*.pyc
+
+# 計画表ファイル
+plan_archives/
+*.xlsx
+*.pdf
+
+# その他
+tree
