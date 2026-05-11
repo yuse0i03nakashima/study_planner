@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>問題編集</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .form-box { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input[type="text"], select, textarea {
+      width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc;
+      border-radius: 4px; font-size: 15px; box-sizing: border-box;
+    }
+    textarea { height: 70px; resize: vertical; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .hint { font-size: 12px; color: #888; margin-top: 2px; }
+    button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    button:hover { background: #2c5fa8; }
+    a { color: #4472C4; }
+  </style>
+</head>
+<body>
+  <h1>問題編集</h1>
+  <div class="form-box">
+    <form method="POST">
+      <div class="row2">
+        <div>
+          <label>教科</label>
+          <input type="text" name="subject" value="{{ problem.subject }}" required>
+        </div>
+        <div>
+          <label>テキスト名</label>
+          <input type="text" name="textbook" value="{{ problem.textbook }}" required>
+        </div>
+      </div>
+      <label>問題番号・名称</label>
+      <input type="text" name="problem_number" value="{{ problem.problem_number }}" required>
+      <div class="row3">
+        <div>
+          <label>重要度（1〜5）</label>
+          <select name="importance">
+            {% for i in range(5, 0, -1) %}
+            <option value="{{ i }}" {% if problem.importance == i %}selected{% endif %}>
+              {{ i }}{% if i == 5 %}（最重要）{% elif i == 1 %}（低）{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="hint">試験での出題頻度・概念的重要性</p>
+        </div>
+        <div>
+          <label>難易度（1〜5）</label>
+          <select name="difficulty">
+            {% for i in range(5, 0, -1) %}
+            <option value="{{ i }}" {% if problem.difficulty == i %}selected{% endif %}>
+              {{ i }}{% if i == 5 %}（最難）{% elif i == 1 %}（基礎）{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="hint">問題の難しさ</p>
+        </div>
+        <div>
+          <label>復習価値（1〜5）</label>
+          <select name="review_value">
+            {% for i in range(5, 0, -1) %}
+            <option value="{{ i }}" {% if problem.review_value == i %}selected{% endif %}>
+              {{ i }}{% if i == 5 %}（最高）{% elif i == 1 %}（最低）{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <p class="hint">繰り返し解く意義の大きさ</p>
+        </div>
+      </div>
+      <div class="row2">
+        <div>
+          <label>所要時間（5分単位）</label>
+          <select name="estimated_minutes">
+            {% for m in range(5, 125, 5) %}
+            <option value="{{ m }}" {% if problem.estimated_minutes == m %}selected{% endif %}>{{ m }}分</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <label>学習指示（任意）</label>
+      <textarea name="instruction">{{ problem.instruction or "" }}</textarea>
+      <button type="submit">更新する</button>
+    </form>
+  </div>
+
+  <div class="form-box" style="margin-top:24px;">
+    <h2 style="font-size:16px;color:#2c3e50;">出題予定の追加</h2>
+    <form method="POST" action="/problems/assign/{{ problem.problem_id }}">
+      <label>生徒</label>
+      <select name="student_id" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
+        {% for s in students %}
+        <option value="{{ s.student_id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+      <label>出題区分</label>
+      <select name="category" style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
+        <option value="予習">予習</option>
+        <option value="復習">復習</option>
+        <option value="定着">定着</option>
+        <option value="再定着">再定着</option>
+      </select>
+      <label>出題日（任意）</label>
+      <input type="date" name="scheduled_date" style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
+      <p style="font-size:12px;color:#888;margin-top:4px;">空欄の場合は出題日未定として登録されます。</p>
+      <button type="submit" style="margin-top:12px;padding:8px 20px;background:#27ae60;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">出題予定に追加</button>
+    </form>
+  </div>
+
+  <p><a href="/problems">← 問題マスタ一覧に戻る</a></p>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>授業記録修正</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 13px; }
+    th { background: #4472C4; color: white; padding: 10px; }
+    td { padding: 8px 10px; border-bottom: 1px solid #eee; text-align: center; }
+    .edit-btn { padding: 4px 12px; background: #4472C4; color: white; border-radius: 4px; text-decoration: none; font-size: 12px; }
+    .del-btn { padding: 4px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    .edit-btn:hover { background: #2c5fa8; }
+    .del-btn:hover { background: #c0392b; }
+    a.back { color: #4472C4; }
+  </style>
+</head>
+<body>
+  <h1>③ 授業記録修正</h1>
+  <div class="filter-box">
+    <form method="GET">
+      <label>生徒で絞り込み：</label>
+      <select name="student_id" onchange="this.form.submit()">
+        {% for s in students %}
+        <option value="{{ s.student_id }}"
+          {% if s.student_id == selected_student %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  <table>
+    <tr>
+      <th>日付</th><th>教科</th><th>テキスト名</th><th>問題番号</th>
+      <th>正誤</th><th>習熟度</th><th>区分</th><th>操作</th>
+    </tr>
+    {% for r in records %}
+    <tr>
+      <td>{{ r.date }}</td>
+      <td>{{ r.subject }}</td>
+      <td>{{ r.textbook }}</td>
+      <td>{{ r.problem_number }}</td>
+      <td>{{ "正答" if r.correct else "誤答" }}</td>
+      <td>
+        <form method="POST" action="/mastery/edit/{{ r.history_id }}"
+              style="display:inline;">
+          <select name="mastery" style="font-size:11px;padding:2px;width:60px;">
+            {% for m in [1,2,3] %}
+            <option value="{{ m }}" {% if m == r.mastery %}selected{% endif %}>
+              {{ "★" * m }}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit" style="padding:2px 6px;background:#4472C4;color:white;border:none;border-radius:3px;font-size:10px;cursor:pointer;">修正</button>
+        </form>
+      </td>
+      <td>{{ r.category }}</td>
+      <td>
+        <a class="edit-btn" href="/record/edit/{{ r.history_id }}">編集</a>
+        <form method="POST" action="/record/delete/{{ r.history_id }}"
+              style="display:inline"
+              onsubmit="return confirm('この記録を削除しますか？')">
+          <button class="del-btn">削除</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8">記録がありません</td></tr>
+    {% endfor %}
+  </table>
+  <p><a class="back" href="/">← トップに戻る</a></p>
+</body>
+</html>

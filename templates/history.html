@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>過去の計画表</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    th { background: #4472C4; color: white; padding: 10px; }
+    td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; }
+    .dl-btn { padding: 6px 16px; background: #27ae60; color: white; border-radius: 4px; text-decoration: none; font-size: 13px; margin-right: 4px; }
+    .dl-btn:hover { background: #1e8449; }
+    .del-btn { padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; margin-right: 2px; }
+    .del-btn:hover { background: #c0392b; }
+    .reset-btn { padding: 6px 12px; background: #8e44ad; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    .reset-btn:hover { background: #6c3483; }
+    a.back { color: #4472C4; }
+  </style>
+</head>
+<body>
+  <h1>⑧ 過去の計画表</h1>
+  <div class="filter-box">
+    <form method="GET">
+      <label>生徒で絞り込み：</label>
+      <select name="student_id" onchange="this.form.submit()">
+        <option value="">全生徒</option>
+        {% for s in students %}
+        <option value="{{ s.student_id }}"
+          {% if s.student_id == selected_student %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+  <table>
+    <tr>
+      <th>生徒</th><th>生成日</th><th>計画開始日</th><th>計画終了日</th><th>操作</th>
+    </tr>
+    {% for h in histories %}
+    <tr>
+      <td>{{ h.name }}</td>
+      <td>{{ h.generated_date }}</td>
+      <td>{{ h.start_date }}</td>
+      <td>{{ h.end_date }}</td>
+      <td>
+        <a class="dl-btn" href="/history/download/{{ h.history_id }}">📥 DL</a>
+        <form method="POST" action="/history/delete/{{ h.history_id }}"
+              style="display:inline"
+              onsubmit="return confirm('この計画表を削除しますか？')">
+          <input type="hidden" name="reset_assignments" value="0">
+          <button class="del-btn">削除</button>
+        </form>
+        <form method="POST" action="/history/delete/{{ h.history_id }}"
+              style="display:inline"
+              onsubmit="return confirm('計画表と出題履歴をリセットしますか？この操作は取り消せません。')">
+          <input type="hidden" name="reset_assignments" value="1">
+          <button class="reset-btn">🔄 履歴リセット</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5">計画表の履歴がありません</td></tr>
+    {% endfor %}
+  </table>
+  <p><a class="back" href="/">← トップに戻る</a></p>
+</body>
+</html>

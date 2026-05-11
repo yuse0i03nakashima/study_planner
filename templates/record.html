@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>授業記録入力</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .form-box { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    select, input[type="date"] { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
+    .problem-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding: 10px; background: #f0f4ff; border-radius: 6px; }
+    .problem-row input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; flex-shrink: 0; }
+    .problem-label { flex: 1; font-size: 14px; }
+    .correct-select { width: 90px; flex-shrink: 0; }
+    .category-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; color: white; flex-shrink: 0; }
+    .cat-予習  { background: #4472C4; }
+    .cat-復習  { background: #27ae60; }
+    .cat-定着  { background: #f39c12; }
+    .cat-再定着 { background: #e74c3c; }
+    #problem-list { margin-top: 12px; }
+    .no-problems { color: #888; margin-top: 12px; }
+    button { margin-top: 20px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    button:hover { background: #2c5fa8; }
+    a { color: #4472C4; }
+  </style>
+</head>
+<body>
+  <h1>② 授業記録入力</h1>
+  <div class="form-box">
+    <form method="POST" id="record-form">
+      <label>生徒</label>
+      <select name="student_id" id="student-select" onchange="loadProblems()">
+        {% for s in students %}
+        <option value="{{ s.student_id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label>授業日</label>
+      <input type="date" name="date" required>
+
+      <label>扱った問題</label>
+      <div id="problem-list">
+        <p class="no-problems">生徒を選択すると問題が表示されます</p>
+      </div>
+
+      <button type="submit">記録を保存</button>
+    </form>
+  </div>
+  <p><a href="/">← トップに戻る</a></p>
+
+  <script>
+    function loadProblems() {
+      const studentId = document.getElementById("student-select").value;
+      fetch(`/get_assignments?student_id=${studentId}`)
+        .then(r => r.json())
+        .then(data => {
+          const list = document.getElementById("problem-list");
+          if (data.length === 0) {
+            list.innerHTML = '<p class="no-problems">出題予定の問題がありません</p>';
+            return;
+          }
+          list.innerHTML = data.map(p => `
+            <div class="problem-row">
+              <input type="checkbox" name="problem_ids" value="${p.problem_id}" id="p${p.problem_id}">
+              <span class="category-badge cat-${p.category}">${p.category}</span>
+              <label class="problem-label" for="p${p.problem_id}">
+                【${p.subject}】${p.textbook} ${p.problem_number}（重要度${p.importance}）
+              </label>
+              <select name="correct_${p.problem_id}" class="correct-select">
+                <option value="1">正答</option>
+                <option value="0">誤答</option>
+              </select>
+            </div>
+          `).join("");
+        });
+    }
+    // 初期ロード
+    window.onload = loadProblems;
+  </script>
+</body>
+</html>

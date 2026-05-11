@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>学習計画管理システム</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 60px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .menu a {
+      display: block; margin: 16px 0; padding: 18px 24px;
+      background: #4472C4; color: white; text-decoration: none;
+      border-radius: 8px; font-size: 18px;
+    }
+    .menu a:hover { background: #2c5fa8; }
+    .menu a.sub {
+      background: #7f8c8d; font-size: 15px;
+      padding: 12px 24px; margin: -8px 0 16px 0;
+    }
+    .menu a.sub:hover { background: #636e72; }
+  </style>
+</head>
+<body>
+  <h1>📚 学習計画管理システム</h1>
+  <div class="menu">
+    <a href="/problems">① 問題マスタ登録</a>
+    <a href="/problems/list" class="sub">　└ 問題一覧・編集・削除</a>
+    <a href="/record">② 授業記録入力</a>
+    <a href="/record/list">③ 授業記録修正・習熟度修正</a>
+    <a href="/assignments/list">④ 出題予定管理</a>
+    <a href="/preview">⑤ 計画表プレビュー・出力</a>
+    <a href="/schedule">⑥ 勉強時間登録（全体）</a>
+    <a href="/schedule_subject">⑦ 勉強時間登録（教科別）</a>
+    <a href="/students">⑧ 生徒管理</a>
+    <a href="/history">⑨ 過去の計画表</a>
+    <a href="/class_schedule">⑩ 授業スケジュール管理</a>
+  </div>
+</body>
+</html>

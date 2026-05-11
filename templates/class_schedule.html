@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>授業スケジュール管理</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .form-box { background: white; padding: 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 16px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    select, input[type="date"] { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
+    .dow-checks { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+    .dow-checks label { font-weight: normal; display: flex; align-items: center; gap: 4px; font-size: 14px; }
+    .dow-checks input { width: auto; }
+    .subject-section { background: #f8f9fa; border-radius: 6px; padding: 16px; margin-top: 16px; border-left: 4px solid #4472C4; }
+    .subject-section h3 { margin: 0 0 8px 0; color: #4472C4; font-size: 15px; }
+    .current-setting { font-size: 13px; color: #555; margin-bottom: 8px; }
+    .current-setting span { background: #4472C4; color: white; padding: 2px 8px; border-radius: 4px; margin-right: 4px; font-size: 12px; }
+    .override-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 8px; }
+    button { margin-top: 12px; padding: 8px 20px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    button:hover { background: #2c5fa8; }
+    .btn-del { background: #e74c3c; }
+    .btn-del:hover { background: #c0392b; }
+    .btn-small { padding: 6px 14px; font-size: 13px; margin-top: 0; }
+    a { color: #4472C4; }
+    .hint { font-size: 12px; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>⑧ 授業スケジュール管理</h1>
+
+  <div class="form-box">
+    <h2>生徒を選択</h2>
+    <select onchange="location.href='?student_id='+this.value">
+      {% for s in students %}
+      <option value="{{ s.student_id }}"
+        {% if s.student_id == selected_student %}selected{% endif %}>
+        {{ s.name }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {% if student_subjects %}
+  {% set dow_names = ["月", "火", "水", "木", "金", "土", "日"] %}
+
+  {% for subject in student_subjects %}
+  <div class="form-box">
+    <h2>{{ subject }}</h2>
+
+    <!-- 現在のベース設定 -->
+    <div class="current-setting">
+      ベース授業曜日：
+      {% if base_schedule.get(subject) %}
+        {% for dow in base_schedule.get(subject, []) %}
+          <span>{{ dow_names[dow] }}</span>
+        {% endfor %}
+      {% else %}
+        未設定
+      {% endif %}
+    </div>
+
+    <!-- ベース曜日設定フォーム -->
+    <div class="subject-section">
+      <h3>授業曜日を設定（毎週固定）</h3>
+      <form method="POST">
+        <input type="hidden" name="action" value="save_base">
+        <input type="hidden" name="student_id" value="{{ selected_student }}">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <div class="dow-checks">
+          {% for i in range(7) %}
+          <label>
+            <input type="checkbox" name="dows" value="{{ i }}"
+              {% if i in base_schedule.get(subject, []) %}checked{% endif %}>
+            {{ dow_names[i] }}
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit">曜日を保存</button>
+      </form>
+    </div>
+
+    <!-- 次回授業日の上書き -->
+    <div class="subject-section" style="border-left-color: #27ae60; margin-top: 12px;">
+      <h3>次回授業日を手動指定（都度変更）</h3>
+      {% if override_schedule.get(subject) %}
+      <div class="current-setting">
+        現在の指定：<span style="background:#27ae60;">{{ override_schedule.get(subject) }}</span>
+        <form method="POST" style="display:inline;">
+          <input type="hidden" name="action" value="delete_override">
+          <input type="hidden" name="student_id" value="{{ selected_student }}">
+          <input type="hidden" name="subject" value="{{ subject }}">
+          <button type="submit" class="btn-del btn-small">解除</button>
+        </form>
+      </div>
+      {% endif %}
+      <form method="POST">
+        <input type="hidden" name="action" value="save_override">
+        <input type="hidden" name="student_id" value="{{ selected_student }}">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <div class="override-row">
+          <input type="date" name="next_class_date"
+            value="{{ override_schedule.get(subject, '') }}">
+          <button type="submit" class="btn-small">指定</button>
+        </div>
+        <p class="hint">ベース曜日より優先されます。計画表出力後は手動で解除してください。</p>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <p><a href="/">← トップに戻る</a></p>
+</body>
+</html>

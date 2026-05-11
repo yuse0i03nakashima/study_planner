@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>出題予定管理</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1100px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    select, input[type="date"] { padding: 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 12px; }
+    th { background: #4472C4; color: white; padding: 8px; white-space: nowrap; }
+    td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; }
+    .cat-予習  { background: #DDEEFF; }
+    .cat-復習  { background: #DDFFDD; }
+    .cat-定着  { background: #FFFADD; }
+    .cat-再定着 { background: #FFE5DD; }
+    .btn-save { padding: 3px 10px; background: #4472C4; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .btn-del { padding: 3px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    a { color: #4472C4; }
+    .count { color: #555; font-size: 13px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <h1>⑨ 出題予定管理</h1>
+
+  <div class="filter-box">
+    <form method="GET">
+      <label style="font-weight:bold;">生徒：</label>
+      <select name="student_id" onchange="this.form.submit()">
+        {% for s in students %}
+        <option value="{{ s.student_id }}"
+          {% if s.student_id == selected_student %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+
+  <p class="count">{{ assignments | length }} 件</p>
+
+  <table>
+    <tr>
+      <th>教科</th><th>テキスト名</th><th>問題番号</th>
+      <th>重要度</th><th>復習価値</th><th>習熟度</th>
+      <th>出題区分</th><th>出題日</th><th>操作</th>
+    </tr>
+    {% for a in assignments %}
+    <tr class="cat-{{ a.category }}">
+      <td>{{ a.subject }}</td>
+      <td>{{ a.textbook }}</td>
+      <td>{{ a.problem_number }}</td>
+      <td>{{ a.importance }}</td>
+      <td>{{ a.review_value }}</td>
+      <td>{{ "★" * (a.mastery or 1) }}</td>
+      <td>
+        <form method="POST" action="/assignments/update" style="display:inline;">
+          <input type="hidden" name="assignment_id" value="{{ a.assignment_id }}">
+          <input type="hidden" name="student_id" value="{{ selected_student }}">
+          <select name="category" style="font-size:11px;padding:2px;">
+            {% for cat in ["予習","復習","定着","再定着"] %}
+            <option value="{{ cat }}" {% if cat == a.category %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+          <input type="date" name="scheduled_date"
+            value="{{ a.scheduled_date }}"
+            style="font-size:11px;padding:2px;">
+          <button type="submit" class="btn-save">更新</button>
+        </form>
+      </td>
+      <td>{{ "未定" if a.scheduled_date == "2099-12-31" else a.scheduled_date }}</td>
+      <td>
+        <form method="POST" action="/assignments/delete/{{ a.assignment_id }}"
+              style="display:inline"
+              onsubmit="return confirm('この出題予定を削除しますか？')">
+          <input type="hidden" name="student_id" value="{{ selected_student }}">
+          <button class="btn-del">削除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p><a href="/">← トップに戻る</a></p>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>教科別勉強時間登録</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .form-box { background: white; padding: 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 16px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    select, input[type="date"], input[type="number"] { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
+    .dow-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 12px; }
+    .dow-item { text-align: center; }
+    .dow-item span { display: block; font-weight: bold; margin-bottom: 4px; font-size: 13px; }
+    .dow-item input { padding: 4px; font-size: 13px; text-align: center; }
+    .override-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
+    button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
+    button:hover { background: #2c5fa8; }
+    .hint { font-size: 12px; color: #888; margin-top: 4px; }
+    a { color: #4472C4; }
+    .note { background: #fff3cd; padding: 12px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>⑩ 教科別勉強時間登録</h1>
+
+  <div class="note">
+    教科ごとに勉強時間を設定すると、各教科が独立して時間を割り当てます。<br>
+    設定しない教科は全体の勉強時間設定（⑥）が使われます。
+  </div>
+
+  <div class="form-box">
+    <h2>生徒と教科を選択</h2>
+    <form method="GET">
+      <label>生徒</label>
+      <select name="student_id" onchange="this.form.submit()">
+        {% for s in students %}
+        <option value="{{ s.student_id }}"
+          {% if s.student_id == selected_student %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% if student_subjects %}
+      <label>教科</label>
+      <select name="subject" onchange="this.form.submit()">
+        {% for sub in student_subjects %}
+        <option value="{{ sub }}"
+          {% if sub == selected_subject %}selected{% endif %}>
+          {{ sub }}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if selected_subject %}
+  <div class="form-box">
+    <h2>{{ selected_subject }}の曜日別勉強時間（分）</h2>
+    <p class="hint">0の場合はその曜日に{{ selected_subject }}の学習を割り当てません。</p>
+    <form method="POST">
+      <input type="hidden" name="action" value="save_base">
+      <input type="hidden" name="student_id" value="{{ selected_student }}">
+      <input type="hidden" name="subject" value="{{ selected_subject }}">
+      <div class="dow-grid">
+        {% set dow_names = ["月", "火", "水", "木", "金", "土", "日"] %}
+        {% for i in range(7) %}
+        <div class="dow-item">
+          <span>{{ dow_names[i] }}</span>
+          <input type="number" name="dow_{{ i }}" min="0" step="5"
+            value="{{ base_schedule.get(i, 0) }}" placeholder="0">
+        </div>
+        {% endfor %}
+      </div>
+      <p class="hint">単位：分</p>
+      <button type="submit">保存</button>
+    </form>
+  </div>
+
+  <div class="form-box">
+    <h2>特定の日だけ変更</h2>
+    <form method="POST">
+      <input type="hidden" name="action" value="save_override">
+      <input type="hidden" name="student_id" value="{{ selected_student }}">
+      <input type="hidden" name="subject" value="{{ selected_subject }}">
+      <div class="override-row">
+        <div>
+          <label>日付</label>
+          <input type="date" name="override_date" required>
+        </div>
+        <div>
+          <label>勉強時間（分）</label>
+          <input type="number" name="override_minutes" min="0" step="5"
+            placeholder="例：60" required>
+        </div>
+      </div>
+      <button type="submit">上書き保存</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <p><a href="/">← トップに戻る</a></p>
+</body>
+</html>
