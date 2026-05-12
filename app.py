@@ -21,8 +21,20 @@ def problems():
     conn = get_connection()
     c = conn.cursor()
     if request.method == "POST":
-        subject = request.form["subject"]
-        textbook = request.form["textbook"]
+        textbook_id = request.form.get("textbook_id")
+        # textbook_idからsubjectとtextbook名を取得
+        conn2 = get_connection()
+        c2 = conn2.cursor()
+        if textbook_id:
+            c2.execute("SELECT subject, name FROM textbooks WHERE textbook_id=?",
+                       (textbook_id,))
+            tb_row = c2.fetchone()
+            subject = tb_row["subject"] if tb_row else request.form.get("subject", "")
+            textbook = tb_row["name"] if tb_row else ""
+        else:
+            subject = request.form.get("subject", "")
+            textbook = request.form.get("textbook", "")
+        conn2.close()
         problem_number = request.form["problem_number"]
         importance = int(request.form["importance"])
         difficulty = int(request.form["difficulty"])
@@ -65,8 +77,20 @@ def problem_edit(problem_id):
     conn = get_connection()
     c = conn.cursor()
     if request.method == "POST":
-        subject = request.form["subject"]
-        textbook = request.form["textbook"]
+        textbook_id = request.form.get("textbook_id")
+        # textbook_idからsubjectとtextbook名を取得
+        conn2 = get_connection()
+        c2 = conn2.cursor()
+        if textbook_id:
+            c2.execute("SELECT subject, name FROM textbooks WHERE textbook_id=?",
+                       (textbook_id,))
+            tb_row = c2.fetchone()
+            subject = tb_row["subject"] if tb_row else request.form.get("subject", "")
+            textbook = tb_row["name"] if tb_row else ""
+        else:
+            subject = request.form.get("subject", "")
+            textbook = request.form.get("textbook", "")
+        conn2.close()
         problem_number = request.form["problem_number"]
         importance = int(request.form["importance"])
         difficulty = int(request.form["difficulty"])
@@ -817,6 +841,149 @@ def schedule_subject():
                            selected_subject=selected_subject,
                            student_subjects=student_subjects,
                            base_schedule=base_schedule)
+
+
+@app.route("/textbooks")
+def textbooks():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT t.textbook_id, t.name, t.subject,
+               s.name as series_name,
+               COUNT(DISTINCT p.problem_id) as problem_count,
+               GROUP_CONCAT(DISTINCT st.name) as students
+        FROM textbooks t
+        LEFT JOIN series s ON t.series_id = s.series_id
+        LEFT JOIN problems p ON t.textbook_id = p.textbook_id
+        LEFT JOIN student_textbooks stb ON t.textbook_id = stb.textbook_id
+        LEFT JOIN students st ON stb.student_id = st.student_id
+        GROUP BY t.textbook_id
+        ORDER BY t.subject, s.name, t.name
+    """)
+    tb_list = c.fetchall()
+    c.execute("""
+        SELECT s.series_id, s.name,
+               COUNT(t.textbook_id) as textbook_count
+        FROM series s
+        LEFT JOIN textbooks t ON s.series_id = t.series_id
+        GROUP BY s.series_id ORDER BY s.name
+    """)
+    series_list = c.fetchall()
+    c.execute("SELECT DISTINCT subjects FROM students ORDER BY subjects")
+    all_subjects_raw = c.fetchall()
+    all_subjects = []
+    for row in all_subjects_raw:
+        for subj in row["subjects"].split(","):
+            s = subj.strip()
+            if s and s not in all_subjects:
+                all_subjects.append(s)
+    conn.close()
+    return render_template("textbooks.html",
+                           textbooks=tb_list,
+                           series_list=series_list,
+                           all_subjects=sorted(all_subjects))
+
+
+@app.route("/textbooks/series/add", methods=["POST"])
+def textbook_series_add():
+    name = request.form["name"].strip()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO series (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+    return redirect("/textbooks")
+
+
+@app.route("/textbooks/series/delete/<int:series_id>", methods=["POST"])
+def textbook_series_delete(series_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE textbooks SET series_id=NULL WHERE series_id=?", (series_id,))
+    c.execute("DELETE FROM series WHERE series_id=?", (series_id,))
+    conn.commit()
+    conn.close()
+    return redirect("/textbooks")
+
+
+@app.route("/textbooks/add", methods=["POST"])
+def textbook_add():
+    series_id = request.form.get("series_id") or None
+    name = request.form["name"].strip()
+    subject = request.form["subject"]
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO textbooks (series_id, name, subject) VALUES (?, ?, ?)
+    """, (series_id, name, subject))
+    conn.commit()
+    conn.close()
+    return redirect("/textbooks")
+
+
+@app.route("/textbooks/delete/<int:textbook_id>", methods=["POST"])
+def textbook_delete(textbook_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) as cnt FROM problems WHERE textbook_id=?",
+              (textbook_id,))
+    if c.fetchone()["cnt"] > 0:
+        conn.close()
+        return "このテキストには問題が登録されているため削除できません。", 400
+    c.execute("DELETE FROM student_textbooks WHERE textbook_id=?", (textbook_id,))
+    c.execute("DELETE FROM textbooks WHERE textbook_id=?", (textbook_id,))
+    conn.commit()
+    conn.close()
+    return redirect("/textbooks")
+
+
+@app.route("/textbooks/<int:textbook_id>/sections", methods=["GET", "POST"])
+def textbook_sections(textbook_id):
+    conn = get_connection()
+    c = conn.cursor()
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        order_index = int(request.form.get("order_index", 0))
+        c.execute("""
+            INSERT INTO textbook_sections (textbook_id, name, order_index)
+            VALUES (?, ?, ?)
+        """, (textbook_id, name, order_index))
+        conn.commit()
+        return redirect(f"/textbooks/{textbook_id}/sections")
+
+    c.execute("""
+        SELECT t.*, s.name as series_name FROM textbooks t
+        LEFT JOIN series s ON t.series_id = s.series_id
+        WHERE t.textbook_id=?
+    """, (textbook_id,))
+    textbook = c.fetchone()
+    c.execute("""
+        SELECT ts.*, COUNT(p.problem_id) as problem_count
+        FROM textbook_sections ts
+        LEFT JOIN problems p ON ts.section_id = p.section_id
+        WHERE ts.textbook_id=?
+        GROUP BY ts.section_id
+        ORDER BY ts.order_index, ts.section_id
+    """, (textbook_id,))
+    sections = c.fetchall()
+    conn.close()
+    return render_template("sections.html",
+                           textbook=textbook, sections=sections)
+
+
+@app.route("/textbooks/sections/delete/<int:section_id>", methods=["POST"])
+def section_delete(section_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT textbook_id FROM textbook_sections WHERE section_id=?",
+              (section_id,))
+    row = c.fetchone()
+    textbook_id = row["textbook_id"] if row else 0
+    c.execute("UPDATE problems SET section_id=NULL WHERE section_id=?", (section_id,))
+    c.execute("DELETE FROM textbook_sections WHERE section_id=?", (section_id,))
+    conn.commit()
+    conn.close()
+    return redirect(f"/textbooks/{textbook_id}/sections")
 
 if __name__ == "__main__":
     init_db()

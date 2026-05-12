@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>テキスト管理</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 40px auto; background: #f5f7fa; }
+    h1 { color: #2c3e50; }
+    .form-box { background: white; padding: 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    h2 { color: #2c3e50; margin-top: 0; font-size: 16px; }
+    label { display: block; margin-top: 12px; font-weight: bold; }
+    input[type="text"], select { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
+    button:hover { background: #2c5fa8; }
+    .btn-del { padding: 4px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 24px; }
+    th { background: #4472C4; color: white; padding: 8px; }
+    td { padding: 8px; border-bottom: 1px solid #eee; text-align: center; }
+    a { color: #4472C4; }
+    .section-box { background: #f0f4ff; border-radius: 6px; padding: 12px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>テキスト管理</h1>
+
+  <!-- シリーズ登録 -->
+  <div class="form-box">
+    <h2>シリーズ登録</h2>
+    <form method="POST" action="/textbooks/series/add">
+      <label>シリーズ名</label>
+      <input type="text" name="name" placeholder="例：青チャート" required>
+      <button type="submit">登録</button>
+    </form>
+  </div>
+
+  <!-- テキスト登録 -->
+  <div class="form-box">
+    <h2>テキスト登録</h2>
+    <form method="POST" action="/textbooks/add">
+      <div class="row2">
+        <div>
+          <label>シリーズ（任意）</label>
+          <select name="series_id">
+            <option value="">シリーズなし</option>
+            {% for s in series_list %}
+            <option value="{{ s.series_id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>教科</label>
+          <select name="subject">
+            {% for subj in all_subjects %}
+            <option value="{{ subj }}">{{ subj }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <label>テキスト名</label>
+      <input type="text" name="name" placeholder="例：数I+A" required>
+      <button type="submit">登録</button>
+    </form>
+  </div>
+
+  <!-- テキスト一覧 -->
+  <h2>テキスト一覧</h2>
+  <table>
+    <tr>
+      <th>ID</th><th>シリーズ</th><th>テキスト名</th><th>教科</th>
+      <th>問題数</th><th>使用生徒</th><th>セクション</th><th>操作</th>
+    </tr>
+    {% for t in textbooks %}
+    <tr>
+      <td>{{ t.textbook_id }}</td>
+      <td>{{ t.series_name or "―" }}</td>
+      <td>{{ t.name }}</td>
+      <td>{{ t.subject }}</td>
+      <td>{{ t.problem_count }}</td>
+      <td style="font-size:12px;">{{ t.students }}</td>
+      <td>
+        <a href="/textbooks/{{ t.textbook_id }}/sections">セクション管理</a>
+      </td>
+      <td>
+        <form method="POST" action="/textbooks/delete/{{ t.textbook_id }}"
+              style="display:inline"
+              onsubmit="return confirm('削除しますか？')">
+          <button class="btn-del">削除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <!-- シリーズ一覧 -->
+  <h2>シリーズ一覧</h2>
+  <table>
+    <tr><th>ID</th><th>シリーズ名</th><th>テキスト数</th><th>操作</th></tr>
+    {% for s in series_list %}
+    <tr>
+      <td>{{ s.series_id }}</td>
+      <td>{{ s.name }}</td>
+      <td>{{ s.textbook_count }}</td>
+      <td>
+        <form method="POST" action="/textbooks/series/delete/{{ s.series_id }}"
+              style="display:inline"
+              onsubmit="return confirm('削除しますか？')">
+          <button class="btn-del">削除</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <p><a href="/">← トップに戻る</a></p>
+</body>
+</html>

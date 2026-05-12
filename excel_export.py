@@ -37,8 +37,18 @@ def priority_score(item):
 
 
 def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
+    """
+    割り当てロジック：
+    予習：problem_id順 × テキスト間インターリーブ分散（授業日当日を含む）
+    復習：前半60%・後半40%に分散して全問振り分け
+    定着・再定着：残り時間に均等分散、代表問題優先、抑制中はスキップ
+    """
+    from database import get_suppressed_problems
+    from collections import defaultdict
+
     remaining = {d: m for d, m in schedule.items() if m > 0}
     dates_sorted = sorted(remaining.keys())
+
     if not dates_sorted:
         for item in plan:
             item["assigned_date"] = None
@@ -59,10 +69,14 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         for s in subjects
     }
 
+    suppressed_ids = set(get_suppressed_problems(student_id))
+
     assigned = []
     unassigned = []
+    n = len(dates_sorted)
 
     def try_assign(item, search_dates):
+        """残り時間が最も多い日に割り当て"""
         minutes = get_adjusted_minutes(item)
         valid = [d for d in search_dates if remaining.get(d, 0) >= minutes]
         if not valid:
@@ -73,43 +87,111 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         assigned.append(item)
         return True
 
-    plan_sorted = sorted(plan, key=priority_score)
-    review_list = [p for p in plan_sorted
-                   if p["category"] in ("復習", "定着", "再定着")]
-    yosyu_list = sorted(
+    def try_assign_balanced(item, search_dates, date_counts):
+        """問題数が少ない日を優先して均等に割り当て"""
+        minutes = get_adjusted_minutes(item)
+        valid = [d for d in search_dates if remaining.get(d, 0) >= minutes]
+        if not valid:
+            return False
+        # 問題数が少なく残り時間が多い日を優先
+        d = min(valid, key=lambda x: (date_counts[x], -remaining[x]))
+        remaining[d] -= minutes
+        item["assigned_date"] = d
+        date_counts[d] += 1
+        assigned.append(item)
+        return True
+
+    # 日付ごとの問題数カウント（均等分散用）
+    date_counts = defaultdict(int)
+
+    # ─── 予習：problem_id順 × テキスト間インターリーブ ───
+    yosyu_items = sorted(
         [p for p in plan if p["category"] == "予習"],
         key=lambda x: x.get("problem_id", 0))
 
-    for item in [p for p in review_list if p["category"] == "復習"]:
-        class_dates = subject_class_dates.get(item["subject"], [])
-        search_from = dates_sorted[0]
-        past = [d for d in class_dates if d <= start_date_str]
-        if past:
-            search_from = past[-1]
-        search = [d for d in dates_sorted if d >= search_from]
-        if not try_assign(item, search):
-            item["assigned_date"] = None
-            unassigned.append(item)
+    yosyu_by_textbook = defaultdict(list)
+    for item in yosyu_items:
+        tb_id = item.get("textbook_id") or item.get("textbook", "unknown")
+        yosyu_by_textbook[tb_id].append(item)
 
-    for item in [p for p in review_list
-                 if p["category"] in ("定着", "再定着")]:
-        if not try_assign(item, dates_sorted):
-            item["assigned_date"] = None
-            unassigned.append(item)
+    interleaved_yosyu = []
+    textbook_queues = list(yosyu_by_textbook.values())
+    indices = [0] * len(textbook_queues)
+    while True:
+        added = False
+        for i, queue in enumerate(textbook_queues):
+            if indices[i] < len(queue):
+                interleaved_yosyu.append(queue[indices[i]])
+                indices[i] += 1
+                added = True
+        if not added:
+            break
 
-    for item in yosyu_list:
-        class_dates = subject_class_dates.get(item["subject"], [])
+    for item in interleaved_yosyu:
+        subject = item["subject"]
+        class_dates = subject_class_dates.get(subject, [])
         future = sorted([d for d in class_dates if d > start_date_str])
         if future:
             next_class = future[0]
+            # 授業日当日も含める
             search = [d for d in dates_sorted if d <= next_class]
         else:
             search = list(dates_sorted)
-        if not try_assign(item, search):
+        if not try_assign_balanced(item, search, date_counts):
+            item["assigned_date"] = None
+            unassigned.append(item)
+
+    # ─── 復習：前半60%・後半40%に分散 ──────────────────
+    fukushu_items = sorted(
+        [p for p in plan if p["category"] == "復習"],
+        key=priority_score)
+
+    front_end = max(1, int(n * 0.6))
+    front_dates = dates_sorted[:front_end]
+    back_dates = dates_sorted[front_end:] if len(dates_sorted) > front_end else dates_sorted
+
+    total = len(fukushu_items)
+    front_count = max(1, int(total * 0.6)) if total > 0 else 0
+
+    for i, item in enumerate(fukushu_items):
+        if i < front_count:
+            search = front_dates
+        else:
+            search = back_dates
+        if not try_assign_balanced(item, search, date_counts):
+            if not try_assign_balanced(item, dates_sorted, date_counts):
+                item["assigned_date"] = None
+                unassigned.append(item)
+
+    # ─── 定着・再定着：均等分散、代表問題優先 ──────────
+    teichaku_items = [p for p in plan
+                      if p["category"] in ("定着", "再定着")]
+
+    rep_items = sorted(
+        [p for p in teichaku_items
+         if int(p.get("review_value", 0) or 0) >= 4
+         and p.get("problem_id") not in suppressed_ids],
+        key=priority_score)
+
+    normal_items = sorted(
+        [p for p in teichaku_items
+         if int(p.get("review_value", 0) or 0) < 4
+         and p.get("problem_id") not in suppressed_ids],
+        key=priority_score)
+
+    for item in rep_items:
+        if not try_assign_balanced(item, dates_sorted, date_counts):
+            item["assigned_date"] = None
+            unassigned.append(item)
+
+    for item in normal_items:
+        if not try_assign_balanced(item, dates_sorted, date_counts):
             item["assigned_date"] = None
             unassigned.append(item)
 
     return assigned, unassigned
+
+
 
 
 def build_plan_data(student_id, start_date_str, target_date_str,
