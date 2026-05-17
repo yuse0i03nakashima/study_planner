@@ -4,83 +4,176 @@
   <meta charset="UTF-8">
   <title>出題予定管理</title>
   <style>
-    body { font-family: sans-serif; max-width: 1100px; margin: 40px auto; background: #f5f7fa; }
+    body { font-family: sans-serif; max-width: 1200px; margin: 40px auto; background: #f5f7fa; }
     h1 { color: #2c3e50; }
-    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    select, input[type="date"] { padding: 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 12px; }
+    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .bulk-bar { background: #2c3e50; padding: 12px 24px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 16px; }
+    .bulk-bar span { color: white; font-size: 14px; }
+    .btn-bulk { padding: 8px 24px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; }
+    .btn-bulk:hover { background: #1e8449; }
+    .btn-bulk-del { padding: 8px 24px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .btn-bulk-del:hover { background: #c0392b; }
+    select, input[type="date"] { padding: 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     th { background: #4472C4; color: white; padding: 8px; white-space: nowrap; }
     td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; }
     .cat-予習  { background: #DDEEFF; }
     .cat-復習  { background: #DDFFDD; }
     .cat-定着  { background: #FFFADD; }
     .cat-再定着 { background: #FFE5DD; }
-    .btn-save { padding: 3px 10px; background: #4472C4; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
     .btn-del { padding: 3px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
+    .changed { outline: 2px solid #f39c12; }
     a { color: #4472C4; }
     .count { color: #555; font-size: 13px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
-  <h1>⑨ 出題予定管理</h1>
+  <h1>④ 出題予定管理</h1>
 
   <div class="filter-box">
-    <form method="GET">
-      <label style="font-weight:bold;">生徒：</label>
-      <select name="student_id" onchange="this.form.submit()">
-        {% for s in students %}
-        <option value="{{ s.student_id }}"
-          {% if s.student_id == selected_student %}selected{% endif %}>
-          {{ s.name }}
-        </option>
-        {% endfor %}
-      </select>
+    <form method="GET" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <div>
+        <label style="font-weight:bold;font-size:13px;display:block;margin-bottom:4px;">生徒</label>
+        <select name="student_id" onchange="this.form.submit()">
+          {% for s in students %}
+          <option value="{{ s.student_id }}"
+            {% if s.student_id == selected_student %}selected{% endif %}>
+            {{ s.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
     </form>
+  </div>
+
+  <!-- 一括更新バー -->
+  <div class="bulk-bar">
+    <span>一括操作：</span>
+    <button class="btn-bulk" onclick="bulkUpdate()">✅ 変更した行をまとめて更新</button>
+    <span id="change-count" style="color:#f1c40f;font-size:13px;"></span>
   </div>
 
   <p class="count">{{ assignments | length }} 件</p>
 
-  <table>
+  <table id="assignments-table">
     <tr>
+      <th><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
       <th>教科</th><th>テキスト名</th><th>問題番号</th>
       <th>重要度</th><th>復習価値</th><th>習熟度</th>
-      <th>出題区分</th><th>出題日</th><th>操作</th>
+      <th>出題区分</th><th>出題日</th><th>削除</th>
     </tr>
     {% for a in assignments %}
-    <tr class="cat-{{ a.category }}">
+    <tr id="row-{{ a.assignment_id }}" class="cat-{{ a.category }}">
+      <td><input type="checkbox" class="row-check" value="{{ a.assignment_id }}"></td>
       <td>{{ a.subject }}</td>
-      <td>{{ a.textbook }}</td>
-      <td>{{ a.problem_number }}</td>
+      <td style="text-align:left;font-size:12px;">{{ a.textbook }}</td>
+      <td style="font-size:12px;">{{ a.problem_number }}</td>
       <td>{{ a.importance }}</td>
       <td>{{ a.review_value }}</td>
       <td>{{ "★" * (a.mastery or 1) }}</td>
       <td>
-        <form method="POST" action="/assignments/update" style="display:inline;">
-          <input type="hidden" name="assignment_id" value="{{ a.assignment_id }}">
-          <input type="hidden" name="student_id" value="{{ selected_student }}">
-          <select name="category" style="font-size:11px;padding:2px;">
-            {% for cat in ["予習","復習","定着","再定着"] %}
-            <option value="{{ cat }}" {% if cat == a.category %}selected{% endif %}>{{ cat }}</option>
-            {% endfor %}
-          </select>
-          <input type="date" name="scheduled_date"
-            value="{{ a.scheduled_date }}"
-            style="font-size:11px;padding:2px;">
-          <button type="submit" class="btn-save">更新</button>
-        </form>
+        <select class="edit-field" data-id="{{ a.assignment_id }}" data-field="category"
+          onchange="markChanged(this, {{ a.assignment_id }})">
+          {% for cat in ["予習","復習","定着","再定着"] %}
+          <option value="{{ cat }}" {% if cat == a.category %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
       </td>
-      <td>{{ "未定" if a.scheduled_date == "2099-12-31" else a.scheduled_date }}</td>
       <td>
-        <form method="POST" action="/assignments/delete/{{ a.assignment_id }}"
-              style="display:inline"
-              onsubmit="return confirm('この出題予定を削除しますか？')">
-          <input type="hidden" name="student_id" value="{{ selected_student }}">
-          <button class="btn-del">削除</button>
-        </form>
+        <input type="date" class="edit-field" data-id="{{ a.assignment_id }}" data-field="scheduled_date"
+          value="{{ '' if a.scheduled_date == '2099-12-31' else a.scheduled_date }}"
+          onchange="markChanged(this, {{ a.assignment_id }})">
+      </td>
+      <td>
+        <button class="btn-del" onclick="deleteAssignment({{ a.assignment_id }}, this)">削除</button>
       </td>
     </tr>
     {% endfor %}
   </table>
+
   <p><a href="/">← トップに戻る</a></p>
+
+  <script>
+    // 変更追跡
+    const changedRows = new Map(); // assignment_id -> {category, scheduled_date}
+
+    function markChanged(el, assignmentId) {
+      const row = document.getElementById('row-' + assignmentId);
+      const fields = row.querySelectorAll('.edit-field');
+      const data = {};
+      fields.forEach(f => { data[f.dataset.field] = f.value; });
+      changedRows.set(assignmentId, data);
+      row.style.boxShadow = 'inset 0 0 0 2px #f39c12';
+      document.getElementById('change-count').textContent =
+        changedRows.size + '行が変更済み（未保存）';
+    }
+
+    async function bulkUpdate() {
+      if (changedRows.size === 0) {
+        alert('変更された行がありません。');
+        return;
+      }
+      const updates = [];
+      changedRows.forEach((data, id) => {
+        updates.push({ assignment_id: id, ...data });
+      });
+
+      try {
+        const res = await fetch('/assignments/bulk_update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            student_id: '{{ selected_student }}',
+            updates: updates
+          })
+        });
+        if (res.ok) {
+          // 行の色を更新してリセット
+          changedRows.forEach((data, id) => {
+            const row = document.getElementById('row-' + id);
+            if (row) {
+              row.style.boxShadow = '';
+              row.className = 'cat-' + data.category;
+              // カテゴリ選択を更新
+              const sel = row.querySelector('select.edit-field');
+              if (sel) sel.value = data.category;
+            }
+          });
+          changedRows.clear();
+          document.getElementById('change-count').textContent = '✅ 更新完了';
+          setTimeout(() => {
+            document.getElementById('change-count').textContent = '';
+          }, 3000);
+        } else {
+          alert('更新に失敗しました。');
+        }
+      } catch(e) {
+        alert('エラー: ' + e);
+      }
+    }
+
+    function toggleAll(cb) {
+      document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+    }
+
+    async function deleteAssignment(assignmentId, btn) {
+      if (!confirm('この出題予定を削除しますか？')) return;
+      try {
+        const res = await fetch('/assignments/delete/' + assignmentId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'student_id={{ selected_student }}'
+        });
+        if (res.ok || res.redirected) {
+          const row = document.getElementById('row-' + assignmentId);
+          if (row) row.remove();
+        } else {
+          alert('削除に失敗しました。');
+        }
+      } catch(e) {
+        alert('削除に失敗しました: ' + e);
+      }
+    }
+  </script>
 </body>
 </html>

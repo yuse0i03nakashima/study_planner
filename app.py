@@ -335,9 +335,7 @@ def preview():
         if not start_date:
             start_date = date.today().isoformat()
 
-        # 出題日が過ぎた問題を自動昇格
-        from database import auto_promote_past_assignments
-        auto_promote_past_assignments(student_id)
+        # 自動昇格はアプリ起動時に実行済み
 
         selected = {
             "student_id": student_id,
@@ -985,6 +983,71 @@ def section_delete(section_id):
     conn.close()
     return redirect(f"/textbooks/{textbook_id}/sections")
 
+
+@app.route("/assignments/bulk_update", methods=["POST"])
+def assignments_bulk_update():
+    import json as _json
+    data = request.get_json()
+    updates = data.get("updates", [])
+    conn = get_connection()
+    c = conn.cursor()
+    for upd in updates:
+        assignment_id = upd.get("assignment_id")
+        category = upd.get("category", "")
+        scheduled_date = upd.get("scheduled_date", "").strip()
+        if not scheduled_date:
+            scheduled_date = "2099-12-31"
+        if category and assignment_id:
+            c.execute("""
+                UPDATE assignments
+                SET category=?, scheduled_date=?
+                WHERE assignment_id=?
+            """, (category, scheduled_date, assignment_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "updated": len(updates)})
+
+
+@app.route("/mastery/bulk_update", methods=["POST"])
+def mastery_bulk_update():
+    import json as _json
+    data = request.get_json()
+    updates = data.get("updates", [])
+    conn = get_connection()
+    c = conn.cursor()
+    for upd in updates:
+        history_id = upd.get("history_id")
+        mastery = upd.get("mastery")
+        if history_id and mastery:
+            c.execute("UPDATE history SET mastery=? WHERE history_id=?",
+                      (mastery, history_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "updated": len(updates)})
+
 if __name__ == "__main__":
     init_db()
+
+    # アプリ起動時に自動昇格を実行
+    from database import (auto_promote_on_launch,
+                          get_last_launch_date,
+                          update_last_launch_date)
+    from datetime import date as _date, timedelta as _timedelta
+    last_launch = get_last_launch_date()
+    today = _date.today().isoformat()
+    if last_launch < today:
+        # 前回起動日の翌日から昨日までを昇格対象とする
+        # （今日のは今日の授業が終わってから昇格すべきなので除く）
+        from_date = (
+            _date.fromisoformat(last_launch) + _timedelta(days=1)
+        ).isoformat()
+        to_date = (
+            _date.today() - _timedelta(days=1)
+        ).isoformat()
+        if from_date <= to_date:
+            promoted = auto_promote_on_launch(from_date, to_date)
+            print(f"自動昇格：{promoted}問を処理しました"
+                  f"（{from_date}〜{to_date}）")
+    update_last_launch_date()
+
     app.run(debug=True)

@@ -1,4 +1,9 @@
-<!DOCTYPE html>
+import os
+
+base = r"C:\Users\ynaka\study_planner"
+templates = os.path.join(base, "templates")
+
+html = """<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -361,4 +366,8 @@
     days[d.getDay()];
 </script>
 </body>
-</html>
+</html>"""
+
+with open(os.path.join(templates, "index.html"), "w", encoding="utf-8") as f:
+    f.write(html)
+print("✅ index.html を更新しました")

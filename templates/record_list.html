@@ -33,6 +33,16 @@
       </select>
     </form>
   </div>
+  <!-- 一括更新バー -->
+  <div style="background:#2c3e50;padding:12px 24px;border-radius:8px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+    <span style="color:white;font-size:14px;">一括操作：</span>
+    <button onclick="bulkUpdateMastery()"
+      style="padding:8px 24px;background:#27ae60;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-weight:bold;">
+      ✅ 変更した習熟度をまとめて更新
+    </button>
+    <span id="mastery-change-count" style="color:#f1c40f;font-size:13px;"></span>
+  </div>
+
   <table>
     <tr>
       <th>日付</th><th>教科</th><th>テキスト名</th><th>問題番号</th>
@@ -48,14 +58,15 @@
       <td>
         <form method="POST" action="/mastery/edit/{{ r.history_id }}"
               style="display:inline;">
-          <select name="mastery" style="font-size:11px;padding:2px;width:60px;">
+          <select class="mastery-select" data-id="{{ r.history_id }}"
+            style="font-size:11px;padding:2px;width:60px;"
+            onchange="markMasteryChanged(this, {{ r.history_id }})">
             {% for m in [1,2,3] %}
             <option value="{{ m }}" {% if m == r.mastery %}selected{% endif %}>
               {{ "★" * m }}
             </option>
             {% endfor %}
           </select>
-          <button type="submit" style="padding:2px 6px;background:#4472C4;color:white;border:none;border-radius:3px;font-size:10px;cursor:pointer;">修正</button>
         </form>
       </td>
       <td>{{ r.category }}</td>
@@ -73,5 +84,50 @@
     {% endfor %}
   </table>
   <p><a class="back" href="/">← トップに戻る</a></p>
+  <script>
+    const masteryChanges = new Map();
+
+    function markMasteryChanged(el, historyId) {
+      masteryChanges.set(historyId, parseInt(el.value));
+      el.style.outline = '2px solid #f39c12';
+      document.getElementById('mastery-change-count').textContent =
+        masteryChanges.size + '行が変更済み（未保存）';
+    }
+
+    async function bulkUpdateMastery() {
+      if (masteryChanges.size === 0) {
+        alert('変更された行がありません。');
+        return;
+      }
+      const updates = [];
+      masteryChanges.forEach((mastery, id) => {
+        updates.push({ history_id: id, mastery: mastery });
+      });
+      try {
+        const res = await fetch('/mastery/bulk_update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ updates: updates })
+        });
+        if (res.ok) {
+          masteryChanges.forEach((mastery, id) => {
+            const sel = document.querySelector(
+              '.mastery-select[data-id="' + id + '"]');
+            if (sel) sel.style.outline = '';
+          });
+          masteryChanges.clear();
+          document.getElementById('mastery-change-count').textContent =
+            '✅ 更新完了';
+          setTimeout(() => {
+            document.getElementById('mastery-change-count').textContent = '';
+          }, 3000);
+        } else {
+          alert('更新に失敗しました。');
+        }
+      } catch(e) {
+        alert('エラー: ' + e);
+      }
+    }
+  </script>
 </body>
 </html>

@@ -141,7 +141,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
             item["assigned_date"] = None
             unassigned.append(item)
 
-    # ─── 復習：前半60%・後半40%に分散 ──────────────────
+    # ─── 復習：次回授業日の前日までに配置、前半60%・後半40% ──
     fukushu_items = sorted(
         [p for p in plan if p["category"] == "復習"],
         key=priority_score)
@@ -154,14 +154,33 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     front_count = max(1, int(total * 0.6)) if total > 0 else 0
 
     for i, item in enumerate(fukushu_items):
-        if i < front_count:
-            search = front_dates
+        subject = item["subject"]
+        class_dates = subject_class_dates.get(subject, [])
+        future = sorted([d for d in class_dates if d > start_date_str])
+
+        # 次回授業日の前日を計算
+        if future:
+            from datetime import date as _date, timedelta as _timedelta
+            next_class = future[0]
+            next_class_obj = _date.fromisoformat(next_class)
+            prev_day = (next_class_obj - _timedelta(days=1)).isoformat()
+            deadline_dates = [d for d in dates_sorted if d <= prev_day]
         else:
-            search = back_dates
+            deadline_dates = dates_sorted
+
+        # 期限内で前半・後半に分散
+        if i < front_count:
+            search = [d for d in front_dates if d in deadline_dates] or deadline_dates
+        else:
+            search = [d for d in back_dates if d in deadline_dates] or deadline_dates
+
         if not try_assign_balanced(item, search, date_counts):
-            if not try_assign_balanced(item, dates_sorted, date_counts):
-                item["assigned_date"] = None
-                unassigned.append(item)
+            # フォールバック：期限内全日付
+            if not try_assign_balanced(item, deadline_dates, date_counts):
+                # 最終フォールバック：全日付
+                if not try_assign_balanced(item, dates_sorted, date_counts):
+                    item["assigned_date"] = None
+                    unassigned.append(item)
 
     # ─── 定着・再定着：均等分散、代表問題優先 ──────────
     teichaku_items = [p for p in plan

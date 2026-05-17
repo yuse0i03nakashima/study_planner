@@ -98,6 +98,12 @@ def init_db():
         )
     """)
     c.execute("""
+        CREATE TABLE IF NOT EXISTS app_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    c.execute("""
         CREATE TABLE IF NOT EXISTS class_schedule_override (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id TEXT NOT NULL,
@@ -394,55 +400,61 @@ def get_schedule_subject(student_id, subject, start_date_str, end_date_str):
     return schedule
 
 
-def auto_promote_past_assignments(student_id):
+def auto_promote_on_launch(from_date, to_date):
     """
-    出題日が過ぎた問題を自動的に正答扱いして昇格させる。
-    特段誤りの報告がない場合、出題日翌日以降に自動処理。
+    アプリ起動時に呼び出す自動昇格処理。
+    from_date〜to_dateの間にscheduled_dateがある問題を
+    全生徒対象に正答扱いで昇格させる。
+    誤答はadd_recordで別途報告がある場合のみ反映済みのため、
+    日付が過ぎた問題は原則として正答とみなす。
     """
     conn = get_connection()
     c = conn.cursor()
-    today = date.today().isoformat()
 
     c.execute("""
-        SELECT a.problem_id, a.scheduled_date, a.category,
-               a.assignment_id,
-               p.review_value,
+        SELECT a.student_id, a.problem_id, a.scheduled_date,
+               a.category, a.assignment_id, p.review_value,
                (SELECT mastery FROM history h
                 WHERE h.student_id = a.student_id
                 AND h.problem_id = a.problem_id
                 ORDER BY h.date DESC LIMIT 1) as mastery
         FROM assignments a
         JOIN problems p ON a.problem_id = p.problem_id
-        WHERE a.student_id = ?
-          AND a.scheduled_date < ?
+        WHERE a.scheduled_date BETWEEN ? AND ?
           AND a.scheduled_date != '2099-12-31'
           AND a.category IN ('予習', '復習', '定着', '再定着')
-    """, (student_id, today))
+    """, (from_date, to_date))
     rows = c.fetchall()
 
     promoted = 0
     for row in rows:
+        student_id = row["student_id"]
         problem_id = row["problem_id"]
         scheduled_date = row["scheduled_date"]
-        current_mastery = row["mastery"] if row["mastery"] else 1
+        current_mastery = int(row["mastery"]) if row["mastery"] else 1
 
-        # 新しい習熟度を計算
+        # 既にhistoryに記録がある場合はスキップ
+        # （add_recordで誤答が報告済みの場合はそちらを優先）
+        c.execute("""
+            SELECT history_id FROM history
+            WHERE student_id=? AND problem_id=? AND date=?
+        """, (student_id, problem_id, scheduled_date))
+        if c.fetchone():
+            continue
+
         new_mastery = min(current_mastery + 1, 3)
 
-        # historyに正答記録を追加
         c.execute("""
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (student_id, problem_id, scheduled_date,
-                1, new_mastery, "自動昇格"))
+              1, new_mastery, "自動昇格"))
 
-        # 次回出題日を計算
         review_value = row["review_value"]
         next_date = get_next_date(review_value, new_mastery, scheduled_date)
         category = {1: "復習", 2: "定着"}.get(new_mastery, "再定着")
 
-        # 出題予定を更新
         c.execute("DELETE FROM assignments WHERE assignment_id=?",
                   (row["assignment_id"],))
         c.execute("""
@@ -455,6 +467,35 @@ def auto_promote_past_assignments(student_id):
     conn.commit()
     conn.close()
     return promoted
+
+
+def get_last_launch_date():
+    """前回起動日を取得する"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT value FROM app_state WHERE key='last_launch_date'")
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return row["value"]
+    return date.today().isoformat()
+
+
+def update_last_launch_date():
+    """起動日を今日で更新する"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO app_state (key, value)
+        VALUES ('last_launch_date', ?)
+    """, (date.today().isoformat(),))
+    conn.commit()
+    conn.close()
+
+
+def auto_promote_past_assignments(student_id):
+    """後方互換用：旧関数。auto_promote_on_launchを使うこと。"""
+    return 0
 
 
 
