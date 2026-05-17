@@ -135,26 +135,52 @@ def record():
     conn = get_connection()
     c = conn.cursor()
     if request.method == "POST":
+        from database import (calc_new_mastery_v2, update_assignments_after_record,
+                               score_to_correct)
         student_id = request.form["student_id"]
-        record_date = request.form["date"]
-        problem_ids = request.form.getlist("problem_ids")
-        for pid in problem_ids:
-            correct = int(request.form.get(f"correct_{pid}", "0"))
-            new_mastery = calc_new_mastery(student_id, int(pid), correct, record_date)
-            c.execute("""
-                INSERT INTO history
-                (student_id, problem_id, date, correct, mastery, category)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (student_id, int(pid), record_date, correct, new_mastery, "記録"))
-            conn.commit()
-            update_assignments_after_record(student_id, int(pid), record_date, new_mastery)
+        problem_id = request.form["problem_id"]
+        record_date = request.form["record_date"]
+        score = int(request.form.get("score", 5))
+        correct = score_to_correct(score)
+        new_mastery = calc_new_mastery_v2(student_id, problem_id, score, record_date)
+        c.execute("""
+            INSERT INTO history
+            (student_id, problem_id, date, correct, mastery, category, score)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (student_id, problem_id, record_date, correct, new_mastery, "記録", score))
+        conn.commit()
         conn.close()
+        update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
+        score_label = {5: "Perfect", 4: "Good", 3: "Review",
+                       2: "Retry", 1: "Failed"}
+        flash(
+            f"記録しました（評価：{score}／{score_label[score]}"
+            f"　習熟度：{'★' * new_mastery}）",
+            "success"
+        )
         return redirect("/record")
 
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
+
+    # 今期の問題（assignments）を優先表示
+    c.execute("""
+        SELECT DISTINCT p.problem_id, p.subject, p.textbook, p.problem_number,
+               a.student_id as assigned_student,
+               a.scheduled_date, a.category
+        FROM problems p
+        LEFT JOIN assignments a ON p.problem_id = a.problem_id
+          AND a.scheduled_date != '2099-12-31'
+        ORDER BY
+          CASE WHEN a.scheduled_date IS NOT NULL THEN 0 ELSE 1 END,
+          a.scheduled_date,
+          p.subject, p.textbook, p.problem_id
+    """)
+    problems = c.fetchall()
     conn.close()
-    return render_template("record.html", students=students)
+    today = date.today().isoformat()
+    return render_template("record.html", students=students,
+                           problems=problems, today=today)
 
 
 @app.route("/get_assignments")
@@ -164,7 +190,7 @@ def get_assignments():
     c = conn.cursor()
     c.execute("""
         SELECT a.assignment_id, a.problem_id, a.category, a.scheduled_date,
-               p.subject, p.textbook, p.problem_number, p.importance,
+               p.subject, p.textbook, p.problem_number, p.importance, p.difficulty,
                p.estimated_minutes
         FROM assignments a
         JOIN problems p ON a.problem_id = p.problem_id
@@ -188,6 +214,7 @@ def record_list():
     if student_id:
         c.execute("""
             SELECT h.history_id, h.date, h.correct, h.mastery, h.category,
+               h.score,
                    p.subject, p.textbook, p.problem_number
             FROM history h
             JOIN problems p ON h.problem_id = p.problem_id
@@ -656,7 +683,7 @@ def assignments_list():
         c.execute("""
             SELECT a.assignment_id, a.category, a.scheduled_date,
                    p.problem_id, p.subject, p.textbook, p.problem_number,
-                   p.importance, p.review_value,
+                   p.importance, p.difficulty, p.review_value,
                    (SELECT mastery FROM history h
                     WHERE h.student_id = a.student_id
                     AND h.problem_id = a.problem_id
@@ -1024,6 +1051,53 @@ def mastery_bulk_update():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "updated": len(updates)})
+
+
+@app.route("/problems/update_field", methods=["POST"])
+def problem_update_field():
+    """問題固有フィールドをインライン編集で更新する"""
+    data = request.get_json()
+    problem_id = data.get("problem_id")
+    field = data.get("field")
+    value = data.get("value")
+    allowed = {"importance", "difficulty", "review_value", "estimated_minutes"}
+    if field not in allowed:
+        return jsonify({"status": "error", "message": "Invalid field"}), 400
+    try:
+        value = int(value)
+        if not (1 <= value <= 5):
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Value must be 1-5"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
+              (value, problem_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/mastery/single_update", methods=["POST"])
+def mastery_single_update():
+    """Assignmentsページから習熟度を単体更新する"""
+    data = request.get_json()
+    student_id = data.get("student_id")
+    problem_id = data.get("problem_id")
+    mastery = data.get("mastery")
+    if not all([student_id, problem_id, mastery]):
+        return jsonify({"status": "error"}), 400
+    mastery = int(mastery)
+    today = __import__("datetime").date.today().isoformat()
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO history (student_id, problem_id, date, correct, mastery, category)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (student_id, problem_id, today, 1, mastery, "手動修正"))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
 
 if __name__ == "__main__":
     init_db()

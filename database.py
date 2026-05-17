@@ -735,3 +735,42 @@ def get_suppressed_problems(student_id):
     result = [r["problem_id"] for r in c.fetchall()]
     conn.close()
     return result
+
+
+def calc_new_mastery_v2(student_id, problem_id, score, record_date):
+    """
+    5段階評価スコアから新しい習熟度を計算する。
+    score: 5=完璧, 4=大体合ってる, 3=解き直し必要, 2=復習必要, 1=全く理解なし
+    5,4 → 正答扱い（習熟度+1方向）
+    3   → 現状維持
+    2,1 → 誤答扱い（習熟度-1方向）
+    """
+    conn = get_connection()
+    c = conn.cursor()
+
+    # 現在の習熟度を取得
+    c.execute("""
+        SELECT mastery FROM history
+        WHERE student_id=? AND problem_id=?
+        ORDER BY date DESC LIMIT 1
+    """, (student_id, problem_id))
+    row = c.fetchone()
+    current_mastery = row["mastery"] if row else 1
+
+    if score >= 4:
+        # 正答扱い：通常のSRSロジックで昇格判定
+        conn.close()
+        return calc_new_mastery(student_id, problem_id, 1, record_date)
+    elif score == 3:
+        # 現状維持
+        conn.close()
+        return current_mastery
+    else:
+        # 誤答扱い
+        conn.close()
+        return calc_new_mastery(student_id, problem_id, 0, record_date)
+
+
+def score_to_correct(score):
+    """5段階スコアをcorrect(0/1)に変換する"""
+    return 1 if score >= 4 else 0

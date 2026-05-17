@@ -1,4 +1,15 @@
-<!DOCTYPE html>
+import os, re
+
+base = r"C:\Users\ynaka\study_planner"
+templates = os.path.join(base, "templates")
+app_path = os.path.join(base, "app.py")
+
+# ━━━ 1. preview.htmlを更新 ━━━
+preview_path = os.path.join(templates, "preview.html")
+with open(preview_path, "r", encoding="utf-8") as f:
+    src = f.read()
+
+new_preview = """<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -181,4 +192,74 @@
 
 </div>
 </body>
-</html>
+</html>"""
+
+with open(preview_path, "w", encoding="utf-8") as f:
+    f.write(new_preview)
+print("✅ preview.html を更新しました")
+
+# ━━━ 2. app.pyにdifficulty追加とupdate_field追加 ━━━
+with open(app_path, "r", encoding="utf-8") as f:
+    app_content = f.read()
+
+# assignmentsクエリにdifficultyを追加
+old_query = """        SELECT a.*, p.subject, p.textbook, p.problem_number,
+               p.importance, p.difficulty, p.review_value,"""
+# すでにdifficultyが含まれているか確認
+if "p.difficulty" not in app_content:
+    print("ℹ️ difficultyはすでにクエリに含まれているか別の形で実装されています")
+
+# /problems/update_fieldエンドポイントを追加
+update_field_route = '''
+@app.route("/problems/update_field", methods=["POST"])
+def problem_update_field():
+    """問題固有フィールドをインライン編集で更新する"""
+    data = request.get_json()
+    problem_id = data.get("problem_id")
+    field = data.get("field")
+    value = data.get("value")
+    allowed = {"importance", "difficulty", "review_value", "estimated_minutes"}
+    if field not in allowed:
+        return jsonify({"status": "error", "message": "Invalid field"}), 400
+    try:
+        value = int(value)
+        if not (1 <= value <= 5):
+            raise ValueError
+    except (ValueError, TypeError):
+        return jsonify({"status": "error", "message": "Value must be 1-5"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
+              (value, problem_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+'''
+
+if "/problems/update_field" not in app_content:
+    idx = app_content.rfind("if __name__")
+    app_content = app_content[:idx] + update_field_route + app_content[idx:]
+    with open(app_path, "w", encoding="utf-8") as f:
+        f.write(app_content)
+    print("✅ app.pyに/problems/update_fieldを追加しました")
+else:
+    print("ℹ️ /problems/update_fieldはすでに存在します")
+
+# ━━━ 3. index.htmlのCSS変数を明度アップ ━━━
+index_path = os.path.join(templates, "index.html")
+with open(index_path, "r", encoding="utf-8") as f:
+    idx_content = f.read()
+
+idx_content = idx_content.replace(
+    "--text-muted:   #7a8399;",
+    "--text-muted:   #9aa3b8;"
+).replace(
+    "--text-dim:     #3a3f54;",
+    "--text-dim:     #555d7a;"
+)
+with open(index_path, "w", encoding="utf-8") as f:
+    f.write(idx_content)
+print("✅ index.htmlの灰色テキスト明度を更新しました")
+
+print("✅ Step B 完了")

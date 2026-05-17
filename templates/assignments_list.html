@@ -2,178 +2,376 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>出題予定管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Assignments — Study Planner</title>
   <style>
-    body { font-family: sans-serif; max-width: 1200px; margin: 40px auto; background: #f5f7fa; }
-    h1 { color: #2c3e50; }
-    .filter-box { background: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    .bulk-bar { background: #2c3e50; padding: 12px 24px; border-radius: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 16px; }
-    .bulk-bar span { color: white; font-size: 14px; }
-    .btn-bulk { padding: 8px 24px; background: #27ae60; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; }
-    .btn-bulk:hover { background: #1e8449; }
-    .btn-bulk-del { padding: 8px 24px; background: #e74c3c; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    .btn-bulk-del:hover { background: #c0392b; }
-    select, input[type="date"] { padding: 7px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    th { background: #4472C4; color: white; padding: 8px; white-space: nowrap; }
-    td { padding: 6px 8px; border-bottom: 1px solid #eee; text-align: center; vertical-align: middle; }
-    .cat-予習  { background: #DDEEFF; }
-    .cat-復習  { background: #DDFFDD; }
-    .cat-定着  { background: #FFFADD; }
-    .cat-再定着 { background: #FFE5DD; }
-    .btn-del { padding: 3px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; }
-    .changed { outline: 2px solid #f39c12; }
-    a { color: #4472C4; }
-    .count { color: #555; font-size: 13px; margin-bottom: 8px; }
+    :root {
+      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
+      --border:#252838; --border-light:#2f3347;
+      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
+      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
+    body::after { content:''; position:fixed; inset:0;
+      background-image: linear-gradient(var(--border) 1px,transparent 1px),
+        linear-gradient(90deg,var(--border) 1px,transparent 1px);
+      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
+    .container { max-width:1300px; margin:0 auto; position:relative; z-index:1; }
+    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
+      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
+    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--rose); }
+    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+      color:var(--text-muted); margin-top:4px; }
+    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
+    .page-header-back::before { content:'← '; }
+    .page-header-back:hover { color:var(--text); }
+    .filter-bar { background:var(--surface); border:1px solid var(--border);
+      padding:14px 20px; margin-bottom:12px;
+      display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+    .filter-bar label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--text-muted); margin:0 0 4px 0; display:block; }
+    .filter-bar select { background:var(--surface2); border:1px solid var(--border-light);
+      color:var(--text); padding:8px 12px; font-size:13px; outline:none; min-width:140px; }
+    .bulk-bar { background:var(--surface2); border:1px solid var(--border-light);
+      border-left:2px solid var(--green); padding:10px 20px; margin-bottom:10px;
+      display:flex; align-items:center; gap:14px; }
+    .bulk-label { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--text-muted); }
+    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+      padding:8px 20px; border:none; cursor:pointer; transition:all 0.15s;
+      display:inline-flex; align-items:center; gap:6px; }
+    .btn-success { background:var(--green); color:#0c0d11; }
+    .btn-success:hover { background:#5eddaa; }
+    .btn-danger  { background:var(--red); color:white; padding:4px 10px; font-size:10px; }
+    .btn-danger:hover  { background:#f87171; }
+    /* テーブル */
+    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
+    .data-table th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
+      font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 10px;
+      text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
+    .data-table td { padding:8px 10px; border-bottom:1px solid var(--border);
+      text-align:center; vertical-align:middle; font-family:'Noto Serif JP',serif; }
+    .data-table tr:hover td { background:var(--surface2); }
+    .data-table td.left { text-align:left; }
+    /* カテゴリ行色 */
+    .row-予習  { border-left:2px solid var(--blue); }
+    .row-復習  { border-left:2px solid var(--green); }
+    .row-定着  { border-left:2px solid var(--amber); }
+    .row-再定着 { border-left:2px solid var(--rose); }
+    .changed-row td { box-shadow:inset 0 0 0 1px var(--amber); }
+    /* 編集可能セル（点線枠） */
+    .editable {
+      cursor:pointer; padding:3px 6px; display:inline-block; min-width:24px;
+      border:1px dashed transparent; border-radius:2px; transition:border-color 0.12s, background 0.12s;
+    }
+    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
+    .editable.editing { display:none; }
+    .inline-input { background:var(--surface2); border:1px solid var(--blue);
+      color:var(--text); padding:3px 6px; font-size:12px; outline:none; width:52px; }
+    .inline-select { background:var(--surface2); border:1px solid var(--blue);
+      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
+    /* セレクト（カテゴリ・出題日） */
+    select.edit-field, input.edit-field[type="date"] {
+      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
+      padding:5px 8px; font-size:12px; outline:none; transition:border-color 0.15s;
+    }
+    select.edit-field:focus, input.edit-field[type="date"]:focus { border-color:var(--blue); }
+    /* 習熟度色 */
+    .mastery-1 { color:var(--rose); } .mastery-2 { color:var(--amber); } .mastery-3 { color:var(--green); }
+    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
+    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    /* トースト通知 */
+    #toast {
+      position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:var(--surface2); border:1px solid var(--border-light);
+      color:var(--text); font-family:'DM Mono',monospace; font-size:11px;
+      letter-spacing:1px; padding:12px 24px; opacity:0;
+      transition:all 0.3s ease; pointer-events:none; z-index:9999;
+    }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-left:2px solid var(--green); color:var(--green); }
+    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
   </style>
 </head>
 <body>
-  <h1>④ 出題予定管理</h1>
+<div class="container">
 
-  <div class="filter-box">
-    <form method="GET" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">04 / Records</div>
+      <div class="page-title">Assignments</div>
+      <div class="page-title-ja">出題予定管理</div>
+    </div>
+    <a class="page-header-back" href="/">TOP</a>
+  </div>
+
+  <div class="filter-bar fade-in">
+    <form method="GET" style="display:contents;">
       <div>
-        <label style="font-weight:bold;font-size:13px;display:block;margin-bottom:4px;">生徒</label>
+        <label>Student</label>
         <select name="student_id" onchange="this.form.submit()">
-          {% for s in students %}
+          {%- for s in students %}
           <option value="{{ s.student_id }}"
-            {% if s.student_id == selected_student %}selected{% endif %}>
+            {%- if s.student_id == selected_student %} selected{%- endif %}>
             {{ s.name }}
           </option>
-          {% endfor %}
+          {%- endfor %}
         </select>
       </div>
     </form>
+    <span class="meta-text" style="margin-left:auto;">{{ assignments|length }} items</span>
   </div>
 
-  <!-- 一括更新バー -->
-  <div class="bulk-bar">
-    <span>一括操作：</span>
-    <button class="btn-bulk" onclick="bulkUpdate()">✅ 変更した行をまとめて更新</button>
-    <span id="change-count" style="color:#f1c40f;font-size:13px;"></span>
+  <div class="bulk-bar fade-in">
+    <span class="bulk-label">Bulk Edit</span>
+    <span class="meta-text">カテゴリ・出題日を変更後に保存</span>
+    <button class="btn btn-success" onclick="bulkUpdate()">✓ Apply Changes</button>
+    <span id="change-count" class="meta-text"></span>
   </div>
 
-  <p class="count">{{ assignments | length }} 件</p>
-
-  <table id="assignments-table">
-    <tr>
-      <th><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
-      <th>教科</th><th>テキスト名</th><th>問題番号</th>
-      <th>重要度</th><th>復習価値</th><th>習熟度</th>
-      <th>出題区分</th><th>出題日</th><th>削除</th>
-    </tr>
-    {% for a in assignments %}
-    <tr id="row-{{ a.assignment_id }}" class="cat-{{ a.category }}">
+  <div class="fade-in" style="overflow-x:auto;">
+  <table class="data-table" id="assignments-table">
+    <thead>
+      <tr>
+        <th style="width:32px;"><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
+        <th>教科</th>
+        <th>テキスト</th>
+        <th>問題番号</th>
+        <th>Imp</th>
+        <th>Dif</th>
+        <th>RV</th>
+        <th>習熟度</th>
+        <th>カテゴリ</th>
+        <th>出題日</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {%- for a in assignments %}
+    <tr id="row-{{ a.assignment_id }}" class="row-{{ a.category }}">
       <td><input type="checkbox" class="row-check" value="{{ a.assignment_id }}"></td>
-      <td>{{ a.subject }}</td>
-      <td style="text-align:left;font-size:12px;">{{ a.textbook }}</td>
-      <td style="font-size:12px;">{{ a.problem_number }}</td>
-      <td>{{ a.importance }}</td>
-      <td>{{ a.review_value }}</td>
-      <td>{{ "★" * (a.mastery or 1) }}</td>
+      <td class="meta-text">{{ a.subject }}</td>
+      <td class="left" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+        {{ a.textbook }}
+      </td>
+      <td class="left" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+        {{ a.problem_number }}
+      </td>
+      <!-- 問題固有：ダブルクリックで数値編集 -->
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="importance">
+        <span class="editable" ondblclick="startNumEdit(this)">{{ a.importance }}</span>
+      </td>
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="difficulty">
+        <span class="editable" ondblclick="startNumEdit(this)">{{ a.difficulty }}</span>
+      </td>
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="review_value">
+        <span class="editable" ondblclick="startNumEdit(this)">{{ a.review_value }}</span>
+      </td>
+      <!-- 習熟度：ダブルクリックでセレクト編集 -->
+      <td class="mastery-cell"
+        data-student="{{ selected_student }}"
+        data-problem="{{ a.problem_id }}">
+        {%- set m = a.mastery or 1 %}
+        <span class="editable mastery-{{ m }}" ondblclick="startMasteryEdit(this, {{ m }})">
+          {{ '★' * m }}
+        </span>
+      </td>
+      <!-- 生徒固有：セレクト＋日付 -->
       <td>
-        <select class="edit-field" data-id="{{ a.assignment_id }}" data-field="category"
+        <select class="edit-field inline-select"
+          data-id="{{ a.assignment_id }}" data-field="category"
+          style="width:76px;"
           onchange="markChanged(this, {{ a.assignment_id }})">
-          {% for cat in ["予習","復習","定着","再定着"] %}
-          <option value="{{ cat }}" {% if cat == a.category %}selected{% endif %}>{{ cat }}</option>
-          {% endfor %}
+          {%- for cat in ['予習','復習','定着','再定着'] %}
+          <option value="{{ cat }}" {%- if cat == a.category %} selected{%- endif %}>{{ cat }}</option>
+          {%- endfor %}
         </select>
       </td>
       <td>
-        <input type="date" class="edit-field" data-id="{{ a.assignment_id }}" data-field="scheduled_date"
+        <input type="date" class="edit-field"
+          data-id="{{ a.assignment_id }}" data-field="scheduled_date"
           value="{{ '' if a.scheduled_date == '2099-12-31' else a.scheduled_date }}"
+          style="width:130px;"
           onchange="markChanged(this, {{ a.assignment_id }})">
       </td>
       <td>
-        <button class="btn-del" onclick="deleteAssignment({{ a.assignment_id }}, this)">削除</button>
+        <button class="btn btn-danger"
+          onclick="deleteAssignment({{ a.assignment_id }}, this)">×</button>
       </td>
     </tr>
-    {% endfor %}
+    {%- endfor %}
+    </tbody>
   </table>
+  </div>
 
-  <p><a href="/">← トップに戻る</a></p>
+  <div id="toast"></div>
 
-  <script>
-    // 変更追跡
-    const changedRows = new Map(); // assignment_id -> {category, scheduled_date}
+</div>
 
-    function markChanged(el, assignmentId) {
-      const row = document.getElementById('row-' + assignmentId);
-      const fields = row.querySelectorAll('.edit-field');
-      const data = {};
-      fields.forEach(f => { data[f.dataset.field] = f.value; });
-      changedRows.set(assignmentId, data);
-      row.style.boxShadow = 'inset 0 0 0 2px #f39c12';
-      document.getElementById('change-count').textContent =
-        changedRows.size + '行が変更済み（未保存）';
-    }
+<script>
+// ── トースト通知 ──
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
 
-    async function bulkUpdate() {
-      if (changedRows.size === 0) {
-        alert('変更された行がありません。');
-        return;
-      }
-      const updates = [];
-      changedRows.forEach((data, id) => {
-        updates.push({ assignment_id: id, ...data });
+// ── 生徒固有：カテゴリ・出題日の一括更新 ──
+const changedRows = new Map();
+
+function markChanged(el, id) {
+  const row = document.getElementById('row-' + id);
+  const fields = row.querySelectorAll('.edit-field');
+  const data = {};
+  fields.forEach(f => { data[f.dataset.field] = f.value; });
+  changedRows.set(id, data);
+  row.classList.add('changed-row');
+  document.getElementById('change-count').textContent =
+    changedRows.size + ' row(s) pending';
+}
+
+async function bulkUpdate() {
+  if (changedRows.size === 0) {
+    showToast('No changes to apply.', 'info');
+    return;
+  }
+  const updates = [];
+  changedRows.forEach((data, id) => updates.push({ assignment_id: id, ...data }));
+  const res = await fetch('/assignments/bulk_update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: '{{ selected_student }}', updates })
+  });
+  if (res.ok) {
+    changedRows.forEach((data, id) => {
+      const row = document.getElementById('row-' + id);
+      if (row) { row.classList.remove('changed-row'); row.className = 'row-' + data.category; }
+    });
+    changedRows.clear();
+    document.getElementById('change-count').textContent = '';
+    showToast('✓ Changes saved', 'success');
+  } else { showToast('Error saving changes.', 'warn'); }
+}
+
+// ── 問題固有：数値ダブルクリック編集（Imp/Dif/RV）──
+function startNumEdit(span) {
+  const cell = span.closest('.editable-cell');
+  const field = cell.dataset.field;
+  const problemId = cell.dataset.problem;
+  const current = span.textContent.trim();
+  span.classList.add('editing');
+
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = 1; input.max = 5;
+  input.value = current; input.className = 'inline-input';
+  cell.appendChild(input);
+  input.focus(); input.select();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return; done = true;
+    if (save && input.value !== current) {
+      const res = await fetch('/problems/update_field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem_id: problemId, field: field, value: input.value })
       });
-
-      try {
-        const res = await fetch('/assignments/bulk_update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            student_id: '{{ selected_student }}',
-            updates: updates
-          })
-        });
-        if (res.ok) {
-          // 行の色を更新してリセット
-          changedRows.forEach((data, id) => {
-            const row = document.getElementById('row-' + id);
-            if (row) {
-              row.style.boxShadow = '';
-              row.className = 'cat-' + data.category;
-              // カテゴリ選択を更新
-              const sel = row.querySelector('select.edit-field');
-              if (sel) sel.value = data.category;
-            }
-          });
-          changedRows.clear();
-          document.getElementById('change-count').textContent = '✅ 更新完了';
-          setTimeout(() => {
-            document.getElementById('change-count').textContent = '';
-          }, 3000);
-        } else {
-          alert('更新に失敗しました。');
-        }
-      } catch(e) {
-        alert('エラー: ' + e);
-      }
+      if (res.ok) {
+        span.textContent = input.value;
+        showToast('✓ ' + field + ' updated', 'success');
+      } else { showToast('Update failed.', 'warn'); }
     }
+    input.remove();
+    span.classList.remove('editing');
+  };
 
-    function toggleAll(cb) {
-      document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
-    }
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+}
 
-    async function deleteAssignment(assignmentId, btn) {
-      if (!confirm('この出題予定を削除しますか？')) return;
-      try {
-        const res = await fetch('/assignments/delete/' + assignmentId, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'student_id={{ selected_student }}'
-        });
-        if (res.ok || res.redirected) {
-          const row = document.getElementById('row-' + assignmentId);
-          if (row) row.remove();
-        } else {
-          alert('削除に失敗しました。');
-        }
-      } catch(e) {
-        alert('削除に失敗しました: ' + e);
-      }
+// ── 習熟度：ダブルクリックでセレクト編集 ──
+const STARS = ['', '★', '★★', '★★★'];
+
+function startMasteryEdit(span, current) {
+  const cell = span.closest('.mastery-cell');
+  const studentId = cell.dataset.student;
+  const problemId = cell.dataset.problem;
+  span.classList.add('editing');
+
+  const sel = document.createElement('select');
+  sel.className = 'inline-select';
+  sel.style.width = '76px';
+  [1, 2, 3].forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = STARS[m];
+    if (m === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  cell.appendChild(sel);
+  sel.focus();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return; done = true;
+    const newVal = parseInt(sel.value);
+    if (save && newVal !== current) {
+      const res = await fetch('/mastery/single_update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: studentId, problem_id: problemId, mastery: newVal })
+      });
+      if (res.ok) {
+        span.textContent = STARS[newVal];
+        span.className = 'editable mastery-' + newVal;
+        span.ondblclick = () => startMasteryEdit(span, newVal);
+        showToast('✓ 習熟度を更新しました', 'success');
+      } else { showToast('Update failed.', 'warn'); }
     }
-  </script>
+    sel.remove();
+    span.classList.remove('editing');
+  };
+
+  sel.addEventListener('change', () => setTimeout(() => finish(true), 50));
+  sel.addEventListener('blur',   () => setTimeout(() => finish(true), 100));
+  sel.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+}
+
+function toggleAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+}
+
+async function deleteAssignment(id, btn) {
+  if (!confirm('Delete this assignment?')) return;
+  const res = await fetch('/assignments/delete/' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'student_id={{ selected_student }}'
+  });
+  if (res.ok || res.redirected) {
+    document.getElementById('row-' + id)?.remove();
+    showToast('Deleted.', 'success');
+  } else { showToast('Delete failed.', 'warn'); }
+}
+</script>
 </body>
 </html>

@@ -1,6 +1,9 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
+import os
+
+base = r"C:\Users\ynaka\study_planner"
+templates = os.path.join(base, "templates")
+
+COMMON_HEAD = """\
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
@@ -132,19 +135,234 @@
     .row-復習  { border-left:2px solid var(--green); }
     .row-定着  { border-left:2px solid var(--amber); }
     .row-再定着 { border-left:2px solid var(--rose); }
-  </style>
+  </style>"""
+
+
+def page_header(num, en, ja, color="var(--text)"):
+    return (
+        '<div class="container">\n'
+        '  <div class="page-header fade-in">\n'
+        '    <div>\n'
+        '      <div class="page-label">' + num + '</div>\n'
+        '      <div class="page-title" style="color:' + color + ';">' + en + '</div>\n'
+        '      <div class="page-title-ja">' + ja + '</div>\n'
+        '    </div>\n'
+        '    <a class="page-header-back" href="/">TOP</a>\n'
+        '  </div>'
+    )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 1. assignments_list.html
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+assignments_html = """\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+""" + COMMON_HEAD + """
+  <title>Assignments — Study Planner</title>
+</head>
+<body>
+""" + page_header("04 / Records", "Assignments", "出題予定管理", "var(--rose)") + """
+
+  <div class="filter-bar fade-in">
+    <form method="GET" style="display:contents;">
+      <div>
+        <label>Student</label>
+        <select name="student_id" onchange="this.form.submit()" style="min-width:140px;">
+          {%- for s in students %}
+          <option value="{{ s.student_id }}"
+            {%- if s.student_id == selected_student %} selected{%- endif %}>
+            {{ s.name }}
+          </option>
+          {%- endfor %}
+        </select>
+      </div>
+    </form>
+    <span class="meta-text" style="margin-left:auto;">{{ assignments|length }} items</span>
+  </div>
+
+  <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);
+    margin-bottom:8px;letter-spacing:0.5px;">
+    ※ Imp・Dif・RV はセルをダブルクリックで編集（問題マスタに反映）
+  </div>
+
+  <div class="bulk-bar fade-in">
+    <span class="bulk-label">Bulk Edit</span>
+    <span class="meta-text">カテゴリ・出題日を変更後にまとめて保存</span>
+    <button class="btn btn-success btn-sm" onclick="bulkUpdate()">✓ Apply Changes</button>
+    <span id="change-count" class="meta-text"></span>
+  </div>
+
+  <div class="fade-in" style="overflow-x:auto;">
+  <table class="data-table" id="assignments-table">
+    <thead>
+      <tr>
+        <th style="width:32px;"><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
+        <th>教科</th>
+        <th>テキスト</th>
+        <th>問題番号</th>
+        <th title="重要度 ダブルクリックで編集">Imp ✎</th>
+        <th title="難易度 ダブルクリックで編集">Dif ✎</th>
+        <th title="復習価値 ダブルクリックで編集">RV ✎</th>
+        <th>習熟度</th>
+        <th>カテゴリ</th>
+        <th>出題日</th>
+        <th>削除</th>
+      </tr>
+    </thead>
+    <tbody>
+    {%- for a in assignments %}
+    <tr id="row-{{ a.assignment_id }}" class="row-{{ a.category }}">
+      <td><input type="checkbox" class="row-check" value="{{ a.assignment_id }}"></td>
+      <td class="meta-text">{{ a.subject }}</td>
+      <td class="left" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+        {{ a.textbook }}
+      </td>
+      <td class="left" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+        {{ a.problem_number }}
+      </td>
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="importance">
+        <span class="editable" ondblclick="startEdit(this)">{{ a.importance }}</span>
+      </td>
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="difficulty">
+        <span class="editable" ondblclick="startEdit(this)">{{ a.difficulty }}</span>
+      </td>
+      <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="review_value">
+        <span class="editable" ondblclick="startEdit(this)">{{ a.review_value }}</span>
+      </td>
+      <td>
+        {%- set m = a.mastery or 1 %}
+        <span class="mastery-{{ m }}">{{ '★' * m }}</span>
+      </td>
+      <td>
+        <select class="edit-field inline-select"
+          data-id="{{ a.assignment_id }}" data-field="category"
+          style="width:76px;"
+          onchange="markChanged(this, {{ a.assignment_id }})">
+          {%- for cat in ['予習','復習','定着','再定着'] %}
+          <option value="{{ cat }}" {%- if cat == a.category %} selected{%- endif %}>{{ cat }}</option>
+          {%- endfor %}
+        </select>
+      </td>
+      <td>
+        <input type="date" class="edit-field"
+          data-id="{{ a.assignment_id }}" data-field="scheduled_date"
+          value="{{ '' if a.scheduled_date == '2099-12-31' else a.scheduled_date }}"
+          style="width:130px;"
+          onchange="markChanged(this, {{ a.assignment_id }})">
+      </td>
+      <td>
+        <button class="btn btn-danger btn-sm"
+          onclick="deleteAssignment({{ a.assignment_id }}, this)">×</button>
+      </td>
+    </tr>
+    {%- endfor %}
+    </tbody>
+  </table>
+  </div>
+
+<script>
+const changedRows = new Map();
+
+function markChanged(el, id) {
+  const row = document.getElementById('row-' + id);
+  const fields = row.querySelectorAll('.edit-field');
+  const data = {};
+  fields.forEach(f => { data[f.dataset.field] = f.value; });
+  changedRows.set(id, data);
+  row.classList.add('changed-row');
+  document.getElementById('change-count').textContent =
+    changedRows.size + ' row(s) pending';
+}
+
+async function bulkUpdate() {
+  if (changedRows.size === 0) { alert('No changes to apply.'); return; }
+  const updates = [];
+  changedRows.forEach((data, id) => updates.push({ assignment_id: id, ...data }));
+  const res = await fetch('/assignments/bulk_update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: '{{ selected_student }}', updates })
+  });
+  if (res.ok) {
+    changedRows.forEach((data, id) => {
+      const row = document.getElementById('row-' + id);
+      if (row) { row.classList.remove('changed-row'); row.className = 'row-' + data.category; }
+    });
+    changedRows.clear();
+    document.getElementById('change-count').textContent = '✓ Saved';
+    setTimeout(() => document.getElementById('change-count').textContent = '', 3000);
+  } else { alert('Error saving changes.'); }
+}
+
+function startEdit(span) {
+  const cell = span.closest('.editable-cell');
+  const field = cell.dataset.field;
+  const problemId = cell.dataset.problem;
+  const current = span.textContent.trim();
+  span.classList.add('editing');
+
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = 1; input.max = 5;
+  input.value = current;
+  input.className = 'inline-input';
+  input.style.width = '52px';
+  cell.appendChild(input);
+  input.focus(); input.select();
+
+  const finish = async (save) => {
+    if (save && input.value !== current) {
+      const res = await fetch('/problems/update_field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem_id: problemId, field: field, value: input.value })
+      });
+      if (res.ok) { span.textContent = input.value; }
+      else { alert('Update failed.'); }
+    }
+    input.remove();
+    span.classList.remove('editing');
+  };
+
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+}
+
+function toggleAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+}
+
+async function deleteAssignment(id, btn) {
+  if (!confirm('Delete this assignment?')) return;
+  const res = await fetch('/assignments/delete/' + id, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'student_id={{ selected_student }}'
+  });
+  if (res.ok || res.redirected) { document.getElementById('row-' + id)?.remove(); }
+  else { alert('Delete failed.'); }
+}
+</script>
+</div>
+</body>
+</html>"""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 2. record_list.html
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+record_list_html = """\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+""" + COMMON_HEAD + """
   <title>Edit Records — Study Planner</title>
 </head>
 <body>
-<div class="container">
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">04 / Records</div>
-      <div class="page-title" style="color:var(--rose);">Edit Records</div>
-      <div class="page-title-ja">授業記録修正・習熟度変更</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+""" + page_header("04 / Records", "Edit Records", "授業記録修正・習熟度変更", "var(--rose)") + """
 
   <div class="filter-bar fade-in">
     <form method="GET" style="display:contents;">
@@ -195,17 +413,10 @@
         {{ r.problem_number }}
       </td>
       <td>
-        {%- set sc = r.score if r.score else (5 if r.correct == 1 else 1) %}
-        {%- if sc == 5 %}
-        <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">5 Perfect</span>
-        {%- elif sc == 4 %}
-        <span style="color:var(--blue);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">4 Good</span>
-        {%- elif sc == 3 %}
-        <span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Review</span>
-        {%- elif sc == 2 %}
-        <span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">2 Retry</span>
+        {%- if r.correct == 1 %}
+        <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:14px;">✓</span>
         {%- else %}
-        <span style="color:var(--red);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">1 Failed</span>
+        <span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:14px;">✗</span>
         {%- endif %}
       </td>
       <td class="mastery-cell" data-id="{{ r.history_id }}" data-mastery="{{ r.mastery }}">
@@ -290,4 +501,17 @@ async function bulkUpdateMastery() {
 </script>
 </div>
 </body>
-</html>
+</html>"""
+
+# ━━━ ファイル書き出し ━━━
+files = {
+    "assignments_list.html": assignments_html,
+    "record_list.html":      record_list_html,
+}
+for fname, content in files.items():
+    path = os.path.join(templates, fname)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"✅ {fname} を更新しました")
+
+print("✅ Step A 完了")
