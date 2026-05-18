@@ -1,3 +1,11 @@
+import os
+
+base = r"C:\Users\ynaka\study_planner"
+app_path = os.path.join(base, "app.py")
+templates = os.path.join(base, "templates")
+
+# ─── 1. index.htmlを更新（メニュー構成変更） ─────────────
+index_html = """\
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,7 +18,7 @@
       --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b;
       --border:#252838; --border-light:#2f3347;
       --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --red-main:#f87171; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292;
       --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
       --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
     }
@@ -84,34 +92,26 @@
     .menu-arrow { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-dim);
       flex-shrink:0; transition:color 0.16s,transform 0.16s; }
     .menu-item:hover .menu-arrow { transform:translateX(3px); }
-    /* Master Data = 赤 */
-    .master   .cat-en    { color:#f87171; }
-    .master   .menu-item { border-left-color:#f87171; }
-    .master   .menu-item:hover { border-color:rgba(248,113,113,0.3);
-      border-left-color:#f87171; box-shadow:0 2px 12px rgba(248,113,113,0.08); }
-    .master   .menu-item:hover .menu-arrow { color:#f87171; }
-    .master   .menu-icon { color:#f87171; background:rgba(248,113,113,0.10); }
-    /* Students = 青 */
-    .students .cat-en    { color:#5b8ff9; }
-    .students .menu-item { border-left-color:#5b8ff9; }
-    .students .menu-item:hover { border-color:rgba(91,143,249,0.3);
-      border-left-color:#5b8ff9; box-shadow:0 2px 12px rgba(91,143,249,0.08); }
-    .students .menu-item:hover .menu-arrow { color:#5b8ff9; }
-    .students .menu-icon { color:#5b8ff9; background:rgba(91,143,249,0.10); }
-    /* Plan = 緑 */
-    .plan     .cat-en    { color:#3ecf8e; }
-    .plan     .menu-item { border-left-color:#3ecf8e; }
-    .plan     .menu-item:hover { border-color:rgba(62,207,142,0.3);
-      border-left-color:#3ecf8e; box-shadow:0 2px 12px rgba(62,207,142,0.08); }
-    .plan     .menu-item:hover .menu-arrow { color:#3ecf8e; }
-    .plan     .menu-icon { color:#3ecf8e; background:rgba(62,207,142,0.10); }
-    /* Records = オレンジ */
-    .record   .cat-en    { color:#f5a623; }
-    .record   .menu-item { border-left-color:#f5a623; }
-    .record   .menu-item:hover { border-color:rgba(245,166,35,0.3);
-      border-left-color:#f5a623; box-shadow:0 2px 12px rgba(245,166,35,0.08); }
-    .record   .menu-item:hover .menu-arrow { color:#f5a623; }
-    .record   .menu-icon { color:#f5a623; background:rgba(245,166,35,0.10); }
+    .master   .cat-en { color:var(--blue); }
+    .master   .menu-item { border-left-color:var(--blue); }
+    .master   .menu-item:hover { border-color:rgba(91,143,249,0.3); border-left-color:var(--blue); box-shadow:0 2px 12px rgba(91,143,249,0.08); }
+    .master   .menu-item:hover .menu-arrow { color:var(--blue); }
+    .master   .menu-icon { color:var(--blue); background:var(--blue-bg); }
+    .students .cat-en { color:var(--green); }
+    .students .menu-item { border-left-color:var(--green); }
+    .students .menu-item:hover { border-color:rgba(62,207,142,0.3); border-left-color:var(--green); box-shadow:0 2px 12px rgba(62,207,142,0.08); }
+    .students .menu-item:hover .menu-arrow { color:var(--green); }
+    .students .menu-icon { color:var(--green); background:var(--green-bg); }
+    .plan     .cat-en { color:var(--amber); }
+    .plan     .menu-item { border-left-color:var(--amber); }
+    .plan     .menu-item:hover { border-color:rgba(245,166,35,0.3); border-left-color:var(--amber); box-shadow:0 2px 12px rgba(245,166,35,0.08); }
+    .plan     .menu-item:hover .menu-arrow { color:var(--amber); }
+    .plan     .menu-icon { color:var(--amber); background:var(--amber-bg); }
+    .record   .cat-en { color:var(--rose); }
+    .record   .menu-item { border-left-color:var(--rose); }
+    .record   .menu-item:hover { border-color:rgba(240,98,146,0.3); border-left-color:var(--rose); box-shadow:0 2px 12px rgba(240,98,146,0.08); }
+    .record   .menu-item:hover .menu-arrow { color:var(--rose); }
+    .record   .menu-icon { color:var(--rose); background:var(--rose-bg); }
     .footer { margin-top:64px; padding-top:20px; border-top:1px solid var(--border);
       display:flex; justify-content:space-between; align-items:center; }
     .footer p { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
@@ -325,4 +325,10 @@
     days[d.getDay()];
 </script>
 </body>
-</html>
+</html>"""
+
+with open(os.path.join(templates, "index.html"), "w", encoding="utf-8") as f:
+    f.write(index_html)
+print("✅ index.htmlを更新しました（02 Studentsに統合）")
+
+print("✅ Step C 完了")

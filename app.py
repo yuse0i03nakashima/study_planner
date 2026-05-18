@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, send_file, jsonify
+from flask import Flask, render_template, request, redirect, send_file, jsonify, flash, url_for, get_flashed_messages
 from database import (init_db, get_connection, calc_new_mastery,
                       update_assignments_after_record, get_plan, get_schedule,
                       save_plan_history, get_plan_histories)
@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import os
 
 app = Flask(__name__)
+app.secret_key = "study-planner-secret-2024"
 
 
 @app.route("/")
@@ -20,57 +21,107 @@ def index():
 def problems():
     conn = get_connection()
     c = conn.cursor()
+
     if request.method == "POST":
+        # textbook_idからsubject・textbook名を取得
         textbook_id = request.form.get("textbook_id")
-        # textbook_idからsubjectとtextbook名を取得
-        conn2 = get_connection()
-        c2 = conn2.cursor()
         if textbook_id:
-            c2.execute("SELECT subject, name FROM textbooks WHERE textbook_id=?",
-                       (textbook_id,))
-            tb_row = c2.fetchone()
-            subject = tb_row["subject"] if tb_row else request.form.get("subject", "")
-            textbook = tb_row["name"] if tb_row else ""
+            c.execute("SELECT subject, name FROM textbooks WHERE textbook_id=?",
+                      (textbook_id,))
+            tb_row = c.fetchone()
+            subject  = tb_row["subject"] if tb_row else request.form.get("subject", "")
+            textbook = tb_row["name"]    if tb_row else ""
         else:
-            subject = request.form.get("subject", "")
+            subject  = request.form.get("subject", "")
             textbook = request.form.get("textbook", "")
-        conn2.close()
-        problem_number = request.form["problem_number"]
-        importance = int(request.form["importance"])
-        difficulty = int(request.form["difficulty"])
-        review_value = int(request.form["review_value"])
-        estimated_minutes = int(request.form["estimated_minutes"])
-        instruction = request.form.get("instruction", "")
+
         c.execute("""
             INSERT INTO problems
-            (subject, textbook, problem_number, importance, difficulty,
-             review_value, estimated_minutes, instruction, type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (subject, textbook, problem_number, importance, difficulty,
-              review_value, estimated_minutes, instruction, "標準"))
+            (subject, textbook, textbook_id, problem_number,
+             importance, difficulty, review_value,
+             estimated_minutes, instruction, type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            subject, textbook, textbook_id,
+            request.form["problem_number"],
+            request.form["importance"],
+            request.form["difficulty"],
+            request.form["review_value"],
+            request.form["estimated_minutes"],
+            request.form.get("instruction", ""),
+            "標準"
+        ))
         conn.commit()
         problem_id = c.lastrowid
-        student_ids = request.form.getlist("student_ids")
+
+        # 生徒×出題予定の登録
+        from database import get_auto_next_class_date
+        student_ids    = request.form.getlist("student_ids")
         scheduled_date = request.form.get("scheduled_date", "").strip()
-        category = request.form.get("category", "予習")
-        if scheduled_date and student_ids:
-            for sid in student_ids:
-                c.execute("""
-                    INSERT INTO assignments
-                    (student_id, problem_id, scheduled_date, category)
-                    VALUES (?, ?, ?, ?)
-                """, (sid, problem_id, scheduled_date, category))
+        category       = request.form.get("category", "予習")
+
+        for sid in student_ids:
+            # scheduled_dateが未指定なら自動計算
+            if not scheduled_date:
+                auto_date = get_auto_next_class_date(sid, subject)
+                effective_date = auto_date if auto_date else "2099-12-31"
+            else:
+                effective_date = scheduled_date
+            # student_textbooksに紐づけ
+            c.execute("""
+                INSERT OR IGNORE INTO student_textbooks (student_id, textbook_id)
+                VALUES (?, ?)
+            """, (sid, textbook_id))
+            # assignmentsに登録
+            c.execute("""
+                INSERT INTO assignments
+                (student_id, problem_id, scheduled_date, category)
+                VALUES (?, ?, ?, ?)
+            """, (sid, problem_id, effective_date, category))
+
         conn.commit()
         conn.close()
         return redirect("/problems")
 
-    c.execute("SELECT * FROM problems ORDER BY problem_id DESC LIMIT 50")
-    problems = c.fetchall()
+    # GET
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
-    conn.close()
-    return render_template("problems.html", problems=problems, students=students)
 
+    c.execute("""
+        SELECT p.problem_id, p.subject, p.textbook, p.problem_number,
+               p.importance, p.difficulty, p.review_value,
+               p.estimated_minutes, p.instruction
+        FROM problems p
+        ORDER BY p.problem_id DESC LIMIT 50
+    """)
+    probs = c.fetchall()
+
+    # テキスト一覧（教科でフィルタできるようにdata-subjectを付与）
+    c.execute("""
+        SELECT t.textbook_id, t.name, t.subject,
+               s.name as series_name
+        FROM textbooks t
+        LEFT JOIN series s ON t.series_id = s.series_id
+        ORDER BY t.subject, s.name, t.name
+    """)
+    textbooks_list = c.fetchall()
+
+    # 教科一覧（studentsのsubjectsから生成）
+    c.execute("SELECT DISTINCT subjects FROM students ORDER BY subjects")
+    all_subjects = []
+    for row in c.fetchall():
+        for subj in row["subjects"].split(","):
+            s = subj.strip()
+            if s and s not in all_subjects:
+                all_subjects.append(s)
+    all_subjects = sorted(all_subjects)
+
+    conn.close()
+    return render_template("problems.html",
+                           students=students,
+                           problems=probs,
+                           textbooks=textbooks_list,
+                           all_subjects=all_subjects)
 
 @app.route("/problems/edit/<int:problem_id>", methods=["GET", "POST"])
 def problem_edit(problem_id):
@@ -269,44 +320,10 @@ def record_delete(history_id):
 def students():
     conn = get_connection()
     c = conn.cursor()
-    if request.method == "POST":
-        action = request.form.get("action")
-        if action == "add":
-            student_id = request.form["student_id"]
-            name = request.form["name"]
-            subjects = request.form["subjects"]
-            c.execute("""
-                INSERT OR IGNORE INTO students (student_id, name, subjects)
-                VALUES (?, ?, ?)
-            """, (student_id, name, subjects))
-        elif action == "edit":
-            student_id = request.form["student_id"]
-            name = request.form["name"]
-            subjects = request.form["subjects"]
-            plan_mode = request.form.get("plan_mode", "all")
-            c.execute("""
-                UPDATE students SET name=?, subjects=?, plan_mode=?
-                WHERE student_id=?
-            """, (name, subjects, plan_mode, student_id))
-        elif action == "delete":
-            student_id = request.form["student_id"]
-            c.execute("DELETE FROM assignments WHERE student_id=?", (student_id,))
-            c.execute("DELETE FROM history WHERE student_id=?", (student_id,))
-            c.execute("DELETE FROM schedule_base WHERE student_id=?", (student_id,))
-            c.execute("DELETE FROM schedule_override WHERE student_id=?", (student_id,))
-            c.execute("DELETE FROM plan_history WHERE student_id=?", (student_id,))
-            c.execute("DELETE FROM students WHERE student_id=?", (student_id,))
-        conn.commit()
-        conn.close()
-        return redirect("/students")
-
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
     conn.close()
     return render_template("students.html", students=students)
-
-
-# ─── 計画表出力・プレビュー ────────────────────────────
 
 @app.route("/export", methods=["GET", "POST"])
 def export():
@@ -400,46 +417,32 @@ def preview():
 def schedule():
     conn = get_connection()
     c = conn.cursor()
+
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        student_id = request.form["student_id"]
-        if action == "save_base":
-            for dow in range(7):
-                minutes = int(request.form.get(f"dow_{dow}", 0))
-                c.execute("""
-                    INSERT INTO schedule_base (student_id, dow, available_minutes)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(student_id, dow) DO UPDATE SET available_minutes = ?
-                """, (student_id, dow, minutes, minutes))
-            conn.commit()
-        elif action == "save_override":
-            date_str = request.form["override_date"]
-            minutes = int(request.form.get("override_minutes", 0))
-            c.execute("""
-                INSERT INTO schedule_override (student_id, date, available_minutes)
-                VALUES (?, ?, ?)
-                ON CONFLICT(student_id, date) DO UPDATE SET available_minutes = ?
-            """, (student_id, date_str, minutes, minutes))
-            conn.commit()
+    if not students:
         conn.close()
-        return redirect("/schedule")
+        return render_template("schedule.html", students=[],
+                               selected_student="", base_schedule={}, overrides=[])
 
-    selected_student = request.args.get("student_id",
-                        students[0]["student_id"] if students else None)
-    base_schedule = {}
-    if selected_student:
-        c.execute("""
-            SELECT dow, available_minutes FROM schedule_base WHERE student_id=?
-        """, (selected_student,))
-        base_schedule = {row["dow"]: row["available_minutes"] for row in c.fetchall()}
+    selected_student = request.args.get("student_id") or                        students[0]["student_id"]
+
+    # ベーススケジュール: available_minutesカラム
+    c.execute("""SELECT dow, available_minutes FROM schedule_base
+                 WHERE student_id=?""", (selected_student,))
+    base_schedule = {row["dow"]: row["available_minutes"] for row in c.fetchall()}
+
+    # オーバーライド
+    c.execute("""SELECT date, available_minutes FROM schedule_override
+                 WHERE student_id=? ORDER BY date""", (selected_student,))
+    overrides = c.fetchall()
+
     conn.close()
-    return render_template("schedule.html", students=students,
+    return render_template("schedule.html",
+                           students=students,
                            selected_student=selected_student,
-                           base_schedule=base_schedule)
-
+                           base_schedule=base_schedule,
+                           overrides=overrides)
 
 @app.route("/history")
 def history():
@@ -546,85 +549,36 @@ def problems_list():
 def class_schedule():
     conn = get_connection()
     c = conn.cursor()
+
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
 
-    if request.method == "POST":
-        action = request.form.get("action")
-        student_id = request.form["student_id"]
-        subject = request.form["subject"]
+    # schedule_map: {student_id: {subject: {dow: bool}}}
+    # class_schedule_baseは (student_id, subject, dow) の行ごと登録
+    schedule_map = {}
+    c.execute("SELECT student_id, subject, dow FROM class_schedule_base")
+    for row in c.fetchall():
+        sid  = row["student_id"]
+        subj = row["subject"]
+        dow  = row["dow"]
+        if sid  not in schedule_map: schedule_map[sid]  = {}
+        if subj not in schedule_map[sid]: schedule_map[sid][subj] = {}
+        schedule_map[sid][subj][dow] = True
 
-        if action == "save_base":
-            # 既存を削除して再登録
-            c.execute("DELETE FROM class_schedule_base "
-                      "WHERE student_id=? AND subject=?",
-                      (student_id, subject))
-            dows = request.form.getlist("dows")
-            for dow in dows:
-                c.execute("""
-                    INSERT OR IGNORE INTO class_schedule_base
-                    (student_id, subject, dow) VALUES (?, ?, ?)
-                """, (student_id, subject, int(dow)))
-            conn.commit()
-
-        elif action == "save_override":
-            next_date = request.form["next_class_date"]
-            c.execute("""
-                INSERT INTO class_schedule_override
-                (student_id, subject, next_class_date)
-                VALUES (?, ?, ?)
-                ON CONFLICT(student_id, subject)
-                DO UPDATE SET next_class_date=?
-            """, (student_id, subject, next_date, next_date))
-            conn.commit()
-
-        elif action == "delete_override":
-            c.execute("DELETE FROM class_schedule_override "
-                      "WHERE student_id=? AND subject=?",
-                      (student_id, subject))
-            conn.commit()
-
-        conn.close()
-        return redirect(f"/class_schedule?student_id={student_id}")
-
-    selected_student = request.args.get(
-        "student_id", students[0]["student_id"] if students else None)
-
-    # 現在の設定を取得
-    base_schedule = {}
-    override_schedule = {}
-    student_subjects = []
-
-    if selected_student:
-        c.execute("SELECT subjects FROM students WHERE student_id=?",
-                  (selected_student,))
-        row = c.fetchone()
-        if row:
-            student_subjects = [s.strip()
-                                 for s in row["subjects"].split(",")]
-
-        c.execute("""
-            SELECT subject, dow FROM class_schedule_base
-            WHERE student_id=? ORDER BY subject, dow
-        """, (selected_student,))
-        for r in c.fetchall():
-            base_schedule.setdefault(r["subject"], []).append(r["dow"])
-
-        c.execute("""
-            SELECT subject, next_class_date FROM class_schedule_override
-            WHERE student_id=?
-        """, (selected_student,))
-        override_schedule = {r["subject"]: r["next_class_date"]
-                             for r in c.fetchall()}
+    # next_class_map: {student_id: {subject: date_str}}
+    next_class_map = {}
+    c.execute("SELECT student_id, subject, next_class_date FROM class_schedule_override")
+    for row in c.fetchall():
+        sid  = row["student_id"]
+        subj = row["subject"]
+        if sid not in next_class_map: next_class_map[sid] = {}
+        next_class_map[sid][subj] = row["next_class_date"] or ""
 
     conn.close()
     return render_template("class_schedule.html",
                            students=students,
-                           selected_student=selected_student,
-                           student_subjects=student_subjects,
-                           base_schedule=base_schedule,
-                           override_schedule=override_schedule)
-
+                           schedule_map=schedule_map,
+                           next_class_map=next_class_map)
 
 @app.route("/problems/assign/<int:problem_id>", methods=["POST"])
 def problem_assign(problem_id):
@@ -797,76 +751,52 @@ def history_delete(history_id):
 def schedule_subject():
     conn = get_connection()
     c = conn.cursor()
+
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
-
-    if request.method == "POST":
-        action = request.form.get("action")
-        student_id = request.form["student_id"]
-        subject = request.form["subject"]
-
-        if action == "save_base":
-            for dow in range(7):
-                minutes = int(request.form.get(f"dow_{dow}", 0))
-                c.execute("""
-                    INSERT INTO schedule_base_subject
-                    (student_id, subject, dow, available_minutes)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(student_id, subject, dow)
-                    DO UPDATE SET available_minutes=?
-                """, (student_id, subject, dow, minutes, minutes))
-            conn.commit()
-
-        elif action == "save_override":
-            date_str = request.form["override_date"]
-            minutes = int(request.form.get("override_minutes", 0))
-            c.execute("""
-                INSERT INTO schedule_override_subject
-                (student_id, subject, date, available_minutes)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(student_id, subject, date)
-                DO UPDATE SET available_minutes=?
-            """, (student_id, subject, date_str, minutes, minutes))
-            conn.commit()
-
+    if not students:
         conn.close()
-        return redirect(
-            f"/schedule_subject?student_id={student_id}&subject={subject}")
+        return render_template("schedule_subject.html", students=[],
+                               selected_student="", subjects=[],
+                               subject_base={}, subject_overrides={})
 
-    selected_student = request.args.get(
-        "student_id", students[0]["student_id"] if students else None)
-    selected_subject = request.args.get("subject", "")
+    selected_student = request.args.get("student_id") or                        students[0]["student_id"]
 
-    student_subjects = []
-    base_schedule = {}
+    # 教科一覧
+    c.execute("SELECT subjects FROM students WHERE student_id=?",
+              (selected_student,))
+    row = c.fetchone()
+    subjects = [s.strip() for s in row["subjects"].split(",")] if row else []
 
-    if selected_student:
-        c.execute("SELECT subjects FROM students WHERE student_id=?",
-                  (selected_student,))
-        row = c.fetchone()
-        if row:
-            student_subjects = [s.strip()
-                                 for s in row["subjects"].split(",")]
-        if not selected_subject and student_subjects:
-            selected_subject = student_subjects[0]
+    # ベーススケジュール
+    subject_base = {}
+    c.execute("""SELECT subject, dow, available_minutes FROM schedule_base_subject
+                 WHERE student_id=?""", (selected_student,))
+    for r in c.fetchall():
+        if selected_student not in subject_base:
+            subject_base[selected_student] = {}
+        if r["subject"] not in subject_base[selected_student]:
+            subject_base[selected_student][r["subject"]] = {}
+        subject_base[selected_student][r["subject"]][r["dow"]] = r["available_minutes"]
 
-        if selected_subject:
-            c.execute("""
-                SELECT dow, available_minutes FROM schedule_base_subject
-                WHERE student_id=? AND subject=?
-                ORDER BY dow
-            """, (selected_student, selected_subject))
-            base_schedule = {r["dow"]: r["available_minutes"]
-                             for r in c.fetchall()}
+    # オーバーライド
+    subject_overrides = {}
+    c.execute("""SELECT subject, date, available_minutes FROM schedule_override_subject
+                 WHERE student_id=? ORDER BY subject, date""", (selected_student,))
+    for r in c.fetchall():
+        if selected_student not in subject_overrides:
+            subject_overrides[selected_student] = {}
+        if r["subject"] not in subject_overrides[selected_student]:
+            subject_overrides[selected_student][r["subject"]] = []
+        subject_overrides[selected_student][r["subject"]].append(r)
 
     conn.close()
     return render_template("schedule_subject.html",
                            students=students,
                            selected_student=selected_student,
-                           selected_subject=selected_subject,
-                           student_subjects=student_subjects,
-                           base_schedule=base_schedule)
-
+                           subjects=subjects,
+                           subject_base=subject_base,
+                           subject_overrides=subject_overrides)
 
 @app.route("/textbooks")
 def textbooks():
@@ -1098,6 +1028,286 @@ def mastery_single_update():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
+
+
+@app.route("/problems/update_instruction", methods=["POST"])
+def problem_update_instruction():
+    data = request.get_json()
+    problem_id = data.get("problem_id")
+    instruction = data.get("instruction", "")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE problems SET instruction=? WHERE problem_id=?",
+              (instruction, problem_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/problems/update_number", methods=["POST"])
+def problem_update_number():
+    data = request.get_json()
+    problem_id = data.get("problem_id")
+    value = data.get("value", "").strip()
+    if not value:
+        return jsonify({"status": "error", "message": "Empty value"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE problems SET problem_number=? WHERE problem_id=?",
+              (value, problem_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+
+
+
+
+
+
+
+@app.route("/schedule/base", methods=["POST"])
+def schedule_base_save():
+    student_id = request.form.get("student_id")
+    conn = get_connection()
+    c = conn.cursor()
+    for dow in ["mon","tue","wed","thu","fri","sat","sun"]:
+        minutes = int(request.form.get(dow, 0))
+        c.execute("""
+            INSERT OR REPLACE INTO schedule_base
+            (student_id, dow, available_minutes) VALUES (?, ?, ?)
+        """, (student_id, dow, minutes))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/schedule/override", methods=["POST"])
+def schedule_override_add():
+    student_id    = request.form.get("student_id")
+    override_date = request.form.get("override_date")
+    minutes       = int(request.form.get("override_minutes", 0))
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO schedule_override
+        (student_id, date, available_minutes) VALUES (?, ?, ?)
+    """, (student_id, override_date, minutes))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/schedule/override/delete", methods=["POST"])
+def schedule_override_delete():
+    student_id    = request.form.get("student_id")
+    override_date = request.form.get("override_date")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM schedule_override WHERE student_id=? AND date=?",
+              (student_id, override_date))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/schedule_subject/base", methods=["POST"])
+def schedule_subject_base_save():
+    student_id = request.form.get("student_id")
+    subject    = request.form.get("subject")
+    conn = get_connection()
+    c = conn.cursor()
+    for dow in ["mon","tue","wed","thu","fri","sat","sun"]:
+        minutes = int(request.form.get(dow, 0))
+        c.execute("""
+            INSERT OR REPLACE INTO schedule_base_subject
+            (student_id, subject, dow, available_minutes) VALUES (?, ?, ?, ?)
+        """, (student_id, subject, dow, minutes))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/schedule_subject/override", methods=["POST"])
+def schedule_subject_override_add():
+    student_id    = request.form.get("student_id")
+    subject       = request.form.get("subject")
+    override_date = request.form.get("override_date")
+    minutes       = int(request.form.get("override_minutes", 0))
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR REPLACE INTO schedule_override_subject
+        (student_id, subject, date, available_minutes) VALUES (?, ?, ?, ?)
+    """, (student_id, subject, override_date, minutes))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/schedule_subject/override/delete", methods=["POST"])
+def schedule_subject_override_delete():
+    student_id    = request.form.get("student_id")
+    subject       = request.form.get("subject")
+    override_date = request.form.get("override_date")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        DELETE FROM schedule_override_subject
+        WHERE student_id=? AND subject=? AND date=?
+    """, (student_id, subject, override_date))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#schedule")
+
+
+@app.route("/class_schedule/set", methods=["POST"])
+def class_schedule_set():
+    student_id = request.form.get("student_id")
+    subject    = request.form.get("subject")
+    dows       = request.form.getlist("dows")
+    conn = get_connection()
+    c = conn.cursor()
+    # 既存の曜日設定を削除してから再登録
+    c.execute("DELETE FROM class_schedule_base WHERE student_id=? AND subject=?",
+              (student_id, subject))
+    for dow in dows:
+        c.execute("""
+            INSERT INTO class_schedule_base (student_id, subject, dow)
+            VALUES (?, ?, ?)
+        """, (student_id, subject, dow))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#classdays")
+
+
+@app.route("/class_schedule/next", methods=["POST"])
+def class_schedule_next():
+    student_id      = request.form.get("student_id")
+    subject         = request.form.get("subject")
+    next_class_date = request.form.get("next_class_date", "").strip()
+    conn = get_connection()
+    c = conn.cursor()
+    if next_class_date:
+        c.execute("""
+            INSERT OR REPLACE INTO class_schedule_override
+            (student_id, subject, next_class_date) VALUES (?, ?, ?)
+        """, (student_id, subject, next_class_date))
+    else:
+        c.execute("""
+            DELETE FROM class_schedule_override
+            WHERE student_id=? AND subject=?
+        """, (student_id, subject))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#classdays")
+
+
+@app.route("/students/<student_id>", methods=["GET"])
+def student_detail(student_id):
+    from database import get_auto_next_class_date
+    conn = get_connection()
+    c = conn.cursor()
+
+    c.execute("SELECT * FROM students WHERE student_id=?", (student_id,))
+    student = c.fetchone()
+    if not student:
+        conn.close()
+        return "Student not found", 404
+
+    subjects = [s.strip() for s in student["subjects"].split(",")]
+
+    # テキスト一覧
+    c.execute("""
+        SELECT t.textbook_id, t.name, t.subject,
+               s.name as series_name,
+               COUNT(DISTINCT p.problem_id) as problem_count
+        FROM textbooks t
+        LEFT JOIN series s ON t.series_id = s.series_id
+        LEFT JOIN problems p ON t.textbook_id = p.textbook_id
+        JOIN student_textbooks st ON t.textbook_id = st.textbook_id
+        WHERE st.student_id=?
+        GROUP BY t.textbook_id ORDER BY t.subject, t.name
+    """, (student_id,))
+    textbooks = c.fetchall()
+
+    # 全体スケジュール
+    c.execute("SELECT dow, available_minutes FROM schedule_base WHERE student_id=?",
+              (student_id,))
+    base_schedule = {r["dow"]: r["available_minutes"] for r in c.fetchall()}
+
+    c.execute("SELECT date, available_minutes FROM schedule_override WHERE student_id=? ORDER BY date",
+              (student_id,))
+    overrides = c.fetchall()
+
+    # 教科別スケジュール
+    subject_base = {}
+    c.execute("SELECT subject, dow, available_minutes FROM schedule_base_subject WHERE student_id=?",
+              (student_id,))
+    for r in c.fetchall():
+        if r["subject"] not in subject_base:
+            subject_base[r["subject"]] = {}
+        subject_base[r["subject"]][r["dow"]] = r["available_minutes"]
+
+    subject_overrides = {}
+    c.execute("""SELECT subject, date, available_minutes FROM schedule_override_subject
+                 WHERE student_id=? ORDER BY subject, date""", (student_id,))
+    for r in c.fetchall():
+        if r["subject"] not in subject_overrides:
+            subject_overrides[r["subject"]] = []
+        subject_overrides[r["subject"]].append(r)
+
+    # 授業曜日
+    schedule_map = {}
+    c.execute("SELECT subject, dow FROM class_schedule_base WHERE student_id=?",
+              (student_id,))
+    for r in c.fetchall():
+        if r["subject"] not in schedule_map:
+            schedule_map[r["subject"]] = {}
+        schedule_map[r["subject"]][r["dow"]] = True
+
+    # 次回授業日（override）
+    next_class_map = {}
+    c.execute("SELECT subject, next_class_date FROM class_schedule_override WHERE student_id=?",
+              (student_id,))
+    for r in c.fetchall():
+        next_class_map[r["subject"]] = r["next_class_date"] or ""
+
+    conn.close()
+
+    # 自動計算された次回授業日
+    auto_next = {}
+    for subj in subjects:
+        if not next_class_map.get(subj):
+            auto_next[subj] = get_auto_next_class_date(student_id, subj) or "—"
+
+    return render_template("student_detail.html",
+                           student=student,
+                           subjects=subjects,
+                           textbooks=textbooks,
+                           base_schedule=base_schedule,
+                           overrides=overrides,
+                           subject_base=subject_base,
+                           subject_overrides=subject_overrides,
+                           schedule_map=schedule_map,
+                           next_class_map=next_class_map,
+                           auto_next=auto_next)
+
+
+@app.route("/students/<student_id>/update", methods=["POST"])
+def student_update(student_id):
+    name       = request.form.get("name", "").strip()
+    subjects   = request.form.get("subjects", "").strip()
+    plan_mode  = request.form.get("plan_mode", "all")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""UPDATE students SET name=?, subjects=?, plan_mode=?
+                 WHERE student_id=?""",
+              (name, subjects, plan_mode, student_id))
+    conn.commit()
+    conn.close()
+    return redirect(f"/students/{student_id}#profile")
 
 if __name__ == "__main__":
     init_db()

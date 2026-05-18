@@ -774,3 +774,45 @@ def calc_new_mastery_v2(student_id, problem_id, score, record_date):
 def score_to_correct(score):
     """5段階スコアをcorrect(0/1)に変換する"""
     return 1 if score >= 4 else 0
+
+
+def get_auto_next_class_date(student_id, subject):
+    """
+    class_schedule_overrideがあればそれを返す。
+    なければclass_schedule_baseの曜日から
+    「今日以降の最初の授業日」を自動計算して返す。
+    """
+    conn = get_connection()
+    c = conn.cursor()
+
+    # overrideを確認
+    c.execute("""
+        SELECT next_class_date FROM class_schedule_override
+        WHERE student_id=? AND subject=?
+    """, (student_id, subject))
+    row = c.fetchone()
+    if row and row["next_class_date"]:
+        conn.close()
+        return row["next_class_date"]
+
+    # baseの曜日から計算
+    c.execute("""
+        SELECT dow FROM class_schedule_base
+        WHERE student_id=? AND subject=?
+    """, (student_id, subject))
+    rows = c.fetchall()
+    conn.close()
+
+    if not rows:
+        return None
+
+    dow_map = {"mon":0,"tue":1,"wed":2,"thu":3,"fri":4,"sat":5,"sun":6}
+    class_dows = set(dow_map[r["dow"]] for r in rows if r["dow"] in dow_map)
+
+    today = date.today()
+    for delta in range(1, 14):
+        d = today + timedelta(days=delta)
+        if d.weekday() in class_dows:
+            return d.isoformat()
+
+    return None

@@ -1,0 +1,524 @@
+import os
+
+base = r"C:\Users\ynaka\study_planner"
+templates = os.path.join(base, "templates")
+
+FONTS = '<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">'
+
+COMMON_CSS = """\
+    :root {
+      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
+      --border:#252838; --border-light:#2f3347;
+      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
+      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
+    body::after { content:''; position:fixed; inset:0;
+      background-image: linear-gradient(var(--border) 1px,transparent 1px),
+        linear-gradient(90deg,var(--border) 1px,transparent 1px);
+      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
+    .container { max-width:1000px; margin:0 auto; position:relative; z-index:1; }
+    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
+      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
+    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; }
+    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+      color:var(--text-muted); margin-top:4px; }
+    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
+    .page-header-back::before { content:'← '; }
+    .page-header-back:hover { color:var(--text); }
+    .card { background:var(--surface); border:1px solid var(--border);
+      padding:24px 28px; margin-bottom:20px; }
+    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
+      padding-bottom:10px; border-bottom:1px solid var(--border); }
+    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
+      margin-bottom:6px; margin-top:16px; }
+    label:first-child { margin-top:0; }
+    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+      width:100%; padding:9px 12px; background:var(--surface2);
+      border:1px solid var(--border-light); color:var(--text);
+      font-family:'Noto Serif JP',serif; font-size:13px; outline:none; transition:border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
+    select option { background:var(--surface2); }
+    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
+      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
+    .btn-primary { background:var(--blue); color:#0c0d11; }
+    .btn-primary:hover { background:#7aaafb; }
+    .btn-danger  { background:var(--red); color:white; }
+    .btn-danger:hover  { background:#f87171; }
+    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
+    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
+    .btn-sm { padding:5px 14px; font-size:10px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
+    .data-table th { background:var(--surface2); color:var(--text-muted);
+      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
+      text-transform:uppercase; padding:10px 12px; text-align:center;
+      border-bottom:1px solid var(--border-light); white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
+      text-align:center; vertical-align:middle; }
+    .data-table tr:hover td { background:var(--surface2); }
+    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
+    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); margin-top:5px; }
+    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    a { color:var(--blue); text-decoration:none; }
+    .time-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
+    .time-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .time-cell .day-label { font-family:'DM Mono',monospace; font-size:10px;
+      color:var(--text-muted); letter-spacing:1px; }
+    .time-cell input { text-align:center; padding:8px 4px; }
+    .dow-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
+    .dow-btn { display:flex; flex-direction:column; align-items:center; padding:10px 6px;
+      background:var(--surface2); border:1px solid var(--border-light); cursor:pointer;
+      transition:all 0.15s; user-select:none; }
+    .dow-btn:has(input:checked) { background:var(--blue-bg); border-color:rgba(91,143,249,0.4); }
+    .dow-btn span.en { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); }
+    .dow-btn span.ja { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); margin-top:2px; }
+    .dow-btn:has(input:checked) span { color:var(--blue); }
+    .dow-btn input { accent-color:var(--blue); }
+    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
+      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-left:2px solid var(--green); color:var(--green); }
+    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }"""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 1. students.html（一覧ページ）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+students_html = """\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  """ + FONTS + """
+  <title>Students — Study Planner</title>
+  <style>
+""" + COMMON_CSS + """
+    .student-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-bottom:24px; }
+    .student-card { background:var(--surface); border:1px solid var(--border);
+      border-left:2px solid var(--blue); padding:20px 24px;
+      transition:all 0.15s; text-decoration:none; color:var(--text); display:block; }
+    .student-card:hover { background:var(--surface2); transform:translateX(3px);
+      box-shadow:0 2px 12px rgba(91,143,249,0.08); }
+    .student-id { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2px;
+      color:var(--text-dim); margin-bottom:6px; }
+    .student-name { font-family:'DM Mono',monospace; font-weight:500; font-size:16px;
+      letter-spacing:1px; color:var(--text); margin-bottom:8px; }
+    .student-meta { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+      letter-spacing:0.5px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">02 / Students</div>
+      <div class="page-title" style="color:var(--blue);">Students</div>
+      <div class="page-title-ja">生徒管理・スケジュール設定</div>
+    </div>
+    <a class="page-header-back" href="/">TOP</a>
+  </div>
+
+  <!-- 生徒カード一覧 -->
+  <div class="student-grid fade-in">
+    {% for s in students %}
+    <a class="student-card" href="/students/{{ s.student_id }}">
+      <div class="student-id">{{ s.student_id }}</div>
+      <div class="student-name">{{ s.name }}</div>
+      <div class="student-meta">
+        {{ s.subjects }}<br>
+        <span style="color:var(--text-dim);">{{ s.plan_mode }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- 生徒追加フォーム -->
+  <div class="card fade-in">
+    <div class="card-title">Add Student</div>
+    <form method="POST" action="/students/add">
+      <div class="grid-3">
+        <div>
+          <label>Student ID</label>
+          <input type="text" name="student_id" placeholder="例：S005" required>
+        </div>
+        <div>
+          <label>Name</label>
+          <input type="text" name="name" placeholder="例：山田太郎" required>
+        </div>
+        <div>
+          <label>Subjects</label>
+          <input type="text" name="subjects" placeholder="例：数学,英語">
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:0;">
+        <div>
+          <label>Plan Mode</label>
+          <select name="plan_mode">
+            <option value="all">all（全教科一括）</option>
+            <option value="per_subject">per_subject（教科別）</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button type="submit" class="btn btn-primary">Add →</button>
+      </div>
+    </form>
+  </div>
+</div>
+</body>
+</html>"""
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 2. student_detail.html（詳細ページ・タブ形式）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+student_detail_html = """\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  """ + FONTS + """
+  <title>{{ student.name }} — Study Planner</title>
+  <style>
+""" + COMMON_CSS + """
+    /* タブ */
+    .tab-bar { display:flex; gap:0; margin-bottom:0; border-bottom:1px solid var(--border-light); }
+    .tab-btn { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; padding:12px 24px; background:transparent;
+      border:none; border-bottom:2px solid transparent; color:var(--text-muted);
+      cursor:pointer; transition:all 0.15s; margin-bottom:-1px; }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+    .tab-content { display:none; padding-top:24px; }
+    .tab-content.active { display:block; }
+    /* 教科セクション */
+    .subject-block { border:1px solid var(--border); margin-bottom:16px; }
+    .subject-header { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--text-muted); padding:10px 16px;
+      background:var(--surface2); border-bottom:1px solid var(--border); }
+    .subject-body { padding:20px; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">02 / Students / {{ student.student_id }}</div>
+      <div class="page-title" style="color:var(--blue);">{{ student.name }}</div>
+      <div class="page-title-ja">{{ student.subjects }} — {{ student.plan_mode }}</div>
+    </div>
+    <a class="page-header-back" href="/students">Students</a>
+  </div>
+
+  <!-- タブバー -->
+  <div class="tab-bar fade-in">
+    <button class="tab-btn active" onclick="switchTab('profile')">Profile</button>
+    <button class="tab-btn" onclick="switchTab('schedule')">Schedule</button>
+    <button class="tab-btn" onclick="switchTab('classdays')">Class Days</button>
+  </div>
+
+  <!-- ─── Tab: Profile ─── -->
+  <div class="tab-content active" id="tab-profile">
+    <div class="card">
+      <div class="card-title">Basic Info</div>
+      <form method="POST" action="/students/{{ student.student_id }}/update">
+        <div class="grid-2">
+          <div>
+            <label>Name</label>
+            <input type="text" name="name" value="{{ student.name }}" required>
+          </div>
+          <div>
+            <label>Subjects</label>
+            <input type="text" name="subjects" value="{{ student.subjects }}">
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:0;">
+          <div>
+            <label>Plan Mode</label>
+            <select name="plan_mode">
+              <option value="all" {% if student.plan_mode == 'all' %}selected{% endif %}>all（全教科一括）</option>
+              <option value="per_subject" {% if student.plan_mode == 'per_subject' %}selected{% endif %}>per_subject（教科別）</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:16px;">
+          <button type="submit" class="btn btn-primary btn-sm">Save →</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Linked Textbooks</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Series</th><th>Textbook</th><th>Subject</th><th>Problems</th></tr>
+        </thead>
+        <tbody>
+        {% for t in textbooks %}
+        <tr>
+          <td class="meta-text">{{ t.series_name or '—' }}</td>
+          <td class="left">{{ t.name }}</td>
+          <td class="meta-text">{{ t.subject }}</td>
+          <td class="meta-text">{{ t.problem_count }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ─── Tab: Schedule ─── -->
+  <div class="tab-content" id="tab-schedule">
+
+    <!-- 全体スケジュール -->
+    <div class="card">
+      <div class="card-title">Overall — 全体勉強時間（分／曜日）</div>
+      <form method="POST" action="/schedule/base">
+        <input type="hidden" name="student_id" value="{{ student.student_id }}">
+        <div class="time-grid">
+          {% set days_en = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+          {% set days_val = ['mon','tue','wed','thu','fri','sat','sun'] %}
+          {% for i in range(7) %}
+          <div class="time-cell">
+            <span class="day-label">{{ days_en[i] }}</span>
+            <input type="number" name="{{ days_val[i] }}" min="0" max="600" step="5"
+              value="{{ base_schedule.get(days_val[i], 0) }}">
+          </div>
+          {% endfor %}
+        </div>
+        <div style="margin-top:14px;">
+          <button type="submit" class="btn btn-primary btn-sm">Save →</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- 全体オーバーライド -->
+    <div class="card">
+      <div class="card-title">Overall Override — 特定日の上書き</div>
+      <form method="POST" action="/schedule/override">
+        <input type="hidden" name="student_id" value="{{ student.student_id }}">
+        <div class="grid-3">
+          <div>
+            <label>Date</label>
+            <input type="date" name="override_date">
+          </div>
+          <div>
+            <label>Minutes</label>
+            <input type="number" name="override_minutes" min="0" max="600" step="5" value="0">
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Add →</button>
+          </div>
+        </div>
+      </form>
+      {% if overrides %}
+      <div style="margin-top:14px;overflow-x:auto;">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Minutes</th><th></th></tr></thead>
+        <tbody>
+        {% for ov in overrides %}
+        <tr>
+          <td class="meta-text">{{ ov.date }}</td>
+          <td class="meta-text">{{ ov.available_minutes }} min</td>
+          <td>
+            <form method="POST" action="/schedule/override/delete" style="display:inline;">
+              <input type="hidden" name="student_id" value="{{ student.student_id }}">
+              <input type="hidden" name="override_date" value="{{ ov.date }}">
+              <button class="btn btn-danger btn-sm">×</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 教科別スケジュール -->
+    {% for subj in subjects %}
+    <div class="subject-block">
+      <div class="subject-header">{{ subj }} — 教科別勉強時間</div>
+      <div class="subject-body">
+        <form method="POST" action="/schedule_subject/base">
+          <input type="hidden" name="student_id" value="{{ student.student_id }}">
+          <input type="hidden" name="subject" value="{{ subj }}">
+          <div class="time-grid">
+            {% set days_en = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+            {% set days_val = ['mon','tue','wed','thu','fri','sat','sun'] %}
+            {% for i in range(7) %}
+            <div class="time-cell">
+              <span class="day-label">{{ days_en[i] }}</span>
+              <input type="number" name="{{ days_val[i] }}" min="0" max="600" step="5"
+                value="{{ subject_base.get(subj, {}).get(days_val[i], 0) }}">
+            </div>
+            {% endfor %}
+          </div>
+          <div style="margin-top:12px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save →</button>
+          </div>
+        </form>
+
+        <form method="POST" action="/schedule_subject/override" style="margin-top:16px;">
+          <input type="hidden" name="student_id" value="{{ student.student_id }}">
+          <input type="hidden" name="subject" value="{{ subj }}">
+          <div class="grid-3">
+            <div>
+              <label style="margin-top:0;">Override Date</label>
+              <input type="date" name="override_date">
+            </div>
+            <div>
+              <label style="margin-top:0;">Minutes</label>
+              <input type="number" name="override_minutes" min="0" max="600" step="5" value="0">
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Add →</button>
+            </div>
+          </div>
+        </form>
+
+        {% set ovs = subject_overrides.get(subj, []) %}
+        {% if ovs %}
+        <div style="margin-top:12px;overflow-x:auto;">
+        <table class="data-table">
+          <thead><tr><th>Date</th><th>Minutes</th><th></th></tr></thead>
+          <tbody>
+          {% for ov in ovs %}
+          <tr>
+            <td class="meta-text">{{ ov.date }}</td>
+            <td class="meta-text">{{ ov.available_minutes }} min</td>
+            <td>
+              <form method="POST" action="/schedule_subject/override/delete" style="display:inline;">
+                <input type="hidden" name="student_id" value="{{ student.student_id }}">
+                <input type="hidden" name="subject" value="{{ subj }}">
+                <input type="hidden" name="override_date" value="{{ ov.date }}">
+                <button class="btn btn-danger btn-sm">×</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ─── Tab: Class Days ─── -->
+  <div class="tab-content" id="tab-classdays">
+    {% for subj in subjects %}
+    <div class="subject-block">
+      <div class="subject-header">{{ subj }}</div>
+      <div class="subject-body">
+
+        <!-- 授業曜日 -->
+        <form method="POST" action="/class_schedule/set">
+          <input type="hidden" name="student_id" value="{{ student.student_id }}">
+          <input type="hidden" name="subject" value="{{ subj }}">
+          <label style="margin-top:0;">Class Days</label>
+          <div class="dow-grid">
+            {% set days_en  = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+            {% set days_val = ['mon','tue','wed','thu','fri','sat','sun'] %}
+            {% set days_ja  = ['月','火','水','木','金','土','日'] %}
+            {% for i in range(7) %}
+            <label class="dow-btn" style="margin:0;">
+              <input type="checkbox" name="dows" value="{{ days_val[i] }}"
+                {% if schedule_map.get(subj, {}).get(days_val[i]) %}checked{% endif %}>
+              <span class="en">{{ days_en[i] }}</span>
+              <span class="ja">{{ days_ja[i] }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div style="margin-top:12px;">
+            <button type="submit" class="btn btn-primary btn-sm">Save Days →</button>
+          </div>
+        </form>
+
+        <!-- 次回授業日 -->
+        <form method="POST" action="/class_schedule/next" style="margin-top:16px;">
+          <input type="hidden" name="student_id" value="{{ student.student_id }}">
+          <input type="hidden" name="subject" value="{{ subj }}">
+          <label>Next Class Date</label>
+          <div style="display:flex;gap:12px;align-items:flex-end;">
+            <div style="flex:1;">
+              <input type="date" name="next_class_date"
+                value="{{ next_class_map.get(subj, '') }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">
+              Set →
+            </button>
+          </div>
+          <p class="hint">
+            空欄で保存 → リセット（以降は授業曜日から自動計算）
+            {% if auto_next.get(subj) %}
+            　自動計算: {{ auto_next[subj] }}
+            {% endif %}
+          </p>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="toast"></div>
+
+</div>
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  // URLハッシュに保存
+  history.replaceState(null, '', '#' + name);
+}
+
+// ページ読み込み時にハッシュでタブを復元
+window.addEventListener('DOMContentLoaded', () => {
+  const hash = location.hash.replace('#', '');
+  if (hash) {
+    const btn = document.querySelector(`.tab-btn[onclick*="${hash}"]`);
+    if (btn) btn.click();
+  }
+});
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>"""
+
+for fname, content in {
+    "students.html":       students_html,
+    "student_detail.html": student_detail_html,
+}.items():
+    with open(os.path.join(templates, fname), "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"✅ {fname} を作成しました")
+
+print("✅ Step A 完了")

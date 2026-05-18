@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Add Problem — Study Planner</title>
-  <style>
+import os
+
+base = r"C:\Users\ynaka\study_planner"
+templates = os.path.join(base, "templates")
+
+COMMON_CSS = """\
     :root {
       --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
       --border:#252838; --border-light:#2f3347;
@@ -28,7 +26,7 @@
     .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
       text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
     .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; color:#f87171; }
+      letter-spacing:2px; text-transform:uppercase; color:var(--blue); }
     .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
       color:var(--text-muted); margin-top:4px; }
     .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
@@ -112,17 +110,18 @@
     #toast.success { border-left:2px solid var(--green); color:var(--green); }
     #toast.info    { border-left:2px solid var(--blue); color:var(--blue); }
     #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    a { color:var(--blue); text-decoration:none; }
-    .editable { cursor:pointer; padding:2px 6px; border-radius:2px;
-      border:1px dashed transparent; transition:border-color 0.12s, background 0.12s;
-      display:inline-block; }
-    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
-    .editable.editing { display:none; }
-    .inline-input { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
-    .inline-textarea { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:4px 8px; font-size:11px; outline:none;
-      width:200px; min-height:52px; resize:both; }
+    a { color:var(--blue); text-decoration:none; }"""
+
+problems_html = """\
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Add Problem — Study Planner</title>
+  <style>
+""" + COMMON_CSS + """
   </style>
 </head>
 <body>
@@ -176,7 +175,7 @@
             {% endfor %}
           </select>
           <p class="hint">
-            <a href="/textbooks" style="color:#f87171;">+ New Textbook</a>
+            <a href="/textbooks" style="color:var(--blue);">+ New Textbook</a>
           </p>
         </div>
       </div>
@@ -267,7 +266,7 @@
 
   <!-- 直近50件 -->
   <div class="card fade-in">
-    <div class="card-title">Recent Problems — Last 50</div>
+    <div class="card-title">Recent Problems — 直近50件</div>
     <div style="overflow-x:auto;">
     <table class="data-table">
       <thead>
@@ -284,35 +283,15 @@
         <td class="left" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
           {{ p.textbook }}
         </td>
-        <!-- 問題番号：テキスト編集 -->
-        <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="problem_number"
-          style="max-width:150px;">
-          <span class="editable" ondblclick="startTextLineEdit(this)"
-            style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">
-            {{ p.problem_number }}
-          </span>
+        <td class="left" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+          {{ p.problem_number }}
         </td>
-        <!-- Imp / Dif / RV：数値編集 -->
-        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="importance">
-          <span class="editable" ondblclick="startNumEdit(this)">{{ p.importance }}</span>
-        </td>
-        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="difficulty">
-          <span class="editable" ondblclick="startNumEdit(this)">{{ p.difficulty }}</span>
-        </td>
-        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="review_value">
-          <span class="editable" ondblclick="startNumEdit(this)">{{ p.review_value }}</span>
-        </td>
-        <!-- 所要時間：数値編集（5分単位） -->
-        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="estimated_minutes">
-          <span class="editable" ondblclick="startNumEdit(this, 5, 120, 5)">{{ p.estimated_minutes }}</span>
-        </td>
-        <!-- 学習指示：テキストエリア編集 -->
-        <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="instruction"
-          style="max-width:140px;">
-          <span class="editable" ondblclick="startTextAreaEdit(this)"
-            style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
-            {{ p.instruction or '—' }}
-          </span>
+        <td class="meta-text">{{ p.importance }}</td>
+        <td class="meta-text">{{ p.difficulty }}</td>
+        <td class="meta-text">{{ p.review_value }}</td>
+        <td class="meta-text">{{ p.estimated_minutes }}</td>
+        <td class="left" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
+          {{ p.instruction or '—' }}
         </td>
         <td>
           <button class="btn btn-danger btn-sm"
@@ -361,14 +340,10 @@ async function askAI() {
     const r = document.getElementById('ai-result');
     r.style.display = 'block';
     r.textContent =
-      `importance     : ${data.importance}
-` +
-      `difficulty     : ${data.difficulty}
-` +
-      `review_value   : ${data.review_value}
-` +
-      `est_minutes    : ${data.estimated_minutes} min
-` +
+      `importance     : ${data.importance}\n` +
+      `difficulty     : ${data.difficulty}\n` +
+      `review_value   : ${data.review_value}\n` +
+      `est_minutes    : ${data.estimated_minutes} min\n` +
       `instruction    : ${data.instruction || '（なし）'}`;
     document.getElementById('apply-row').style.display = 'block';
   } catch(e) {
@@ -388,100 +363,6 @@ function applyAI() {
   showToast('↓ フォームに反映しました', 'success');
 }
 
-// ── インライン編集：数値 ──
-function startNumEdit(span, min=1, max=5, step=1) {
-  const cell = span.closest('.editable-cell');
-  const field = cell.dataset.field;
-  const problemId = cell.dataset.problem;
-  const current = span.textContent.trim();
-  span.classList.add('editing');
-  const input = document.createElement('input');
-  input.type = 'number'; input.min = min; input.max = max; input.step = step;
-  input.value = current; input.className = 'inline-input';
-  input.style.width = field === 'estimated_minutes' ? '64px' : '52px';
-  cell.appendChild(input);
-  input.focus(); input.select();
-  let done = false;
-  const finish = async (save) => {
-    if (done) return; done = true;
-    if (save && input.value !== current) {
-      const res = await fetch('/problems/update_field', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, field: field, value: input.value })
-      });
-      if (res.ok) { span.textContent = input.value; showToast('✓ Updated', 'success'); }
-      else { showToast('Update failed.', 'warn'); }
-    }
-    input.remove(); span.classList.remove('editing');
-  };
-  input.addEventListener('blur', () => finish(true));
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') finish(true);
-    if (e.key === 'Escape') finish(false);
-  });
-}
-
-// ── インライン編集：1行テキスト（問題番号） ──
-function startTextLineEdit(span) {
-  const cell = span.closest('.editable-cell');
-  const problemId = cell.dataset.problem;
-  const current = span.textContent.trim();
-  span.classList.add('editing');
-  const input = document.createElement('input');
-  input.type = 'text'; input.value = current;
-  input.className = 'inline-input'; input.style.width = '180px'; input.style.fontSize = '11px';
-  cell.appendChild(input);
-  input.focus(); input.select();
-  let done = false;
-  const finish = async (save) => {
-    if (done) return; done = true;
-    if (save && input.value.trim() && input.value.trim() !== current) {
-      const res = await fetch('/problems/update_number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, value: input.value.trim() })
-      });
-      if (res.ok) { span.textContent = input.value.trim(); showToast('✓ Updated', 'success'); }
-      else { showToast('Update failed.', 'warn'); }
-    }
-    input.remove(); span.classList.remove('editing');
-  };
-  input.addEventListener('blur', () => finish(true));
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') finish(true);
-    if (e.key === 'Escape') finish(false);
-  });
-}
-
-// ── インライン編集：テキストエリア（学習指示） ──
-function startTextAreaEdit(span) {
-  const cell = span.closest('.editable-cell');
-  const problemId = cell.dataset.problem;
-  const current = span.textContent.trim() === '—' ? '' : span.textContent.trim();
-  span.classList.add('editing');
-  const ta = document.createElement('textarea');
-  ta.value = current; ta.className = 'inline-textarea';
-  cell.appendChild(ta);
-  ta.focus();
-  let done = false;
-  const finish = async (save) => {
-    if (done) return; done = true;
-    if (save && ta.value !== current) {
-      const res = await fetch('/problems/update_instruction', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, instruction: ta.value })
-      });
-      if (res.ok) { span.textContent = ta.value || '—'; showToast('✓ Updated', 'success'); }
-      else { showToast('Update failed.', 'warn'); }
-    }
-    ta.remove(); span.classList.remove('editing');
-  };
-  ta.addEventListener('blur', () => finish(true));
-  ta.addEventListener('keydown', e => { if (e.key === 'Escape') finish(false); });
-}
-
 async function deleteProblem(id, btn) {
   if (!confirm('Problem ' + id + ' を削除しますか？')) return;
   const res = await fetch('/problems/delete/' + id, { method: 'POST' });
@@ -498,4 +379,10 @@ function showToast(msg, type='success') {
 }
 </script>
 </body>
-</html>
+</html>"""
+
+path = os.path.join(templates, "problems.html")
+with open(path, "w", encoding="utf-8") as f:
+    f.write(problems_html)
+print("✅ problems.html を更新しました")
+print("✅ 完了")

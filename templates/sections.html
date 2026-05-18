@@ -2,55 +2,156 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>セクション管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Sections — Study Planner</title>
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
-    h1 { color: #2c3e50; }
-    .form-box { background: white; padding: 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    label { display: block; margin-top: 12px; font-weight: bold; }
-    input[type="text"], input[type="number"] { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
-    button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; }
-    button:hover { background: #2c5fa8; }
-    .btn-del { padding: 4px 10px; background: #e74c3c; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 0; }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    th { background: #4472C4; color: white; padding: 8px; }
-    td { padding: 8px; border-bottom: 1px solid #eee; text-align: center; }
-    a { color: #4472C4; }
+    :root {
+      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
+      --border:#252838; --border-light:#2f3347;
+      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
+      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
+    body::after { content:''; position:fixed; inset:0;
+      background-image: linear-gradient(var(--border) 1px,transparent 1px),
+        linear-gradient(90deg,var(--border) 1px,transparent 1px);
+      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
+    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
+    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
+      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
+    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; }
+    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+      color:var(--text-muted); margin-top:4px; }
+    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
+    .page-header-back::before { content:'← '; }
+    .page-header-back:hover { color:var(--text); }
+    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:20px; }
+    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
+      padding-bottom:10px; border-bottom:1px solid var(--border); }
+    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
+      margin-bottom:6px; margin-top:16px; }
+    label:first-child { margin-top:0; }
+    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+      width:100%; padding:9px 12px; background:var(--surface2);
+      border:1px solid var(--border-light); color:var(--text);
+      font-family:'Noto Serif JP',serif; font-size:13px; outline:none; transition:border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
+    select option { background:var(--surface2); }
+    textarea { resize:vertical; min-height:60px; }
+    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
+      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
+    .btn-primary { background:var(--blue); color:#0c0d11; }
+    .btn-primary:hover { background:#7aaafb; }
+    .btn-success { background:var(--green); color:#0c0d11; }
+    .btn-success:hover { background:#5eddaa; }
+    .btn-danger  { background:var(--red); color:white; }
+    .btn-danger:hover  { background:#f87171; }
+    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
+    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
+    .btn-sm { padding:5px 14px; font-size:10px; }
+    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
+    .data-table th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
+      font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 12px;
+      text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
+      text-align:center; vertical-align:middle; }
+    .data-table tr:hover td { background:var(--surface2); }
+    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+    .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
+    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
+    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; display:inline-block; }
+    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); margin-top:5px; letter-spacing:0.5px; }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    a { color:var(--blue); text-decoration:none; }
+    a:hover { text-decoration:underline; }
+    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
+    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
+    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
+    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
+      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-left:2px solid var(--green); color:var(--green); }
+    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
   </style>
 </head>
 <body>
-  <h1>「{{ textbook.name }}」セクション管理</h1>
-  <p style="color:#555;">シリーズ：{{ textbook.series_name or "なし" }} ／ 教科：{{ textbook.subject }}</p>
+<div class="container">
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">01 / Master Data</div>
+      <div class="page-title" style="color:#f87171;">Sections</div>
+      <div class="page-title-ja">セクション管理</div>
+    </div>
+    <a class="page-header-back" href="/">TOP</a>
+  </div>
 
-  <div class="form-box">
-    <h2 style="font-size:16px;">セクションを追加</h2>
-    <form method="POST">
-      <label>セクション名</label>
-      <input type="text" name="name" placeholder="例：第1章 展開と因数分解" required>
-      <label>表示順</label>
-      <input type="number" name="order_index" value="0" min="0">
-      <button type="submit">追加</button>
+  <div class="meta-text fade-in" style="margin-bottom:20px;">
+    {{ textbook.series_name or '—' }} &rsaquo; {{ textbook.name }}
+    <span style="margin-left:12px;color:var(--text-muted);">{{ textbook.subject }}</span>
+  </div>
+
+  <div class="card fade-in">
+    <div class="card-title">Add Section</div>
+    <form method="POST" style="display:flex;gap:16px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Section Name</label>
+        <input type="text" name="name" placeholder="例：第1章 展開と因数分解" required>
+      </div>
+      <div style="width:120px;">
+        <label>Order</label>
+        <input type="number" name="order_index" value="0" min="0">
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-top:0;">Add →</button>
     </form>
   </div>
 
-  <table>
-    <tr><th>順序</th><th>セクション名</th><th>問題数</th><th>操作</th></tr>
-    {% for s in sections %}
-    <tr>
-      <td>{{ s.order_index }}</td>
-      <td>{{ s.name }}</td>
-      <td>{{ s.problem_count }}</td>
-      <td>
-        <form method="POST" action="/textbooks/sections/delete/{{ s.section_id }}"
-              style="display:inline"
-              onsubmit="return confirm('削除しますか？')">
-          <button class="btn-del">削除</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="card fade-in">
+    <div class="card-title">Section List</div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Order</th><th>Section Name</th><th>Problems</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for s in sections %}
+      <tr>
+        <td class="meta-text">{{ s.order_index }}</td>
+        <td class="left">{{ s.name }}</td>
+        <td class="meta-text">{{ s.problem_count }}</td>
+        <td>
+          <form method="POST" action="/textbooks/sections/delete/{{ s.section_id }}"
+            style="display:inline;"
+            onsubmit="return confirm('Delete this section?')">
+            <button class="btn btn-danger btn-sm">×</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
-  <p><a href="/textbooks">← テキスト管理に戻る</a></p>
+  <a href="/textbooks" class="btn btn-ghost">← Back to Textbooks</a>
+
+</div>
 </body>
 </html>

@@ -2,115 +2,191 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>授業スケジュール管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Class Schedule — Study Planner</title>
   <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
-    h1 { color: #2c3e50; }
-    .form-box { background: white; padding: 24px; border-radius: 8px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    h2 { color: #2c3e50; margin-top: 0; font-size: 16px; }
-    label { display: block; margin-top: 12px; font-weight: bold; }
-    select, input[type="date"] { width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
-    .dow-checks { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
-    .dow-checks label { font-weight: normal; display: flex; align-items: center; gap: 4px; font-size: 14px; }
-    .dow-checks input { width: auto; }
-    .subject-section { background: #f8f9fa; border-radius: 6px; padding: 16px; margin-top: 16px; border-left: 4px solid #4472C4; }
-    .subject-section h3 { margin: 0 0 8px 0; color: #4472C4; font-size: 15px; }
-    .current-setting { font-size: 13px; color: #555; margin-bottom: 8px; }
-    .current-setting span { background: #4472C4; color: white; padding: 2px 8px; border-radius: 4px; margin-right: 4px; font-size: 12px; }
-    .override-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; margin-top: 8px; }
-    button { margin-top: 12px; padding: 8px 20px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    button:hover { background: #2c5fa8; }
-    .btn-del { background: #e74c3c; }
-    .btn-del:hover { background: #c0392b; }
-    .btn-small { padding: 6px 14px; font-size: 13px; margin-top: 0; }
-    a { color: #4472C4; }
-    .hint { font-size: 12px; color: #888; margin-top: 4px; }
+    :root {
+      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
+      --border:#252838; --border-light:#2f3347;
+      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
+      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
+    body::after { content:''; position:fixed; inset:0;
+      background-image: linear-gradient(var(--border) 1px,transparent 1px),
+        linear-gradient(90deg,var(--border) 1px,transparent 1px);
+      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
+    .container { max-width:1000px; margin:0 auto; position:relative; z-index:1; }
+    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
+      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
+    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; }
+    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+      color:var(--text-muted); margin-top:4px; }
+    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
+    .page-header-back::before { content:'← '; }
+    .page-header-back:hover { color:var(--text); }
+    .card { background:var(--surface); border:1px solid var(--border);
+      padding:24px 28px; margin-bottom:20px; }
+    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
+      padding-bottom:10px; border-bottom:1px solid var(--border); }
+    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
+      margin-bottom:6px; margin-top:16px; }
+    label:first-child { margin-top:0; }
+    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+      width:100%; padding:9px 12px; background:var(--surface2);
+      border:1px solid var(--border-light); color:var(--text);
+      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
+      transition:border-color 0.15s; }
+    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
+    select option { background:var(--surface2); }
+    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
+      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
+    .btn-primary { background:var(--blue); color:#0c0d11; }
+    .btn-primary:hover { background:#7aaafb; }
+    .btn-danger  { background:var(--red); color:white; }
+    .btn-danger:hover  { background:#f87171; }
+    .btn-ghost { background:transparent; color:var(--text-muted);
+      border:1px solid var(--border-light); }
+    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
+    .btn-sm { padding:5px 14px; font-size:10px; }
+    .btn-warn { background:var(--amber-bg); color:var(--amber);
+      border:1px solid rgba(245,166,35,0.3); }
+    .btn-warn:hover { background:rgba(245,166,35,0.2); }
+    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
+    .data-table th { background:var(--surface2); color:var(--text-muted);
+      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
+      text-transform:uppercase; padding:10px 12px; text-align:center;
+      border-bottom:1px solid var(--border-light); white-space:nowrap; }
+    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
+      text-align:center; vertical-align:middle; }
+    .data-table tr:hover td { background:var(--surface2); }
+    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .grid-7 { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; }
+    .meta-text { font-family:'DM Mono',monospace; font-size:10px;
+      color:var(--text-dim); letter-spacing:1px; }
+    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
+      margin-top:5px; letter-spacing:0.5px; }
+    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
+    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
+    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    a { color:var(--blue); text-decoration:none; }
+    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
+    /* 曜日チェックボックス */
+    .dow-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
+    .dow-btn { display:flex; flex-direction:column; align-items:center; padding:10px 6px;
+      background:var(--surface2); border:1px solid var(--border-light); cursor:pointer;
+      transition:all 0.15s; user-select:none; }
+    .dow-btn:has(input:checked) { background:var(--blue-bg); border-color:rgba(91,143,249,0.4); }
+    .dow-btn span { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted);
+      margin-top:4px; }
+    .dow-btn:has(input:checked) span { color:var(--blue); }
+    .dow-btn input { accent-color:var(--blue); }
+    /* 時間入力グリッド */
+    .time-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
+    .time-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
+    .time-cell .day-label { font-family:'DM Mono',monospace; font-size:10px;
+      color:var(--text-muted); letter-spacing:1px; }
+    .time-cell input { text-align:center; padding:8px 4px; }
+    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
+      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-left:2px solid var(--green); color:var(--green); }
+    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
   </style>
 </head>
 <body>
-  <h1>⑧ 授業スケジュール管理</h1>
-
-  <div class="form-box">
-    <h2>生徒を選択</h2>
-    <select onchange="location.href='?student_id='+this.value">
-      {% for s in students %}
-      <option value="{{ s.student_id }}"
-        {% if s.student_id == selected_student %}selected{% endif %}>
-        {{ s.name }}
-      </option>
-      {% endfor %}
-    </select>
+<div class="container">
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">02 / Schedule</div>
+      <div class="page-title" style="color:var(--green);">Class Schedule</div>
+      <div class="page-title-ja">授業スケジュール管理</div>
+    </div>
+    <a class="page-header-back" href="/">TOP</a>
   </div>
 
-  {% if student_subjects %}
-  {% set dow_names = ["月", "火", "水", "木", "金", "土", "日"] %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat == 'success' else 'error' }} fade-in">{{ msg }}</div>
+  {% endfor %}
+  {% endwith %}
 
-  {% for subject in student_subjects %}
-  <div class="form-box">
-    <h2>{{ subject }}</h2>
+  {% for student in students %}
+  <div class="card fade-in">
+    <div class="card-title">{{ student.name }} — {{ student.student_id }}</div>
 
-    <!-- 現在のベース設定 -->
-    <div class="current-setting">
-      ベース授業曜日：
-      {% if base_schedule.get(subject) %}
-        {% for dow in base_schedule.get(subject, []) %}
-          <span>{{ dow_names[dow] }}</span>
-        {% endfor %}
-      {% else %}
-        未設定
-      {% endif %}
-    </div>
+    {% for subject in student.subjects.split(',') %}
+    {% set subj = subject.strip() %}
+    <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border);">
+      <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;
+        text-transform:uppercase;color:var(--text-muted);margin-bottom:14px;">
+        {{ subj }}
+      </div>
 
-    <!-- ベース曜日設定フォーム -->
-    <div class="subject-section">
-      <h3>授業曜日を設定（毎週固定）</h3>
-      <form method="POST">
-        <input type="hidden" name="action" value="save_base">
-        <input type="hidden" name="student_id" value="{{ selected_student }}">
-        <input type="hidden" name="subject" value="{{ subject }}">
-        <div class="dow-checks">
+      <!-- 曜日設定 -->
+      <form method="POST" action="/class_schedule/set">
+        <input type="hidden" name="student_id" value="{{ student.student_id }}">
+        <input type="hidden" name="subject" value="{{ subj }}">
+        <label>Class Days</label>
+        <div class="dow-grid">
           {% for i in range(7) %}
-          <label>
-            <input type="checkbox" name="dows" value="{{ i }}"
-              {% if i in base_schedule.get(subject, []) %}checked{% endif %}>
-            {{ dow_names[i] }}
+          {% set dv = ['mon','tue','wed','thu','fri','sat','sun'][i] %}
+          {% set de = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i] %}
+          {% set dj = ['月','火','水','木','金','土','日'][i] %}
+          <label class="dow-btn" style="margin:0;">
+            <input type="checkbox" name="dows" value="{{ dv }}"
+              {% if schedule_map.get(student.student_id, {}).get(subj, {}).get(dv) %}checked{% endif %}>
+            <span>{{ de }}<br><span style="font-size:10px;color:var(--text-dim);">{{ dj }}</span></span>
           </label>
           {% endfor %}
         </div>
-        <button type="submit">曜日を保存</button>
-      </form>
-    </div>
-
-    <!-- 次回授業日の上書き -->
-    <div class="subject-section" style="border-left-color: #27ae60; margin-top: 12px;">
-      <h3>次回授業日を手動指定（都度変更）</h3>
-      {% if override_schedule.get(subject) %}
-      <div class="current-setting">
-        現在の指定：<span style="background:#27ae60;">{{ override_schedule.get(subject) }}</span>
-        <form method="POST" style="display:inline;">
-          <input type="hidden" name="action" value="delete_override">
-          <input type="hidden" name="student_id" value="{{ selected_student }}">
-          <input type="hidden" name="subject" value="{{ subject }}">
-          <button type="submit" class="btn-del btn-small">解除</button>
-        </form>
-      </div>
-      {% endif %}
-      <form method="POST">
-        <input type="hidden" name="action" value="save_override">
-        <input type="hidden" name="student_id" value="{{ selected_student }}">
-        <input type="hidden" name="subject" value="{{ subject }}">
-        <div class="override-row">
-          <input type="date" name="next_class_date"
-            value="{{ override_schedule.get(subject, '') }}">
-          <button type="submit" class="btn-small">指定</button>
+        <div style="margin-top:14px;">
+          <button type="submit" class="btn btn-primary btn-sm">Save Days →</button>
         </div>
-        <p class="hint">ベース曜日より優先されます。計画表出力後は手動で解除してください。</p>
+      </form>
+
+      <!-- 次回授業日 -->
+      <form method="POST" action="/class_schedule/next" style="margin-top:16px;">
+        <input type="hidden" name="student_id" value="{{ student.student_id }}">
+        <input type="hidden" name="subject" value="{{ subj }}">
+        <label>Next Class Date</label>
+        <div style="display:flex;gap:12px;align-items:flex-end;">
+          <div style="flex:1;">
+            <input type="date" name="next_class_date"
+              value="{{ next_class_map.get(student.student_id, {}).get(subj, '') }}">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">
+            Set →
+          </button>
+        </div>
+        <p class="hint">空欄で保存すると次回授業日をリセットします</p>
       </form>
     </div>
+    {% endfor %}
   </div>
   {% endfor %}
-  {% endif %}
 
-  <p><a href="/">← トップに戻る</a></p>
+</div>
 </body>
 </html>
