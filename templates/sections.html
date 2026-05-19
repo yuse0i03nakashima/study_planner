@@ -129,7 +129,7 @@
     <div class="card-title">Section List</div>
     <table class="data-table">
       <thead>
-        <tr><th>Order</th><th>Section Name</th><th>Problems</th><th></th></tr>
+        <tr><th>No.</th><th>Section Name</th><th>Problems</th><th></th></tr>
       </thead>
       <tbody>
       {% for s in sections %}
@@ -149,6 +149,92 @@
       </tbody>
     </table>
   </div>
+
+  <!-- セクション内の問題一覧とorder管理 -->
+  <div class="card fade-in">
+    <div class="card-title">Problems in this Textbook</div>
+    <div style="overflow-x:auto;">
+    <table class="data-table" id="section-prob-table">
+      <thead>
+        <tr>
+          <th>No.</th><th>問題番号</th><th>教科</th><th>Imp</th><th>Dif</th><th>RV</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in problems %}
+      <tr id="sp-{{ p.problem_id }}">
+        <td class="editable-cell" data-problem="{{ p.problem_id }}"
+          data-field="order_in_textbook">
+          <span class="editable" ondblclick="startOrderEdit(this)"
+            style="font-family:'DM Mono',monospace;font-size:11px;">
+            {{ p.order_in_textbook or '—' }}
+          </span>
+        </td>
+        <td class="left" style="font-size:11px;">{{ p.problem_number }}</td>
+        <td class="meta-text">{{ p.subject }}</td>
+        <td class="meta-text">{{ p.importance }}</td>
+        <td class="meta-text">{{ p.difficulty }}</td>
+        <td class="meta-text">{{ p.review_value }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if not problems %}
+    <div style="font-family:'DM Mono',monospace;font-size:11px;
+      color:var(--text-dim);padding:16px 0;text-align:center;">
+      No problems registered for this textbook.
+    </div>
+    {% endif %}
+  </div>
+
+  <div id="toast"></div>
+
+<script>
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+function startOrderEdit(span) {
+  const cell = span.closest('.editable-cell');
+  const problemId = cell.dataset.problem;
+  const current = span.textContent.trim();
+  span.classList.add('editing');
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = 1; input.max = 9999; input.step = 1;
+  input.value = current === '—' ? '' : current;
+  input.className = 'inline-input'; input.style.width = '64px';
+  cell.appendChild(input);
+  input.focus(); input.select();
+  let done = false;
+  const finish = async (save) => {
+    if (done) return; done = true;
+    if (save && input.value && input.value !== current) {
+      const res = await fetch('/problems/update_field', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_id: problemId,
+          field: 'order_in_textbook',
+          value: input.value
+        })
+      });
+      if (res.ok) {
+        span.textContent = input.value;
+        showToast('✓ Order updated', 'success');
+      } else { showToast('Update failed.', 'warn'); }
+    }
+    input.remove(); span.classList.remove('editing');
+  };
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+}
+</script>
 
   <a href="/textbooks" class="btn btn-ghost">← Back to Textbooks</a>
 

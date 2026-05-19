@@ -324,12 +324,14 @@ def get_schedule(student_id, start_date_str, end_date_str):
     overrides = {row["date"]: row["available_minutes"] for row in c.fetchall()}
     conn.close()
 
+    dow_map = {0:"mon",1:"tue",2:"wed",3:"thu",4:"fri",5:"sat",6:"sun"}
     schedule = {}
     current = date.fromisoformat(start_date_str)
     end = date.fromisoformat(end_date_str)
     while current <= end:
         date_str = current.isoformat()
-        schedule[date_str] = overrides.get(date_str, base.get(current.weekday(), 0))
+        dow_str = dow_map[current.weekday()]
+        schedule[date_str] = overrides.get(date_str, base.get(dow_str, 0))
         current += timedelta(days=1)
     return schedule
 

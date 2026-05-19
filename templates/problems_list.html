@@ -151,7 +151,7 @@
   <table class="data-table" id="problem-table">
     <thead>
       <tr>
-        <th>ID</th><th>教科</th><th>テキスト</th><th>問題番号</th>
+        <th>No.</th><th>教科</th><th>テキスト</th><th>問題番号</th>
         <th>Imp</th><th>Dif</th><th>RV</th><th>分</th>
         <th>学習指示</th><th></th>
       </tr>
@@ -159,10 +159,21 @@
     <tbody>
     {% for p in problems %}
     <tr id="prow-{{ p.problem_id }}">
-      <td class="meta-text">{{ p.problem_id }}</td>
+      <td class="editable-cell" data-problem="{{ p.problem_id }}"
+        data-field="order_in_textbook">
+        <span class="editable" ondblclick="startNumEdit(this, 1, 9999, 1)"
+          style="font-family:'DM Mono',monospace;font-size:11px;">
+          {{ p.order_in_textbook or '—' }}
+        </span>
+      </td>
       <td class="meta-text">{{ p.subject }}</td>
-      <td class="left" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
-        {{ p.textbook }}
+      <td class="editable-cell left" data-problem="{{ p.problem_id }}"
+        data-field="textbook" style="max-width:140px;position:relative;">
+        <span class="editable" ondblclick="startTextbookEdit(this)"
+          style="font-size:11px;display:block;overflow:hidden;
+            text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
+          {{ p.textbook }}
+        </span>
       </td>
       <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="problem_number"
         style="max-width:160px;">
@@ -191,6 +202,9 @@
         </span>
       </td>
       <td>
+        <button class="btn btn-ghost btn-sm"
+          onclick="showAddAssignment({{ p.problem_id }})"
+          title="出題予定を追加">+</button>
         <button class="btn btn-danger btn-sm"
           onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
       </td>
@@ -205,7 +219,86 @@
   </div>
 
 <div id="toast"></div>
+
+<!-- 出題予定追加モーダル -->
+<div id="assign-modal" style="display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border-light);
+    padding:28px 32px;min-width:360px;max-width:500px;width:90%;">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+      text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;
+      padding-bottom:10px;border-bottom:1px solid var(--border);">
+      Add Assignment
+    </div>
+    <form method="POST" action="/assignments/add">
+      <input type="hidden" name="problem_id" id="modal-problem-id">
+      <input type="hidden" name="redirect_to" value="/problems/list">
+      <div style="margin-bottom:14px;">
+        <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+          Students
+        </label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          {% for s in students %}
+          <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
+            font-size:13px;font-weight:300;color:var(--text);cursor:pointer;">
+            <input type="checkbox" name="student_ids" value="{{ s.student_id }}"
+              style="accent-color:var(--blue);width:14px;height:14px;">
+            {{ s.name }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+            Category
+          </label>
+          <select name="category"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+            <option value="予習">予習</option>
+            <option value="復習">復習</option>
+            <option value="定着">定着</option>
+            <option value="再定着">再定着</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+            Date
+          </label>
+          <input type="date" name="scheduled_date"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost btn-sm"
+          onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+function showAddAssignment(problemId) {
+  document.getElementById('modal-problem-id').value = problemId;
+  const modal = document.getElementById('assign-modal');
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('assign-modal').style.display = 'none';
+}
+
+// モーダル外クリックで閉じる
+document.getElementById('assign-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
 function showToast(msg, type='success') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'show ' + type;
@@ -283,6 +376,57 @@ function startTextEdit(span) {
   ta.addEventListener('keydown', e => {
     if (e.key === 'Escape') finish(false);
   });
+}
+
+function startTextbookEdit(span) {
+  const cell = span.closest('.editable-cell');
+  const problemId = cell.dataset.problem;
+  span.classList.add('editing');
+
+  // テキスト一覧を取得してセレクトを生成
+  fetch('/api/textbooks/list')
+    .then(r => r.json())
+    .then(textbooks => {
+      const sel = document.createElement('select');
+      sel.className = 'inline-select';
+      sel.style.minWidth = '160px';
+      sel.style.fontSize = '11px';
+      textbooks.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.textbook_id;
+        opt.textContent = (t.series_name ? '[' + t.series_name + '] ' : '') + t.name;
+        if (t.name === span.textContent.trim()) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      cell.appendChild(sel);
+      sel.focus();
+
+      let done = false;
+      const finish = async (save) => {
+        if (done) return; done = true;
+        if (save) {
+          const res = await fetch('/api/problems/update_textbook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              problem_id: problemId,
+              textbook_id: sel.value
+            })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            span.textContent = data.textbook;
+            showToast('✓ Textbook updated', 'success');
+          } else { showToast('Update failed.', 'warn'); }
+        }
+        sel.remove(); span.classList.remove('editing');
+      };
+      sel.addEventListener('change', () => finish(true));
+      sel.addEventListener('blur', () => setTimeout(() => finish(true), 100));
+      sel.addEventListener('keydown', e => {
+        if (e.key === 'Escape') finish(false);
+      });
+    });
 }
 
 function startTextLineEdit(span) {

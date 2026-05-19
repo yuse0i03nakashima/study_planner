@@ -123,7 +123,7 @@
     <div>
       <div class="page-label">02 / Students / {{ student.student_id }}</div>
       <div class="page-title" style="color:#5b8ff9;">{{ student.name }}</div>
-      <div class="page-title-ja">{{ student.subjects }} — {{ student.plan_mode }}</div>
+      <div class="page-title-ja">{{ student.subjects }}</div>
     </div>
     <a class="page-header-back" href="/students">Students</a>
   </div>
@@ -148,15 +148,6 @@
           <div>
             <label>Subjects</label>
             <input type="text" name="subjects" value="{{ student.subjects }}">
-          </div>
-        </div>
-        <div class="grid-2" style="margin-top:0;">
-          <div>
-            <label>Plan Mode</label>
-            <select name="plan_mode">
-              <option value="all" {% if student.plan_mode == 'all' %}selected{% endif %}>all（全教科一括）</option>
-              <option value="per_subject" {% if student.plan_mode == 'per_subject' %}selected{% endif %}>per_subject（教科別）</option>
-            </select>
           </div>
         </div>
         <div style="margin-top:16px;">

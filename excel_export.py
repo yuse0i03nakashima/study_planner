@@ -75,13 +75,16 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     unassigned = []
     n = len(dates_sorted)
 
-    def try_assign(item, search_dates):
-        """残り時間が最も多い日に割り当て"""
+    def try_assign(item, search_dates, prefer_earliest=False):
+        """残り時間がある日に割り当て。prefer_earliest=Trueなら最も早い日優先"""
         minutes = get_adjusted_minutes(item)
         valid = [d for d in search_dates if remaining.get(d, 0) >= minutes]
         if not valid:
             return False
-        d = max(valid, key=lambda x: remaining[x])
+        if prefer_earliest:
+            d = min(valid)
+        else:
+            d = max(valid, key=lambda x: remaining[x])
         remaining[d] -= minutes
         item["assigned_date"] = d
         assigned.append(item)
@@ -107,8 +110,10 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     # ─── 予習：problem_id順 × テキスト間インターリーブ ───
     yosyu_items = sorted(
         [p for p in plan if p["category"] == "予習"],
-        key=lambda x: x.get("problem_id", 0))
-
+        key=lambda x: (
+            x.get("textbook_id") or 0,
+            x.get("order_in_textbook") or x.get("problem_id", 0)
+        ))
     yosyu_by_textbook = defaultdict(list)
     for item in yosyu_items:
         tb_id = item.get("textbook_id") or item.get("textbook", "unknown")
@@ -134,10 +139,11 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         if future:
             next_class = future[0]
             # 授業日当日も含める
-            search = [d for d in dates_sorted if d <= next_class]
+            search = sorted([d for d in dates_sorted if d <= next_class])
         else:
             search = list(dates_sorted)
-        if not try_assign_balanced(item, search, date_counts):
+        # 予習はNo.順を維持するため最も早い日優先で割り当て
+        if not try_assign(item, search, prefer_earliest=True):
             item["assigned_date"] = None
             unassigned.append(item)
 
@@ -238,12 +244,13 @@ def build_plan_data(student_id, start_date_str, target_date_str,
         plan = all_plan
 
     # 教科別スケジュールがあるか確認
+    # 全て0分の場合はNoneとみなしてglobal_scheduleを使用
     subject_schedules = {}
     use_subject_schedule = False
     for subject in subjects:
         subj_sched = get_schedule_subject(
             student_id, subject, start_date_str, target_date_str)
-        if subj_sched is not None:
+        if subj_sched is not None and any(m > 0 for m in subj_sched.values()):
             subject_schedules[subject] = subj_sched
             use_subject_schedule = True
         else:
@@ -310,154 +317,303 @@ def _make_problem_text(item):
             + item["textbook"] + " " + item["problem_number"])
 
 
-def _write_excel_sheet(ws, data, border):
-    subjects = data["subjects"]
-    rows = data["rows"]
-    unassigned = data["unassigned"]
+def _write_excel_sheet(ws, subjects, rows, unassigned,
+                       student_name, start_date, end_date):
+    """全教科を1シートに出力するダークテーマExcel"""
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from datetime import date as date_cls
 
-    header_cols = ["実施日"]
-    for subject in subjects:
-        header_cols.append(subject + "（問題）")
-        header_cols.append(subject + "（指示）")
-    header_cols.append("未割当")
+    # ── カラーパレット ──
+    BG_MAIN     = "0C0D11"
+    BG_SURFACE  = "13151E"
+    BG_SURFACE2 = "1B1E2B"
+    BG_SURFACE3 = "222536"
+    BG_DAY_A    = "13151E"   # 日付ブロックA（濃）
+    BG_DAY_B    = "1B1E2B"   # 日付ブロックB（やや薄）
+    C_TEXT      = "DDE1EC"
+    C_MUTED     = "9AA3B8"
+    C_DIM       = "555D7A"
+    C_BLUE      = "5B8FF9"
+    C_GREEN     = "3ECF8E"
+    C_AMBER     = "F5A623"
+    C_ROSE      = "F06292"
+    C_RED       = "EF4444"
+    C_BORDER    = "252838"
+    C_BORDER_L  = "2F3347"
 
-    for col, h in enumerate(header_cols, start=1):
-        cell = ws.cell(row=1, column=col, value=h)
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill("solid", fgColor="4472C4")
-        cell.alignment = Alignment(horizontal="center")
-        cell.border = border
+    CAT_COLORS = {
+        "予習": C_BLUE, "復習": C_GREEN,
+        "定着": C_AMBER, "再定着": C_ROSE,
+    }
+    MASTERY_COLORS = {1: C_ROSE, 2: C_AMBER, 3: C_GREEN}
+    DOW_JA = ["月", "火", "水", "木", "金", "土", "日"]
 
-    for row_idx, row in enumerate(rows, start=2):
-        dc = ws.cell(row=row_idx, column=1, value=row["date"])
-        dc.font = Font(bold=True)
-        dc.fill = PatternFill("solid", fgColor="E8EEF8")
-        dc.alignment = Alignment(horizontal="center", vertical="top")
-        dc.border = border
+    def fill(c): return PatternFill("solid", fgColor=c)
+    def font(c, bold=False, size=10, mono=False):
+        name = "Consolas" if mono else "Noto Serif JP"
+        return Font(color=c, bold=bold, size=size, name=name)
+    def aln(h="left", v="center", wrap=False):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+    def bdr(c=C_BORDER):
+        s = Side(style="thin", color=c)
+        return Border(left=s, right=s, top=s, bottom=s)
 
-        col_idx = 2
-        for subject in subjects:
-            si = sorted(
-                row["subjects"].get(subject, []),
-                key=lambda x: DISPLAY_ORDER.get(x["category"], 9))
-            prob_lines = [_make_problem_text(i) for i in si]
-            instr_lines = [i.get("instruction", "") or "" for i in si]
-            prob_text = chr(10).join(prob_lines)
-            instr_text = chr(10).join(instr_lines)
-            color = "FFFFFF"
-            if si:
-                color = CATEGORY_COLORS.get(si[0]["category"], "FFFFFF")
+    ws.sheet_view.showGridLines = False
 
-            pc = ws.cell(row=row_idx, column=col_idx, value=prob_text)
-            if si:
-                pc.fill = PatternFill("solid", fgColor=color)
-            pc.alignment = Alignment(
-                horizontal="left", vertical="top", wrap_text=True)
-            pc.border = border
-            col_idx += 1
+    # ── 列定義 ──
+    # Date / Day / Subject / Category / Textbook / Problem / Mastery / Min / Instruction
+    COLS = [
+        ("Date",        10),
+        ("Day",          4),
+        ("Subject",     10),
+        ("Category",     9),
+        ("Textbook",    20),
+        ("Problem",     34),
+        ("Mastery",      8),
+        ("Min",          5),
+        ("Instruction", 44),
+    ]
+    N_COLS = len(COLS)
 
-            ic = ws.cell(row=row_idx, column=col_idx, value=instr_text)
-            if si:
-                ic.fill = PatternFill("solid", fgColor=color)
-            ic.alignment = Alignment(
-                horizontal="left", vertical="top", wrap_text=True)
-            ic.border = border
-            col_idx += 1
+    # ── 全セルにデフォルト背景色を設定 ──
+    # I列より右（J〜Z列）にもダークテーマを適用
+    for r in range(1, 501):
+        for c in range(1, 40):  # A〜AN列まで
+            ws.cell(row=r, column=c).fill = fill(BG_MAIN)
 
-        uc = ws.cell(row=row_idx, column=col_idx, value="")
-        uc.border = border
+    # ── 列幅 ──
+    for i, (_, w) in enumerate(COLS, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
 
+    # ── タイトル行 ──
+    ws.merge_cells(f"A1:{get_column_letter(N_COLS)}1")
+    c1 = ws["A1"]
+    c1.value = f"[SP]  {student_name}   {start_date} → {end_date}"
+    c1.fill = fill(BG_SURFACE)
+    c1.font = Font(color=C_BLUE, bold=True, size=12, name="Consolas")
+    c1.alignment = aln("left", "center")
+    ws.row_dimensions[1].height = 30
+
+    # ── ヘッダ行 ──
+    for i, (h, _) in enumerate(COLS, 1):
+        cell = ws.cell(row=2, column=i)
+        cell.value = h.upper()
+        cell.fill = fill(BG_SURFACE2)
+        cell.font = Font(color=C_MUTED, bold=False, size=8, name="Consolas")
+        cell.alignment = aln("center", "center")
+        cell.border = bdr(C_BORDER_L)
+    # I列より右のヘッダ行はBG_MAINのまま（全体塗りで対応済み）
+    ws.row_dimensions[2].height = 18
+
+    ws.freeze_panes = "A3"
+
+    # ── データ行 ──
+    cur = 3
+    day_toggle = False  # 日付ブロックの交互色制御
+
+    for day_row in rows:
+        date_str_raw = day_row.get("date_str", "")
+        date_label   = day_row.get("date", "")
+        subjects_dict = day_row.get("subjects", {})
+
+        # この日の全問題を収集（教科順）
+        day_items = []
+        for subj in subjects:
+            for item in subjects_dict.get(subj, []):
+                day_items.append((subj, item))
+
+        if not day_items:
+            continue
+
+        # 日付ブロックの背景色を交互に
+        day_bg = BG_DAY_A if day_toggle else BG_DAY_B
+        day_toggle = not day_toggle
+
+        try:
+            d_obj = date_cls.fromisoformat(date_str_raw)
+            dow = DOW_JA[d_obj.weekday()]
+            date_disp = f"{d_obj.month}/{d_obj.day}"
+            is_weekend = d_obj.weekday() >= 5
+        except Exception:
+            dow = ""
+            date_disp = date_label
+            is_weekend = False
+
+        # 曜日色
+        dow_color = C_ROSE if is_weekend else C_MUTED
+
+        for row_i, (subj, item) in enumerate(day_items):
+            cat = item.get("category", "")
+            cat_color = CAT_COLORS.get(cat, C_DIM)
+            mastery_int = item.get("mastery_int", 1)
+            mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
+
+            vals = [
+                date_disp if row_i == 0 else "",
+                dow       if row_i == 0 else "",
+                subj,
+                cat,
+                item.get("textbook", ""),
+                item.get("problem_number", ""),
+                item.get("mastery", "★"),
+                item.get("estimated_minutes", ""),
+                item.get("instruction", ""),
+            ]
+
+            # 同一日の最終行かどうか（下ボーダーを強調）
+            is_last_in_day = (row_i == len(day_items) - 1)
+            bot_side = Side(style="medium", color=C_BORDER_L)                        if is_last_in_day else Side(style="thin", color=C_BORDER)
+            top_side = Side(style="thin", color=C_BORDER)
+            side_side = Side(style="thin", color=C_BORDER)
+
+            for col_i, val in enumerate(vals, 1):
+                cell = ws.cell(row=cur, column=col_i)
+                cell.value = val
+                cell.fill = fill(day_bg)
+                cell.border = Border(
+                    left=side_side, right=side_side,
+                    top=top_side, bottom=bot_side
+                )
+
+                # 列別スタイル
+                if col_i == 1:   # Date
+                    cell.font = font(C_MUTED, size=9, mono=True)
+                    cell.alignment = aln("center", "center")
+                elif col_i == 2: # Day
+                    cell.font = Font(color=dow_color, size=9, name="Consolas")
+                    cell.alignment = aln("center", "center")
+                elif col_i == 3: # Subject
+                    cell.font = font(C_MUTED, size=9, mono=True)
+                    cell.alignment = aln("center", "center")
+                elif col_i == 4: # Category
+                    cell.font = Font(color=cat_color, bold=True,
+                                     size=9, name="Consolas")
+                    cell.alignment = aln("center", "center")
+                elif col_i == 5: # Textbook
+                    cell.font = font(C_MUTED, size=9)
+                    cell.alignment = aln("left", "center")
+                elif col_i == 6: # Problem
+                    cell.font = font(C_TEXT, size=10)
+                    cell.alignment = aln("left", "center", wrap=True)
+                elif col_i == 7: # Mastery
+                    cell.font = Font(color=mastery_color, size=10,
+                                     name="Noto Serif JP")
+                    cell.alignment = aln("center", "center")
+                elif col_i == 8: # Min
+                    cell.font = font(C_DIM, size=9, mono=True)
+                    cell.alignment = aln("center", "center")
+                elif col_i == 9: # Instruction
+                    cell.font = font(C_MUTED, size=9)
+                    cell.alignment = aln("left", "center", wrap=True)
+
+            # 行の高さを内容に応じて動的設定
+            problem_text = str(item.get("problem_number", ""))
+            instruction_text = str(item.get("instruction", ""))
+            # 問題番号：列幅34で1行≒20文字
+            prob_lines = max(1, -(-len(problem_text) // 20))
+            # 学習指示：列幅44で1行≒25文字
+            instr_lines = max(1, -(-len(instruction_text) // 25))
+            row_h = max(prob_lines, instr_lines) * 15 + 4
+            row_h = max(20, min(row_h, 200))  # 20〜200ptの範囲
+            ws.row_dimensions[cur].height = row_h
+            cur += 1
+
+    # ── 未割当ブロック ──
     all_unassigned = []
-    for subject in subjects:
-        all_unassigned.extend(unassigned.get(subject, []))
+    for subj in subjects:
+        for item in unassigned.get(subj, []):
+            all_unassigned.append((subj, item))
 
     if all_unassigned:
-        ur = len(rows) + 2
-        lc = ws.cell(row=ur, column=1, value="未割当")
-        lc.font = Font(bold=True)
-        lc.fill = PatternFill("solid", fgColor="F0F0F0")
-        lc.alignment = Alignment(horizontal="center", vertical="top")
-        lc.border = border
-        col_idx = 2
-        for subject in subjects:
-            si = unassigned.get(subject, [])
-            prob_text = chr(10).join([_make_problem_text(i) for i in si])
-            instr_text = chr(10).join(
-                [i.get("instruction", "") or "" for i in si])
-            pc = ws.cell(row=ur, column=col_idx, value=prob_text)
-            pc.fill = PatternFill("solid", fgColor="F0F0F0")
-            pc.alignment = Alignment(
-                horizontal="left", vertical="top", wrap_text=True)
-            pc.border = border
-            col_idx += 1
-            ic = ws.cell(row=ur, column=col_idx, value=instr_text)
-            ic.fill = PatternFill("solid", fgColor="F0F0F0")
-            ic.alignment = Alignment(
-                horizontal="left", vertical="top", wrap_text=True)
-            ic.border = border
-            col_idx += 1
+        # 区切り
+        ws.merge_cells(f"A{cur}:{get_column_letter(N_COLS)}{cur}")
+        sep = ws.cell(row=cur, column=1)
+        sep.value = "── UNASSIGNED ──"
+        sep.fill = fill("1A0A0A")
+        sep.font = Font(color=C_RED, size=8, name="Consolas")
+        sep.alignment = aln("left", "center")
+        ws.row_dimensions[cur].height = 14
+        cur += 1
 
-    ws.column_dimensions["A"].width = 14
-    cl = 2
-    for subject in subjects:
-        ws.column_dimensions[
-            openpyxl.utils.get_column_letter(cl)].width = 30
-        cl += 1
-        ws.column_dimensions[
-            openpyxl.utils.get_column_letter(cl)].width = 35
-        cl += 1
-    for ri in range(2, len(rows) + 3):
-        ws.row_dimensions[ri].height = 80
+        for subj, item in all_unassigned:
+            cat = item.get("category", "")
+            vals = ["—", "—", subj, cat,
+                    item.get("textbook", ""),
+                    item.get("problem_number", ""),
+                    "—",
+                    item.get("estimated_minutes", ""),
+                    item.get("instruction", "")]
+            for col_i, val in enumerate(vals, 1):
+                cell = ws.cell(row=cur, column=col_i)
+                cell.value = val
+                cell.fill = fill("1A0A0A")
+                cell.font = font(C_DIM, size=9)
+                cell.border = bdr("3A1010")
+                cell.alignment = aln("center" if col_i in (1,2,7,8) else "left",
+                                     "center")
+            ws.row_dimensions[cur].height = 18
+            cur += 1
+
+    # オートフィルター
+    ws.auto_filter.ref = f"A2:{get_column_letter(N_COLS)}{cur - 1}"
 
 
-def export_excel(target_date_str, output_path, student_id=None,
-                 start_date=None, subject_filter=None):
+def export_excel(student_id, start_date_str, end_date_str, subject_filter=None):
+    """計画表をExcelファイルに出力して保存パスを返す"""
+    import openpyxl
+    import os
+    from datetime import datetime
+
+    plan_data = build_plan_data(
+        student_id, start_date_str, end_date_str, subject_filter)
+    if not plan_data:
+        return None
+
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
-    conn = get_connection()
-    c = conn.cursor()
-    if student_id:
-        c.execute(
-            "SELECT student_id, name, subjects, plan_mode FROM students "
-            "WHERE student_id=?", (student_id,))
-    else:
-        c.execute(
-            "SELECT student_id, name, subjects, plan_mode FROM students "
-            "ORDER BY student_id")
-    students = c.fetchall()
-    conn.close()
 
-    thin = Side(style="thin")
-    border = Border(left=thin, right=thin, top=thin, bottom=thin)
-    start_str = start_date if start_date else date.today().isoformat()
+    student_name = plan_data["student_name"]
+    subjects     = plan_data["subjects"]
+    rows         = plan_data["rows"]
+    unassigned   = plan_data.get("unassigned", {})
 
-    for student in students:
-        sid = student["student_id"]
-        name = student["name"]
-        plan_mode = student["plan_mode"] if student["plan_mode"] else "all"
+    # 全教科を1シートに出力
+    ws = wb.create_sheet(title="Plan")
+    _write_excel_sheet(ws, subjects, rows, unassigned,
+                       student_name, start_date_str, end_date_str)
 
-        if subject_filter:
-            subjects_to_process = [subject_filter]
-        elif plan_mode == "per_subject":
-            subjects_to_process = [
-                s.strip() for s in student["subjects"].split(",")]
-        else:
-            subjects_to_process = None
+    # 保存
+    archive_dir = os.path.join(os.path.dirname(__file__), "plan_archives")
+    os.makedirs(archive_dir, exist_ok=True)
+    base_name = f"{student_name}_{start_date_str}_{end_date_str}"
+    filename  = f"{base_name}.xlsx"
+    filepath  = os.path.join(archive_dir, filename)
+    # 同名ファイルが開かれている場合はタイムスタンプを付加
+    if os.path.exists(filepath):
+        try:
+            import tempfile
+            with open(filepath, "a"):
+                pass
+        except PermissionError:
+            from datetime import datetime as _dt
+            filename = f"{base_name}_{_dt.now().strftime('%H%M%S')}.xlsx"
+            filepath = os.path.join(archive_dir, filename)
+    wb.save(filepath)
 
-        if subjects_to_process:
-            for subject in subjects_to_process:
-                data = build_plan_data(
-                    sid, start_str, target_date_str, subject)
-                if not data:
-                    continue
-                ws = wb.create_sheet(title=name + "_" + subject)
-                _write_excel_sheet(ws, data, border)
-        else:
-            data = build_plan_data(sid, start_str, target_date_str)
-            if not data:
-                continue
-            ws = wb.create_sheet(title=name)
-            _write_excel_sheet(ws, data, border)
+    # historyテーブルに記録
+    try:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO plan_history (student_id, filename, created_at)
+            VALUES (?, ?, ?)
+        """, (student_id, filename,
+              datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
-    wb.save(output_path)
-    return output_path
+    return filepath
+

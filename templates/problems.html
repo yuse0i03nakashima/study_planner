@@ -181,9 +181,19 @@
         </div>
       </div>
 
-      <label>Problem Number / Name</label>
-      <input type="text" name="problem_number" id="f-problem_number"
-        placeholder="例：大問5（因数分解の応用）" required>
+      <div class="grid-2" style="margin-top:0;">
+        <div>
+          <label>Problem Number / Name</label>
+          <input type="text" name="problem_number" id="f-problem_number"
+            placeholder="例：大問5（因数分解の応用）" required>
+        </div>
+        <div>
+          <label>No. in Textbook</label>
+          <input type="number" name="order_in_textbook" id="f-order_in_textbook"
+            min="1" max="9999" placeholder="空欄 → 同テキスト最大+1を自動設定">
+          <p class="hint">空欄 → 同テキストの最大Order+1を自動設定</p>
+        </div>
+      </div>
 
       <div class="grid-4" style="margin-top:0;">
         <div>
@@ -238,8 +248,16 @@
         </div>
         <div>
           <label>Scheduled Date</label>
-          <input type="date" name="scheduled_date">
-          <p class="hint">空欄 → 問題マスタのみに登録</p>
+          <input type="date" name="scheduled_date" id="f-scheduled_date">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <input type="checkbox" name="undecided" value="1" id="f-undecided"
+              style="accent-color:var(--blue);width:14px;height:14px;"
+              onchange="toggleDate(this)">
+            <label for="f-undecided" style="font-family:'DM Mono',monospace;font-size:10px;
+              letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
+              margin:0;cursor:pointer;">Undecided（授業日未定）</label>
+          </div>
+          <p class="hint">空欄 → 授業曜日から自動計算 / Undecided → 計画表に出さない</p>
         </div>
       </div>
 
@@ -272,14 +290,16 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>ID</th><th>教科</th><th>テキスト</th><th>問題番号</th>
+          <th>No.</th><th>教科</th><th>テキスト</th><th>問題番号</th>
           <th>Imp</th><th>Dif</th><th>RV</th><th>分</th><th>学習指示</th><th></th>
         </tr>
       </thead>
       <tbody>
       {% for p in problems %}
       <tr id="row-{{ p.problem_id }}">
-        <td class="meta-text">{{ p.problem_id }}</td>
+        <td class="meta-text" style="font-family:'DM Mono',monospace;font-size:11px;">
+          {{ p.order_in_textbook or '—' }}
+        </td>
         <td class="meta-text">{{ p.subject }}</td>
         <td class="left" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
           {{ p.textbook }}
@@ -315,6 +335,9 @@
           </span>
         </td>
         <td>
+          <button class="btn btn-ghost btn-sm"
+            onclick="showAddAssignment({{ p.problem_id }})"
+            title="出題予定を追加">+</button>
           <button class="btn btn-danger btn-sm"
             onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
         </td>
@@ -327,9 +350,89 @@
 
   <div id="toast"></div>
 
+<!-- 出題予定追加モーダル -->
+<div id="assign-modal" style="display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border-light);
+    padding:28px 32px;min-width:360px;max-width:500px;width:90%;">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+      text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;
+      padding-bottom:10px;border-bottom:1px solid var(--border);">
+      Add Assignment
+    </div>
+    <form method="POST" action="/assignments/add">
+      <input type="hidden" name="problem_id" id="modal-problem-id">
+      <input type="hidden" name="redirect_to" value="/problems">
+      <div style="margin-bottom:14px;">
+        <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+          Students
+        </label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          {% for s in students %}
+          <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
+            font-size:13px;font-weight:300;color:var(--text);cursor:pointer;">
+            <input type="checkbox" name="student_ids" value="{{ s.student_id }}"
+              style="accent-color:var(--blue);width:14px;height:14px;">
+            {{ s.name }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+            Category
+          </label>
+          <select name="category"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+            <option value="予習">予習</option>
+            <option value="復習">復習</option>
+            <option value="定着">定着</option>
+            <option value="再定着">再定着</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
+            Date
+          </label>
+          <input type="date" name="scheduled_date"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn btn-ghost btn-sm"
+          onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 </div>
 <script>
 let aiData = null;
+
+function showAddAssignment(problemId) {
+  document.getElementById('modal-problem-id').value = problemId;
+  const modal = document.getElementById('assign-modal');
+  modal.style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('assign-modal').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('assign-modal');
+  if (modal) modal.addEventListener('click', e => {
+    if (e.target === modal) closeModal();
+  });
+});
 
 // 教科でテキストを絞り込む
 function filterTextbooks() {
@@ -340,8 +443,27 @@ function filterTextbooks() {
     opt.hidden = opt.dataset.subject !== subject;
     if (!opt.hidden && first) { opt.selected = true; first = false; }
   }
+  fetchNextOrder();
 }
-filterTextbooks();
+
+async function fetchNextOrder() {
+  const tbId = document.getElementById('f-textbook_id').value;
+  const orderInput = document.getElementById('f-order_in_textbook');
+  if (!tbId || orderInput.value) return;
+  try {
+    const res = await fetch('/api/next_order?textbook_id=' + tbId);
+    const data = await res.json();
+    orderInput.placeholder = 'No.: ' + data.next_order;
+  } catch(e) {}
+}
+
+// テキスト変更時もorderを更新
+document.addEventListener('DOMContentLoaded', () => {
+  const tbSel = document.getElementById('f-textbook_id');
+  if (tbSel) tbSel.addEventListener('change', fetchNextOrder);
+  filterTextbooks();
+  fetchNextOrder();
+});
 
 // AI提案
 async function askAI() {
@@ -480,6 +602,12 @@ function startTextAreaEdit(span) {
   };
   ta.addEventListener('blur', () => finish(true));
   ta.addEventListener('keydown', e => { if (e.key === 'Escape') finish(false); });
+}
+
+function toggleDate(cb) {
+  const dateInput = document.getElementById('f-scheduled_date');
+  dateInput.disabled = cb.checked;
+  if (cb.checked) dateInput.value = '';
 }
 
 async function deleteProblem(id, btn) {

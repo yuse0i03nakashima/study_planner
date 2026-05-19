@@ -131,7 +131,6 @@
       <div class="student-name">{{ s.name }}</div>
       <div class="student-meta">
         {{ s.subjects }}<br>
-        <span style="color:var(--text-dim);">{{ s.plan_mode }}</span>
       </div>
     </a>
     {% endfor %}
@@ -153,15 +152,6 @@
         <div>
           <label>Subjects</label>
           <input type="text" name="subjects" placeholder="例：数学,英語">
-        </div>
-      </div>
-      <div class="grid-2" style="margin-top:0;">
-        <div>
-          <label>Plan Mode</label>
-          <select name="plan_mode">
-            <option value="all">all（全教科一括）</option>
-            <option value="per_subject">per_subject（教科別）</option>
-          </select>
         </div>
       </div>
       <div style="margin-top:16px;">

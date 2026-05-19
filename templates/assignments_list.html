@@ -135,6 +135,62 @@
     <span class="meta-text" style="margin-left:auto;">{{ assignments|length }} items</span>
   </div>
 
+  <!-- 出題予定追加 -->
+  <div style="background:var(--surface);border:1px solid var(--border);
+    border-left:2px solid var(--blue);padding:14px 20px;margin-bottom:10px;" class="fade-in">
+    <form method="POST" action="/assignments/add"
+      style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+      <input type="hidden" name="redirect_to"
+        value="/assignments/list?student_id={{ selected_student }}">
+      <input type="hidden" name="student_ids" value="{{ selected_student }}">
+      <input type="hidden" name="problem_id" id="al-problem-id">
+      <div style="flex:1;min-width:220px;">
+        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
+          Problem Search
+        </label>
+        <input type="text" id="al-search" placeholder="問題番号・テキスト名・IDで検索..."
+          autocomplete="off"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;"
+          oninput="searchProblems(this.value)">
+        <div id="al-search-results"
+          style="display:none;position:absolute;z-index:100;
+            background:var(--surface2);border:1px solid var(--border-light);
+            max-height:200px;overflow-y:auto;min-width:320px;"></div>
+        <div id="al-selected-problem"
+          style="font-family:'DM Mono',monospace;font-size:10px;
+            color:var(--green);margin-top:4px;min-height:16px;letter-spacing:0.5px;">
+        </div>
+      </div>
+      <div>
+        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
+          Category
+        </label>
+        <select name="category"
+          style="background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+          <option value="予習">予習</option>
+          <option value="復習">復習</option>
+          <option value="定着">定着</option>
+          <option value="再定着">再定着</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
+          Date
+        </label>
+        <input type="date" name="scheduled_date"
+          style="background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;width:140px;">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm"
+        onclick="return validateAssign()">+ Add</button>
+    </form>
+  </div>
+
   <div class="bulk-bar fade-in">
     <span class="bulk-label">Bulk Edit</span>
     <span class="meta-text">カテゴリ・出題日を変更後に保存</span>
@@ -355,6 +411,54 @@ function startMasteryEdit(span, current) {
     if (e.key === 'Escape') finish(false);
   });
 }
+
+let alSearchTimer = null;
+
+async function searchProblems(q) {
+  clearTimeout(alSearchTimer);
+  const resultsDiv = document.getElementById('al-search-results');
+  if (!q.trim()) { resultsDiv.style.display = 'none'; return; }
+  alSearchTimer = setTimeout(async () => {
+    const sid = '{{ selected_student }}';
+    const res = await fetch(`/api/problems/search?q=${encodeURIComponent(q)}&student_id=${sid}`);
+    const data = await res.json();
+    if (!data.length) { resultsDiv.style.display = 'none'; return; }
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = data.map(p => `
+      <div onclick="selectProblem(${p.problem_id},'${p.textbook} ${p.problem_number}')"
+        style="padding:8px 12px;cursor:pointer;font-size:11px;
+          border-bottom:1px solid var(--border);font-family:'Noto Serif JP',serif;"
+        onmouseover="this.style.background='var(--surface3)'"
+        onmouseout="this.style.background=''">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;
+          color:var(--text-dim);margin-right:8px;">#${p.problem_id}</span>
+        [${p.subject}] ${p.textbook} ${p.problem_number}
+      </div>
+    `).join('');
+  }, 200);
+}
+
+function selectProblem(id, label) {
+  document.getElementById('al-problem-id').value = id;
+  document.getElementById('al-search').value = label;
+  document.getElementById('al-selected-problem').textContent = '✓ ID: ' + id;
+  document.getElementById('al-search-results').style.display = 'none';
+}
+
+function validateAssign() {
+  if (!document.getElementById('al-problem-id').value) {
+    showToast('問題を選択してください', 'warn'); return false;
+  }
+  return true;
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#al-search-results') &&
+      !e.target.matches('#al-search')) {
+    const r = document.getElementById('al-search-results');
+    if (r) r.style.display = 'none';
+  }
+});
 
 function toggleAll(cb) {
   document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);

@@ -25,15 +25,14 @@
       margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
     .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
       text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px; color:#3ecf8e;
-      letter-spacing:2px; text-transform:uppercase;  }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; color:#3ecf8e; }
     .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
       color:var(--text-muted); margin-top:4px; }
     .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
       letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
     .page-header-back::before { content:'← '; }
     .page-header-back:hover { color:var(--text); }
-    /* フォームカード */
     .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:16px; }
     .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
       text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
@@ -42,7 +41,7 @@
       letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
       margin-bottom:6px; margin-top:16px; }
     label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], select {
+    input[type="date"], select {
       width:100%; padding:9px 12px; background:var(--surface2);
       border:1px solid var(--border-light); color:var(--text);
       font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
@@ -50,35 +49,42 @@
     input:focus, select:focus { border-color:var(--blue); }
     select option { background:var(--surface2); }
     .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      letter-spacing:0.5px; margin-top:5px; }
-    /* アクションボタン群 */
+      margin-top:5px; letter-spacing:0.5px; }
     .action-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; align-items:center; }
     .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
       text-transform:uppercase; padding:11px 24px; border:none; cursor:pointer;
       transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-preview { background:var(--blue-bg); color:var(--blue); border:1px solid rgba(91,143,249,0.35); }
+    .btn-preview { background:var(--blue-bg); color:var(--blue);
+      border:1px solid rgba(91,143,249,0.35); }
     .btn-preview:hover { background:rgba(91,143,249,0.2); }
     .btn-excel  { background:var(--green); color:#0c0d11; }
     .btn-excel:hover { background:#5eddaa; }
-    .btn-pdf    { background:var(--amber-bg); color:var(--amber); border:1px solid rgba(245,166,35,0.35); }
+    .btn-pdf    { background:var(--amber-bg); color:var(--amber);
+      border:1px solid rgba(245,166,35,0.35); }
     .btn-pdf:hover { background:rgba(245,166,35,0.2); }
     .action-sep { width:1px; height:24px; background:var(--border-light); margin:0 4px; }
-    /* プレビューテーブル */
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .preview-section { margin-top:24px; }
     .preview-section h2 { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
       text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; }
     table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
     th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
       font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
-      padding:10px 12px; text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
+      padding:10px 12px; text-align:center; border-bottom:1px solid var(--border-light);
+      white-space:nowrap; }
     td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top;
       font-family:'Noto Serif JP',serif; }
     td.date-col { font-family:'DM Mono',monospace; font-size:10px;
       color:var(--text-muted); white-space:nowrap; }
+    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
+      padding:2px 8px; display:inline-block; }
+    .badge-予習  { background:rgba(91,143,249,0.10);  color:#5b8ff9;  border:1px solid rgba(91,143,249,0.3); }
+    .badge-復習  { background:rgba(62,207,142,0.10);  color:#3ecf8e;  border:1px solid rgba(62,207,142,0.3); }
+    .badge-定着  { background:rgba(245,166,35,0.10);  color:#f5a623;  border:1px solid rgba(245,166,35,0.3); }
+    .badge-再定着 { background:rgba(240,98,146,0.10); color:#f06292;  border:1px solid rgba(240,98,146,0.3); }
     .fade-in { animation:fadeIn 0.3s ease both; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     a { color:var(--blue); }
   </style>
 </head>
@@ -94,14 +100,15 @@
     <a class="page-header-back" href="/">TOP</a>
   </div>
 
-  <!-- 設定カード -->
   <div class="card fade-in">
     <div class="card-title">Export Settings</div>
-    <form method="POST" action="/preview">
+    <form method="POST" action="/preview" id="preview-form">
+
       <div class="grid-3">
         <div>
           <label>Student</label>
-          <select name="student_id">
+          <select name="student_id" id="sel-student"
+            onchange="updateSubjects()">
             {% for s in students %}
             <option value="{{ s.student_id }}"
               {% if selected_student == s.student_id %}selected{% endif %}>
@@ -111,26 +118,33 @@
           </select>
         </div>
         <div>
+          <label>Subject</label>
+          <select name="subject_filter" id="sel-subject">
+            <option value="">— All Subjects —</option>
+            {% for subj in subjects %}
+            <option value="{{ subj }}"
+              {% if selected_subject == subj %}selected{% endif %}>
+              {{ subj }}
+            </option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="mode" value="per_subject">
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div>
           <label>Start Date</label>
           <input type="date" name="start_date" value="{{ start_date }}">
-          <p class="hint">空欄 → 今日の日付を使用</p>
+          <p class="hint">空欄 → 今日の日付</p>
         </div>
         <div>
           <label>End Date</label>
           <input type="date" name="end_date" value="{{ end_date }}">
+          <p class="hint">空欄 → 次回授業日を自動設定</p>
         </div>
       </div>
-      {% if subjects %}
-      <div style="margin-top:16px;">
-        <label>Subject（per_subject モード）</label>
-        <select name="subject">
-          <option value="">— 全教科 —</option>
-          {% for subj in subjects %}
-          <option value="{{ subj }}" {% if selected_subject == subj %}selected{% endif %}>{{ subj }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
+
       <div class="action-row">
         <button type="submit" class="btn btn-preview">
           <span>👁</span> Preview
@@ -146,39 +160,111 @@
     </form>
   </div>
 
-  <!-- プレビュー結果 -->
-  {% if plan_data %}
+    {% if preview_data %}
   <div class="preview-section fade-in">
-    <h2>Preview — {{ selected_student_name }}</h2>
-    {{ plan_data | safe }}
-  </div>
-  {% endif %}
+    <h2>Preview — {{ preview_data.student_name }}
+      <span style="font-size:10px;color:var(--text-dim);margin-left:12px;font-style:normal;">
+        {{ start_date }} → {{ end_date }}
+      </span>
+    </h2>
 
-  {% if unassigned %}
-  <div class="preview-section fade-in">
-    <h2>Unassigned Problems</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>教科</th><th>テキスト</th><th>問題番号</th>
-          <th>カテゴリ</th><th>所要時間</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for u in unassigned %}
-        <tr>
-          <td>{{ u.subject }}</td>
-          <td class="left">{{ u.textbook }}</td>
-          <td class="left">{{ u.problem_number }}</td>
-          <td>{{ u.category }}</td>
-          <td>{{ u.estimated_minutes }}分</td>
-        </tr>
+    {# rows は [{date, date_str, subjects:{教科:[問題,...]}}] の形 #}
+    {% set all_subjects = [] %}
+    {% for day in preview_data.rows %}
+      {% for subj in day.subjects.keys() %}
+        {% if subj not in all_subjects %}
+          {% set _ = all_subjects.append(subj) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    {% for subject in all_subjects %}
+    <div style="margin-bottom:28px;">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+        text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;
+        padding-bottom:8px;border-bottom:1px solid var(--border);">
+        {{ subject }}
+      </div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th><th>Category</th><th>Textbook</th>
+            <th>Problem</th><th>Mastery</th><th>Min</th><th>Instruction</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for day in preview_data.rows %}
+          {% for prob in day.subjects.get(subject, []) %}
+          <tr>
+            <td class="date-col" style="white-space:nowrap;">{{ day.date }}</td>
+            <td>
+              <span class="badge badge-{{ prob.category }}">{{ prob.category }}</span>
+            </td>
+            <td style="font-size:11px;max-width:130px;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
+              {{ prob.textbook }}
+            </td>
+            <td style="font-size:11px;max-width:160px;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
+              {{ prob.problem_number }}
+            </td>
+            <td style="color:
+              {%- if prob.mastery_int == 1 %} var(--rose)
+              {%- elif prob.mastery_int == 2 %} var(--amber)
+              {%- else %} var(--green){%- endif %};">
+              {{ prob.mastery }}
+            </td>
+            <td class="date-col">{{ prob.estimated_minutes }}</td>
+            <td style="font-size:11px;max-width:200px;overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);
+              font-family:'Noto Serif JP',serif;">
+              {{ prob.instruction or '—' }}
+            </td>
+          </tr>
+          {% endfor %}
         {% endfor %}
-      </tbody>
-    </table>
+        </tbody>
+      </table>
+      </div>
+
+      {# 未割当問題 #}
+      {% if preview_data.unassigned is mapping %}
+        {% set unassigned_rows = preview_data.unassigned.get(subject, []) %}
+        {% if unassigned_rows %}
+        <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;
+          color:var(--rose);letter-spacing:1px;padding:8px 12px;
+          background:rgba(240,98,146,0.05);border-left:2px solid var(--rose);">
+          Unassigned ({{ unassigned_rows|length }}):
+          {% for u in unassigned_rows %}
+          <span style="margin-left:6px;color:var(--text-muted);">
+            {{ u.problem_number }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
 </div>
+<script>
+const studentSubjects = {{ student_subjects | tojson }};
+
+function updateSubjects() {
+  const sid  = document.getElementById('sel-student').value;
+  const sel  = document.getElementById('sel-subject');
+  const info = studentSubjects[sid] || {};
+  const subjs = info.subjects || [];
+  sel.innerHTML = '<option value="">— 全教科 —</option>';
+  subjs.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+}
+</script>
 </body>
 </html>

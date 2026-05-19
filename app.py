@@ -35,12 +35,23 @@ def problems():
             subject  = request.form.get("subject", "")
             textbook = request.form.get("textbook", "")
 
+        # order_in_textbook: 入力があればそれを使い、なければ同テキスト最大+1
+        order_input = request.form.get("order_in_textbook", "").strip()
+        if order_input:
+            order_in_textbook = int(order_input)
+        else:
+            c.execute("""
+                SELECT MAX(order_in_textbook) as m FROM problems WHERE textbook_id=?
+            """, (textbook_id,))
+            r = c.fetchone()
+            order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
+
         c.execute("""
             INSERT INTO problems
             (subject, textbook, textbook_id, problem_number,
              importance, difficulty, review_value,
-             estimated_minutes, instruction, type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             estimated_minutes, instruction, type, order_in_textbook)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             subject, textbook, textbook_id,
             request.form["problem_number"],
@@ -49,7 +60,8 @@ def problems():
             request.form["review_value"],
             request.form["estimated_minutes"],
             request.form.get("instruction", ""),
-            "標準"
+            "標準",
+            order_in_textbook
         ))
         conn.commit()
         problem_id = c.lastrowid
@@ -60,9 +72,13 @@ def problems():
         scheduled_date = request.form.get("scheduled_date", "").strip()
         category       = request.form.get("category", "予習")
 
+        undecided = request.form.get("undecided") == "1"
         for sid in student_ids:
-            # scheduled_dateが未指定なら自動計算
-            if not scheduled_date:
+            if undecided:
+                # 授業日未定
+                effective_date = "2099-12-31"
+            elif not scheduled_date:
+                # 未指定なら授業曜日から自動計算
                 auto_date = get_auto_next_class_date(sid, subject)
                 effective_date = auto_date if auto_date else "2099-12-31"
             else:
@@ -90,7 +106,7 @@ def problems():
     c.execute("""
         SELECT p.problem_id, p.subject, p.textbook, p.problem_number,
                p.importance, p.difficulty, p.review_value,
-               p.estimated_minutes, p.instruction
+               p.estimated_minutes, p.instruction, p.order_in_textbook
         FROM problems p
         ORDER BY p.problem_id DESC LIMIT 50
     """)
@@ -335,7 +351,8 @@ def export():
 
     if request.method == "POST":
         student_id = request.form["student_id"]
-        target_date = request.form["date"]
+        _td = request.form.get("end_date") or request.form.get("date") or ""
+        target_date = _td if _td else (date.today() + timedelta(days=7)).isoformat()
         start_date = request.form.get("start_date", "")
         if not start_date:
             start_date = date.today().isoformat()
@@ -362,56 +379,116 @@ def export():
 
 @app.route("/preview", methods=["GET", "POST"])
 def preview():
+    from database import get_auto_next_class_date
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
+
+    # 各生徒の教科・plan_mode
+    c.execute("SELECT student_id, subjects, plan_mode FROM students")
+    student_subjects = {
+        r["student_id"]: {
+            "subjects": [s.strip() for s in r["subjects"].split(",")],
+            "plan_mode": r["plan_mode"] or "all"
+        }
+        for r in c.fetchall()
+    }
     conn.close()
 
     preview_data = None
     selected = {}
 
     if request.method == "POST":
-        student_id = request.form["student_id"]
-        target_date = request.form["date"]
-        start_date = request.form.get("start_date", "")
-        subject_filter = request.form.get("subject_filter", "")
+        student_id    = request.form.get("student_id", "")
+        subject_filter = request.form.get("subject_filter", "").strip()
+        start_date    = request.form.get("start_date", "").strip()
+        end_date      = request.form.get("end_date", "").strip()
+
         if not start_date:
             start_date = date.today().isoformat()
 
-        # 自動昇格はアプリ起動時に実行済み
+        # end_dateが空欄の場合は次回授業日を自動計算
+        if not end_date:
+            target_subject = subject_filter if subject_filter else None
+            if target_subject:
+                next_cls = get_auto_next_class_date(student_id, target_subject)
+            else:
+                # 全教科の中で最も近い次回授業日
+                info = student_subjects.get(student_id, {})
+                subjs = info.get("subjects", [])
+                dates = []
+                for subj in subjs:
+                    d = get_auto_next_class_date(student_id, subj)
+                    if d:
+                        dates.append(d)
+                next_cls = min(dates) if dates else None
+            end_date = next_cls if next_cls else (
+                date.fromisoformat(start_date) + timedelta(days=7)).isoformat()
 
         selected = {
-            "student_id": student_id,
-            "date": target_date,
-            "start_date": start_date,
+            "student_id":     student_id,
+            "mode":           "per_subject" if subject_filter else "all",
             "subject_filter": subject_filter,
+            "start_date":     start_date,
+            "end_date":       end_date,
         }
 
         from excel_export import build_plan_data
+        action = request.form.get("action", "preview")
+
+        if action == "excel":
+            from excel_export import export_excel
+            path = export_excel(student_id, start_date, end_date,
+                                subject_filter if subject_filter else None)
+            if path:
+                import subprocess
+                subprocess.Popen(["start", "", path], shell=True)
+            return redirect("/preview")
+
+        if action == "pdf":
+            from pdf_export import generate_pdf
+            path = generate_pdf(student_id, start_date, end_date,
+                                subject_filter if subject_filter else None)
+            if path:
+                import subprocess
+                subprocess.Popen(["start", "", path], shell=True)
+            return redirect("/preview")
+
         preview_data = build_plan_data(
-            student_id, start_date, target_date,
+            student_id, start_date, end_date,
             subject_filter if subject_filter else None)
 
-    # 各生徒の教科リストを渡す
-    conn2 = get_connection()
-    c2 = conn2.cursor()
-    c2.execute("SELECT student_id, subjects, plan_mode FROM students")
-    student_subjects = {
-        r["student_id"]: {
-            "subjects": [s.strip() for s in r["subjects"].split(",")],
-            "plan_mode": r["plan_mode"] or "all"
-        }
-        for r in c2.fetchall()
-    }
-    conn2.close()
+    # テンプレート変数を整理
+    selected_student     = selected.get("student_id",
+                           students[0]["student_id"] if students else "")
+    selected_mode        = selected.get("mode", "all")
+    selected_subject     = selected.get("subject_filter", "")
+    start_date           = selected.get("start_date", date.today().isoformat())
+    end_date             = selected.get("end_date", "")
+    selected_student_name = ""
+    subjects = []
+    for s in students:
+        if s["student_id"] == selected_student:
+            selected_student_name = s["name"]
+            info = student_subjects.get(selected_student, {})
+            subjects = info.get("subjects", [])
+            break
 
-    return render_template("preview.html", students=students,
-                           preview_data=preview_data, selected=selected,
-                           student_subjects=student_subjects)
+    return render_template("preview.html",
+                           students=students,
+                           preview_data=preview_data,
+                           selected=selected,
+                           student_subjects=student_subjects,
+                           selected_student=selected_student,
+                           selected_student_name=selected_student_name,
+                           selected_mode=selected_mode,
+                           selected_subject=selected_subject,
+                           start_date=start_date,
+                           end_date=end_date,
+                           subjects=subjects,
+                           unassigned=preview_data.get("unassigned", {}) if preview_data else {})
 
-
-# ─── 勉強時間・履歴 ────────────────────────────────────
 
 @app.route("/schedule", methods=["GET", "POST"])
 def schedule():
@@ -474,7 +551,7 @@ def history_download(history_id):
 def export_pdf_route():
     from pdf_export import export_pdf
     student_id = request.form["student_id"]
-    target_date = request.form["date"]
+    target_date = request.form.get("end_date") or request.form.get("date") or ""
     start_date = request.form.get("start_date", "")
     if not start_date:
         start_date = date.today().isoformat()
@@ -832,11 +909,24 @@ def textbooks():
             s = subj.strip()
             if s and s not in all_subjects:
                 all_subjects.append(s)
+    # 全生徒
+    c.execute("SELECT student_id, name FROM students ORDER BY student_id")
+    all_students = c.fetchall()
+
+    # 各テキストの紐づき生徒IDリストを付与
+    tb_list_with_students = []
+    for t in tb_list:
+        c.execute("SELECT student_id FROM student_textbooks WHERE textbook_id=?",
+                  (t["textbook_id"],))
+        sids = [r["student_id"] for r in c.fetchall()]
+        tb_list_with_students.append({**dict(t), "student_ids_list": sids})
+
     conn.close()
     return render_template("textbooks.html",
-                           textbooks=tb_list,
+                           textbooks=tb_list_with_students,
                            series_list=series_list,
-                           all_subjects=sorted(all_subjects))
+                           all_subjects=sorted(all_subjects),
+                           all_students=all_students)
 
 
 @app.route("/textbooks/series/add", methods=["POST"])
@@ -896,6 +986,12 @@ def textbook_delete(textbook_id):
 def textbook_sections(textbook_id):
     conn = get_connection()
     c = conn.cursor()
+    c.execute("SELECT t.*, s.name as series_name FROM textbooks t LEFT JOIN series s ON t.series_id = s.series_id WHERE t.textbook_id=?", (textbook_id,))
+    textbook = c.fetchone()
+    if not textbook:
+        conn.close()
+        return "Textbook not found", 404
+
     if request.method == "POST":
         name = request.form["name"].strip()
         order_index = int(request.form.get("order_index", 0))
@@ -907,24 +1003,28 @@ def textbook_sections(textbook_id):
         return redirect(f"/textbooks/{textbook_id}/sections")
 
     c.execute("""
-        SELECT t.*, s.name as series_name FROM textbooks t
-        LEFT JOIN series s ON t.series_id = s.series_id
-        WHERE t.textbook_id=?
-    """, (textbook_id,))
-    textbook = c.fetchone()
-    c.execute("""
-        SELECT ts.*, COUNT(p.problem_id) as problem_count
-        FROM textbook_sections ts
-        LEFT JOIN problems p ON ts.section_id = p.section_id
-        WHERE ts.textbook_id=?
-        GROUP BY ts.section_id
-        ORDER BY ts.order_index, ts.section_id
+        SELECT s.*, COUNT(p.problem_id) as problem_count
+        FROM textbook_sections s
+        LEFT JOIN problems p ON s.section_id = p.section_id
+        WHERE s.textbook_id=?
+        GROUP BY s.section_id
+        ORDER BY s.order_index, s.section_id
     """, (textbook_id,))
     sections = c.fetchall()
+
+    # テキスト内の問題一覧
+    c.execute("""
+        SELECT problem_id, problem_number, subject,
+               importance, difficulty, review_value, order_in_textbook
+        FROM problems WHERE textbook_id=?
+        ORDER BY order_in_textbook, problem_id
+    """, (textbook_id,))
+    problems = c.fetchall()
     conn.close()
     return render_template("sections.html",
-                           textbook=textbook, sections=sections)
-
+                           textbook=textbook,
+                           sections=sections,
+                           problems=problems)
 
 @app.route("/textbooks/sections/delete/<int:section_id>", methods=["POST"])
 def section_delete(section_id):
@@ -990,15 +1090,18 @@ def problem_update_field():
     problem_id = data.get("problem_id")
     field = data.get("field")
     value = data.get("value")
-    allowed = {"importance", "difficulty", "review_value", "estimated_minutes"}
+    allowed = {"importance", "difficulty", "review_value", "estimated_minutes", "order_in_textbook"}
     if field not in allowed:
         return jsonify({"status": "error", "message": "Invalid field"}), 400
     try:
         value = int(value)
-        if not (1 <= value <= 5):
+        if field == "order_in_textbook":
+            if not (1 <= value <= 9999):
+                raise ValueError
+        elif not (1 <= value <= 5):
             raise ValueError
     except (ValueError, TypeError):
-        return jsonify({"status": "error", "message": "Value must be 1-5"}), 400
+        return jsonify({"status": "error", "message": "Invalid value"}), 400
     conn = get_connection()
     c = conn.cursor()
     c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
@@ -1308,6 +1411,164 @@ def student_update(student_id):
     conn.commit()
     conn.close()
     return redirect(f"/students/{student_id}#profile")
+
+
+@app.route("/students/add", methods=["POST"])
+def students_add():
+    student_id = request.form.get("student_id", "").strip()
+    name       = request.form.get("name", "").strip()
+    subjects   = request.form.get("subjects", "").strip()
+    plan_mode  = request.form.get("plan_mode", "all")
+    if not student_id or not name:
+        return redirect("/students")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT OR IGNORE INTO students
+        (student_id, name, subjects, plan_mode)
+        VALUES (?, ?, ?, ?)
+    """, (student_id, name, subjects, plan_mode))
+    conn.commit()
+    conn.close()
+    return redirect("/students")
+
+
+@app.route("/textbooks/<int:textbook_id>/students", methods=["POST"])
+def textbook_students_update(textbook_id):
+    """テキストと生徒の紐づけを更新する"""
+    student_ids = request.form.getlist("student_ids")
+    conn = get_connection()
+    c = conn.cursor()
+    # 既存の紐づけを削除してから再登録
+    c.execute("DELETE FROM student_textbooks WHERE textbook_id=?", (textbook_id,))
+    for sid in student_ids:
+        c.execute("""
+            INSERT OR IGNORE INTO student_textbooks (student_id, textbook_id)
+            VALUES (?, ?)
+        """, (sid, textbook_id))
+    conn.commit()
+    conn.close()
+    return redirect("/textbooks")
+
+
+@app.route("/assignments/add", methods=["POST"])
+def assignment_add():
+    """出題予定を手動で追加する（複数生徒対応）"""
+    problem_id     = request.form.get("problem_id")
+    student_ids    = request.form.getlist("student_ids")
+    scheduled_date = request.form.get("scheduled_date", "").strip()
+    category       = request.form.get("category", "予習")
+    redirect_to    = request.form.get("redirect_to", "/assignments/list")
+
+    if not scheduled_date:
+        scheduled_date = "2099-12-31"
+
+    conn = get_connection()
+    c = conn.cursor()
+    for sid in student_ids:
+        c.execute("""
+            INSERT OR REPLACE INTO assignments
+            (student_id, problem_id, scheduled_date, category)
+            VALUES (?, ?, ?, ?)
+        """, (sid, problem_id, scheduled_date, category))
+    conn.commit()
+    conn.close()
+    return redirect(redirect_to)
+
+
+@app.route("/api/problems/search")
+def api_problems_search():
+    """問題番号・テキスト名で問題を検索するAPI"""
+    q = request.args.get("q", "").strip()
+    student_id = request.args.get("student_id", "")
+    if not q:
+        return jsonify([])
+    conn = get_connection()
+    c = conn.cursor()
+    like = f"%{q}%"
+    if student_id:
+        c.execute("""
+            SELECT DISTINCT p.problem_id, p.subject, p.textbook,
+                   p.problem_number, p.importance, p.difficulty, p.review_value
+            FROM problems p
+            JOIN student_textbooks st ON p.textbook_id = st.textbook_id
+            WHERE st.student_id = ?
+              AND (p.problem_number LIKE ? OR p.textbook LIKE ?
+                   OR CAST(p.problem_id AS TEXT) LIKE ?)
+            ORDER BY p.subject, p.textbook, p.problem_id
+            LIMIT 20
+        """, (student_id, like, like, like))
+    else:
+        c.execute("""
+            SELECT problem_id, subject, textbook, problem_number,
+                   importance, difficulty, review_value
+            FROM problems
+            WHERE problem_number LIKE ? OR textbook LIKE ?
+               OR CAST(problem_id AS TEXT) LIKE ?
+            ORDER BY subject, textbook, problem_id
+            LIMIT 20
+        """, (like, like, like))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/problems/update_textbook", methods=["POST"])
+def api_problems_update_textbook():
+    """問題のテキストを変更するAPI"""
+    data = request.get_json()
+    problem_id  = data.get("problem_id")
+    textbook_id = data.get("textbook_id")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT name, subject FROM textbooks WHERE textbook_id=?",
+              (textbook_id,))
+    tb = c.fetchone()
+    if not tb:
+        conn.close()
+        return jsonify({"status": "error", "message": "Textbook not found"}), 404
+    c.execute("""
+        UPDATE problems SET textbook_id=?, textbook=?, subject=?
+        WHERE problem_id=?
+    """, (textbook_id, tb["name"], tb["subject"], problem_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok",
+                    "textbook": tb["name"], "subject": tb["subject"]})
+
+
+@app.route("/api/textbooks/list")
+def api_textbooks_list():
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT t.textbook_id, t.name, t.subject,
+               s.name as series_name
+        FROM textbooks t
+        LEFT JOIN series s ON t.series_id = s.series_id
+        ORDER BY t.subject, s.name, t.name
+    """)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/next_order")
+def api_next_order():
+    """同一テキスト内の次のorder_in_textbookを返す"""
+    textbook_id = request.args.get("textbook_id")
+    if not textbook_id:
+        return jsonify({"next_order": 1})
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT MAX(order_in_textbook) as max_order
+        FROM problems WHERE textbook_id=?
+    """, (textbook_id,))
+    row = c.fetchone()
+    conn.close()
+    max_order = row["max_order"] if row and row["max_order"] else 0
+    return jsonify({"next_order": max_order + 1})
 
 if __name__ == "__main__":
     init_db()
