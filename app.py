@@ -447,8 +447,8 @@ def preview():
             return redirect("/preview")
 
         if action == "pdf":
-            from pdf_export import generate_pdf
-            path = generate_pdf(student_id, start_date, end_date,
+            from pdf_export import export_pdf
+            path = export_pdf(student_id, start_date, end_date,
                                 subject_filter if subject_filter else None)
             if path:
                 import subprocess

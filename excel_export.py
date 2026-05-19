@@ -132,61 +132,97 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         if not added:
             break
 
-    for item in interleaved_yosyu:
+    # 予習：No.順を維持しながら後半寄りに分散
+    # 戦略：予習問題をN個とし、i番目の問題は全体の後半60%に収まるよう
+    #        目標日インデックスを設定。その日付以降で空きがあれば割り当て、
+    #        なければ前に戻って探す（順番は絶対に崩さない）
+    n_dates = len(dates_sorted)
+    n_yosyu = len(interleaved_yosyu)
+
+    yosyu_date_counts = {}
+    for yi, item in enumerate(interleaved_yosyu):
         subject = item["subject"]
         class_dates = subject_class_dates.get(subject, [])
         future = sorted([d for d in class_dates if d > start_date_str])
         if future:
             next_class = future[0]
-            # 授業日当日も含める
             search = sorted([d for d in dates_sorted if d <= next_class])
         else:
             search = list(dates_sorted)
-        # 予習はNo.順を維持するため最も早い日優先で割り当て
-        if not try_assign(item, search, prefer_earliest=True):
+
+        n_search = len(search)
+        minutes = item.get("estimated_minutes", 15)
+
+        # i番目の問題の目標位置：後半60%の範囲内でi/N比率で分散
+        # 例：5問なら 0.40, 0.50, 0.60, 0.75, 0.90 のインデックス
+        if n_yosyu > 1:
+            ratio = 0.40 + (yi / (n_yosyu - 1)) * 0.55
+        else:
+            ratio = 0.70
+        target_idx = int(n_search * ratio)
+        target_idx = max(0, min(target_idx, n_search - 1))
+
+        # 目標日以降で空きがある日を探す（後半優先）
+        valid_after = [d for d in search[target_idx:]
+                       if remaining.get(d, 0) >= minutes]
+        valid_before = [d for d in search[:target_idx]
+                        if remaining.get(d, 0) >= minutes]
+
+        if valid_after:
+            # 目標以降で最も問題数が少ない日（同数なら早い日）
+            d = min(valid_after,
+                    key=lambda x: (yosyu_date_counts.get(x, 0), x))
+        elif valid_before:
+            # 前に戻って最も問題数が少ない日（同数なら遅い日＝後半寄り）
+            d = min(valid_before,
+                    key=lambda x: (yosyu_date_counts.get(x, 0), -search.index(x)))
+        else:
             item["assigned_date"] = None
             unassigned.append(item)
+            continue
 
-    # ─── 復習：次回授業日の前日までに配置、前半60%・後半40% ──
-    fukushu_items = sorted(
-        [p for p in plan if p["category"] == "復習"],
-        key=priority_score)
+        remaining[d] -= minutes
+        item["assigned_date"] = d
+        yosyu_date_counts[d] = yosyu_date_counts.get(d, 0) + 1
+        assigned.append(item)
 
-    front_end = max(1, int(n * 0.6))
-    front_dates = dates_sorted[:front_end]
-    back_dates = dates_sorted[front_end:] if len(dates_sorted) > front_end else dates_sorted
+        # ─── 復習：前半優先＋均等分散 ───────────────────────
+    # 前60%の日を優先し、満杯なら後半にスピルオーバー
+    fukusyu_items = [p for p in plan if p["category"] == "復習"]
 
-    total = len(fukushu_items)
-    front_count = max(1, int(total * 0.6)) if total > 0 else 0
+    # 前半60%・後半40%に分割
+    n_dates_f = len(dates_sorted)
+    split_f = int(n_dates_f * 0.60)
+    fuku_first_half  = dates_sorted[:split_f]   # 前半（復習優先）
+    fuku_second_half = dates_sorted[split_f:]   # 後半（スピルオーバー）
 
-    for i, item in enumerate(fukushu_items):
-        subject = item["subject"]
-        class_dates = subject_class_dates.get(subject, [])
-        future = sorted([d for d in class_dates if d > start_date_str])
+    fuku_date_counts = {}
+    for item in fukusyu_items:
+        minutes = item.get("estimated_minutes", 15)
 
-        # 次回授業日の前日を計算
-        if future:
-            from datetime import date as _date, timedelta as _timedelta
-            next_class = future[0]
-            next_class_obj = _date.fromisoformat(next_class)
-            prev_day = (next_class_obj - _timedelta(days=1)).isoformat()
-            deadline_dates = [d for d in dates_sorted if d <= prev_day]
+        # 前半優先で有効な日
+        first_valid  = [d for d in fuku_first_half
+                        if remaining.get(d, 0) >= minutes]
+        second_valid = [d for d in fuku_second_half
+                        if remaining.get(d, 0) >= minutes]
+
+        if first_valid:
+            # 前半：問題数が少ない日優先（同数なら早い日）
+            d = min(first_valid,
+                    key=lambda x: (fuku_date_counts.get(x, 0), x))
+        elif second_valid:
+            # 後半にスピルオーバー
+            d = min(second_valid,
+                    key=lambda x: (fuku_date_counts.get(x, 0), x))
         else:
-            deadline_dates = dates_sorted
+            item["assigned_date"] = None
+            unassigned.append(item)
+            continue
 
-        # 期限内で前半・後半に分散
-        if i < front_count:
-            search = [d for d in front_dates if d in deadline_dates] or deadline_dates
-        else:
-            search = [d for d in back_dates if d in deadline_dates] or deadline_dates
-
-        if not try_assign_balanced(item, search, date_counts):
-            # フォールバック：期限内全日付
-            if not try_assign_balanced(item, deadline_dates, date_counts):
-                # 最終フォールバック：全日付
-                if not try_assign_balanced(item, dates_sorted, date_counts):
-                    item["assigned_date"] = None
-                    unassigned.append(item)
+        remaining[d] -= minutes
+        item["assigned_date"] = d
+        fuku_date_counts[d] = fuku_date_counts.get(d, 0) + 1
+        assigned.append(item)
 
     # ─── 定着・再定着：均等分散、代表問題優先 ──────────
     teichaku_items = [p for p in plan
@@ -390,21 +426,21 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     ws.merge_cells(f"A1:{get_column_letter(N_COLS)}1")
     c1 = ws["A1"]
     c1.value = f"[SP]  {student_name}   {start_date} → {end_date}"
-    c1.fill = fill(BG_SURFACE)
+    c1.fill = fill("0F1119")   # タイトル専用（最も濃い）
     c1.font = Font(color=C_BLUE, bold=True, size=12, name="Consolas")
     c1.alignment = aln("left", "center")
     ws.row_dimensions[1].height = 30
 
     # ── ヘッダ行 ──
+    BG_HEADER_ROW = "222536"   # ヘッダ専用色（BG_SURFACE3相当）
     for i, (h, _) in enumerate(COLS, 1):
         cell = ws.cell(row=2, column=i)
         cell.value = h.upper()
-        cell.fill = fill(BG_SURFACE2)
+        cell.fill = fill(BG_HEADER_ROW)
         cell.font = Font(color=C_MUTED, bold=False, size=8, name="Consolas")
         cell.alignment = aln("center", "center")
         cell.border = bdr(C_BORDER_L)
-    # I列より右のヘッダ行はBG_MAINのまま（全体塗りで対応済み）
-    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[2].height = 20
 
     ws.freeze_panes = "A3"
 
