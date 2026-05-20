@@ -211,6 +211,8 @@
         <th>Imp</th>
         <th>Dif</th>
         <th>RV</th>
+        <th>Min</th>
+        <th>Total</th>
         <th>習熟度</th>
         <th>カテゴリ</th>
         <th>出題日</th>
@@ -238,6 +240,9 @@
       <td class="editable-cell" data-problem="{{ a.problem_id }}" data-field="review_value">
         <span class="editable" ondblclick="startNumEdit(this)">{{ a.review_value }}</span>
       </td>
+      <td class="meta-text">{{ a.estimated_minutes if a.estimated_minutes else '—' }}</td>
+      <td class="meta-text" style="color:var(--text-dim);">
+        {{ a.total_minutes if a.total_minutes else '—' }}</td>
       <!-- 習熟度：ダブルクリックでセレクト編集 -->
       <td class="mastery-cell"
         data-student="{{ selected_student }}"

@@ -299,7 +299,7 @@
       <thead>
         <tr>
           <th>No.</th><th>教科</th><th>テキスト</th><th>問題番号</th>
-          <th>Imp</th><th>Dif</th><th>RV</th><th>分</th><th>学習指示</th><th></th>
+          <th>Imp</th><th>Dif</th><th>RV</th><th>分</th><th>Total</th><th>学習指示</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -334,6 +334,9 @@
         <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="estimated_minutes">
           <span class="editable" ondblclick="startNumEdit(this, 5, 120, 5)">{{ p.estimated_minutes }}</span>
         </td>
+        <!-- 総HP：数値編集 -->
+        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="total_minutes"><span class="editable" ondblclick="startNumEdit(this, 5, 999, 5)" style="color:var(--text-dim);">{{ p.total_minutes if p.total_minutes else '—' }}</span></td>
+        <!-- 総HP：数値編集 -->
         <!-- 学習指示：テキストエリア編集 -->
         <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="instruction"
           style="max-width:140px;">
@@ -535,12 +538,23 @@ function startNumEdit(span, min=1, max=5, step=1) {
   const finish = async (save) => {
     if (done) return; done = true;
     if (save && input.value !== current) {
+      const sendVal = (field === 'total_minutes' && input.value === '') ? null : input.value;
       const res = await fetch('/problems/update_field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, field: field, value: input.value })
+        body: JSON.stringify({ problem_id: problemId, field: field,
+          value: (field === 'total_minutes' && input.value === '') ? null : input.value })
       });
-      if (res.ok) { span.textContent = input.value; showToast('✓ Updated', 'success'); }
+      if (res.ok) {
+        if (field === 'total_minutes') {
+          var dispVal = (sendVal === null || input.value === '') ? '—' : input.value;
+          span.textContent = dispVal;
+          span.style.color = (sendVal !== null && input.value !== '') ? 'var(--green)' : 'var(--text-dim)';
+        } else {
+          span.textContent = input.value;
+        }
+        showToast('✓ Updated', 'success');
+      }
       else { showToast('Update failed.', 'warn'); }
     }
     input.remove(); span.classList.remove('editing');

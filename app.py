@@ -642,7 +642,7 @@ def problems_list():
     query = """
         SELECT p.problem_id, p.subject, p.textbook, p.textbook_id,
                p.problem_number, p.importance, p.difficulty, p.review_value,
-               p.estimated_minutes, p.instruction, p.order_in_textbook
+               p.estimated_minutes, p.total_minutes, p.instruction, p.order_in_textbook
         FROM problems p
         WHERE 1=1
     """
@@ -783,6 +783,7 @@ def assignments_list():
             SELECT a.assignment_id, a.category, a.scheduled_date,
                    p.problem_id, p.subject, p.textbook, p.problem_number,
                    p.importance, p.difficulty, p.review_value,
+                   p.estimated_minutes, p.total_minutes,
                    (SELECT mastery FROM history h
                     WHERE h.student_id = a.student_id
                     AND h.problem_id = a.problem_id
@@ -1156,27 +1157,47 @@ def problem_update_field():
     """問題固有フィールドをインライン編集で更新する"""
     data = request.get_json()
     problem_id = data.get("problem_id")
-    field = data.get("field")
-    value = data.get("value")
-    allowed = {"importance", "difficulty", "review_value", "estimated_minutes", "order_in_textbook"}
+    field      = data.get("field")
+    value      = data.get("value")
+
+    allowed = {"importance", "difficulty", "review_value", "estimated_minutes",
+               "order_in_textbook", "total_minutes", "instruction", "problem_number"}
     if field not in allowed:
-        return jsonify({"status": "error", "message": "Invalid field"}), 400
+        return jsonify({"ok": False, "message": "Invalid field"}), 400
+
+    # フィールドごとのバリデーションと型変換
     try:
-        value = int(value)
-        if field == "order_in_textbook":
+        if field in ("importance", "difficulty", "review_value"):
+            value = int(value)
+            if not (1 <= value <= 5):
+                raise ValueError
+        elif field == "estimated_minutes":
+            value = int(value)
+            if not (5 <= value <= 300):
+                raise ValueError
+        elif field == "order_in_textbook":
+            value = int(value)
             if not (1 <= value <= 9999):
                 raise ValueError
-        elif not (1 <= value <= 5):
-            raise ValueError
+        elif field == "total_minutes":
+            # 空欄・null・「—」はNULLに
+            if value is None or value == "" or value == "—":
+                value = None
+            else:
+                value = int(value)
+                if value < 5:
+                    raise ValueError
+        # instruction・problem_numberはそのまま文字列
     except (ValueError, TypeError):
-        return jsonify({"status": "error", "message": "Invalid value"}), 400
+        return jsonify({"ok": False, "message": "Invalid value"}), 400
+
     conn = get_connection()
     c = conn.cursor()
     c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
               (value, problem_id))
     conn.commit()
     conn.close()
-    return jsonify({"status": "ok"})
+    return jsonify({"ok": True})
 
 
 @app.route("/mastery/single_update", methods=["POST"])
