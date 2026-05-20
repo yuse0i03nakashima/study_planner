@@ -416,6 +416,24 @@ async def list_tools():
             }
         ),
         Tool(
+            name="auto_record_session",
+            description=(
+                "授業報告を受けた後、未報告の問題を自動登録する。"
+                "難易度1〜3の問題はscore=5(Perfect)、難易度4〜5はscore=4(Good)で登録。"
+                "通常はadd_recordを呼んだ時点で自動実行されるが、"
+                "手動でまとめて実行したい場合に使用する。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id":   {"type": "string", "description": "生徒ID"},
+                    "record_date":  {"type": "string",
+                                    "description": "基準日YYYY-MM-DD（省略→今日）。この日以前の未報告問題を処理"}
+                },
+                "required": ["student_id"]
+            }
+        ),
+        Tool(
             name="generate_pdf_plan",
             description="計画表をPDFファイルに出力する。plan_archivesフォルダに保存される。ブラウザUIから出力することを推奨",
             inputSchema={
@@ -774,15 +792,24 @@ async def call_tool(name: str, arguments: dict):
             VALUES (?,?,?,?,?,?,?)
         """, (student_id, problem_id, record_date, correct, new_mastery, "記録", score))
         conn.commit()
+        conn.close()
 
         score_labels = {5:"Perfect",4:"Good",3:"Review",2:"Retry",1:"Failed"}
-        conn.close()
+
+        # 未報告問題の自動登録（報告があった問題より前の出題予定を処理）
+        try:
+            from database import auto_record_unreported
+            auto_results = auto_record_unreported(student_id, record_date)
+        except Exception:
+            auto_results = []
+
         return [TextContent(type="text", text=json.dumps({
             "new_mastery": new_mastery,
             "mastery_stars": "★" * new_mastery,
             "score": score,
             "score_label": score_labels.get(score, str(score)),
-            "correct": correct
+            "correct": correct,
+            "auto_recorded": auto_results
         }, ensure_ascii=False))]
 
     # ── 更新系 ──────────────────────────────────────────
@@ -923,6 +950,31 @@ async def call_tool(name: str, arguments: dict):
             {"status":"ok","cleared":student_id}, ensure_ascii=False))]
 
     # ── 出力系 ──────────────────────────────────────────
+    elif name == "auto_record_session":
+        student_id  = arguments["student_id"]
+        record_date = arguments.get("record_date", date.today().isoformat())
+        try:
+            from database import auto_record_unreported
+            results = auto_record_unreported(student_id, record_date)
+        except Exception as e:
+            results = [{"error": str(e)}]
+        score_labels = {5:"Perfect",4:"Good",3:"Review",2:"Retry",1:"Failed"}
+        summary = []
+        for r in results:
+            summary.append({
+                "problem_id":     r["problem_id"],
+                "scheduled_date": r["scheduled_date"],
+                "difficulty":     r["difficulty"],
+                "score":          r["score"],
+                "score_label":    score_labels.get(r["score"], str(r["score"])),
+                "new_mastery":    r["new_mastery"],
+                "mastery_stars":  "★" * r["new_mastery"],
+            })
+        return [TextContent(type="text", text=json.dumps({
+            "auto_recorded_count": len(summary),
+            "records": summary
+        }, ensure_ascii=False, indent=2))]
+
     elif name == "generate_excel_plan":
         student_id     = arguments["student_id"]
         start_date     = arguments.get("start_date", date.today().isoformat())

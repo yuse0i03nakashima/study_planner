@@ -818,3 +818,62 @@ def get_auto_next_class_date(student_id, subject):
             return d.isoformat()
 
     return None
+
+
+def auto_record_unreported(student_id, record_date):
+    """
+    出題予定のうち授業記録がない問題を自動登録する。
+    難易度1〜3: score=5（Perfect）
+    難易度4〜5: score=4（Good）
+    前日以前に出題予定だった問題が対象。
+    """
+    conn = get_connection()
+    c = conn.cursor()
+
+    # 出題予定のうち、record_date以前で授業記録がない問題を取得
+    c.execute("""
+        SELECT a.assignment_id, a.problem_id, a.scheduled_date,
+               p.difficulty
+        FROM assignments a
+        JOIN problems p ON a.problem_id = p.problem_id
+        WHERE a.student_id = ?
+          AND a.scheduled_date <= ?
+          AND a.scheduled_date != '2099-12-31'
+          AND NOT EXISTS (
+              SELECT 1 FROM history h
+              WHERE h.student_id = a.student_id
+                AND h.problem_id = a.problem_id
+                AND h.date >= a.scheduled_date
+          )
+        ORDER BY a.scheduled_date
+    """, (student_id, record_date))
+    unreported = c.fetchall()
+    conn.close()
+
+    results = []
+    for row in unreported:
+        difficulty = row["difficulty"] or 3
+        score = 5 if difficulty <= 3 else 4
+        new_mastery = calc_new_mastery_v2(
+            student_id, row["problem_id"], score, row["scheduled_date"])
+
+        conn2 = get_connection()
+        c2 = conn2.cursor()
+        c2.execute("""
+            INSERT INTO history
+            (student_id, problem_id, date, correct, mastery, category, score)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (student_id, row["problem_id"], row["scheduled_date"],
+              1, new_mastery, "自動登録", score))
+        conn2.commit()
+        conn2.close()
+
+        results.append({
+            "problem_id":    row["problem_id"],
+            "scheduled_date": row["scheduled_date"],
+            "difficulty":    difficulty,
+            "score":         score,
+            "new_mastery":   new_mastery,
+        })
+
+    return results

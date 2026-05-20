@@ -1570,6 +1570,18 @@ def api_next_order():
     max_order = row["max_order"] if row and row["max_order"] else 0
     return jsonify({"next_order": max_order + 1})
 
+
+@app.route("/favicon.ico")
+def favicon():
+    from flask import send_from_directory
+    return send_from_directory(
+        os.path.join(app.root_path, "static"),
+        "favicon.ico" if os.path.exists(
+            os.path.join(app.root_path, "static", "favicon.ico"))
+        else "favicon.svg",
+        mimetype="image/x-icon"
+    )
+
 if __name__ == "__main__":
     init_db()
 
