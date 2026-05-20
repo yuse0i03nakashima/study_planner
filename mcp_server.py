@@ -245,7 +245,8 @@ async def list_tools():
                     },
                     "category":       {"type": "string",  "description": "カテゴリ：予習/復習/定着/再定着（省略時は予習）"},
                     "scheduled_date": {"type": "string",  "description": "出題日YYYY-MM-DD（省略→授業曜日から自動計算）"},
-                    "undecided":      {"type": "boolean", "description": "true=授業日未定として登録（計画表に出さない）"}
+                    "undecided":      {"type": "boolean", "description": "true=授業日未定として登録（計画表に出さない）"},
+                    "total_minutes":  {"type": "integer", "description": "総HP（省略=通常問題=1回完結）。古文精読など複数セッションに分割したい場合に設定。estimated_minutesより大きな値を設定する"}
                 },
                 "required": ["subject", "textbook_id", "problem_number",
                              "importance", "difficulty", "review_value", "estimated_minutes"]
@@ -704,15 +705,18 @@ async def call_tool(name: str, arguments: dict):
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
 
+        total_minutes = arguments.get("total_minutes")
         c.execute("""
             INSERT INTO problems
             (subject, textbook, textbook_id, problem_number,
              importance, difficulty, review_value,
-             estimated_minutes, instruction, type, order_in_textbook)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+             estimated_minutes, instruction, type, order_in_textbook,
+             total_minutes)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         """, (subject, textbook, textbook_id, problem_number,
               importance, difficulty, review_value,
-              estimated_minutes, instruction, "標準", order_in_textbook))
+              estimated_minutes, instruction, "標準", order_in_textbook,
+              total_minutes))
         conn.commit()
         problem_id = c.lastrowid
 

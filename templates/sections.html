@@ -29,7 +29,7 @@
     .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
       text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
     .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; }
+      letter-spacing:2px; text-transform:uppercase; color:#f87171; }
     .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
       color:var(--text-muted); margin-top:4px; }
     .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
@@ -44,20 +44,17 @@
       letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
       margin-bottom:6px; margin-top:16px; }
     label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
+    input[type="text"], input[type="number"] {
       width:100%; padding:9px 12px; background:var(--surface2);
       border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none; transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    textarea { resize:vertical; min-height:60px; }
+      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
+      transition:border-color 0.15s; }
+    input:focus { border-color:var(--blue); }
     .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
       text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
       transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
     .btn-primary { background:var(--blue); color:#0c0d11; }
     .btn-primary:hover { background:#7aaafb; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
     .btn-danger  { background:var(--red); color:white; }
     .btn-danger:hover  { background:#f87171; }
     .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
@@ -71,40 +68,66 @@
       text-align:center; vertical-align:middle; }
     .data-table tr:hover td { background:var(--surface2); }
     .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
     .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; display:inline-block; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); margin-top:5px; letter-spacing:0.5px; }
+    .editable { cursor:pointer; padding:2px 6px; border-radius:2px;
+      border:1px dashed transparent; transition:border-color 0.12s, background 0.12s; }
+    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
+    .editable.editing { display:none; }
+    .inline-input { background:var(--surface2); border:1px solid var(--blue);
+      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
     .fade-in { animation:fadeIn 0.3s ease both; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
+    /* アコーディオン */
+    .section-name-btn {
+      cursor:pointer; display:flex; align-items:center; gap:10px;
+      padding:4px 0; width:100%; background:none; border:none;
+      color:var(--text); font-family:'Noto Serif JP',serif;
+      font-size:12px; text-align:left; outline:none;
+    }
+    .section-name-btn:focus { outline:none; }
+    .section-name-btn:hover .section-name-text { color:var(--blue); }
+    .chevron { font-family:'DM Mono',monospace; font-size:10px;
+      color:var(--text-dim); transition:transform 0.2s;
+      display:inline-block; min-width:12px; }
+    .chevron.open { transform:rotate(90deg); }
+    .accordion-row td { padding:0; border:none; }
+    .accordion-inner { padding:12px 16px; background:var(--surface2);
+      border-top:1px solid var(--border); }
+    /* 削除確認モーダル */
+    #confirm-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); z-index:1000;
+      align-items:center; justify-content:center; }
+    #confirm-modal.show { display:flex; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
+      border-left:3px solid var(--red); padding:24px 28px;
+      min-width:320px; max-width:460px; width:90%; }
+    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--red);
+      margin-bottom:12px; }
+    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
+      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
+    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
+    /* toast */
     #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
       background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
       font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
       padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
     #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
     #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+    #toast.info    { border-left:2px solid var(--blue); color:var(--blue); }
     #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
   </style>
 </head>
 <body>
 <div class="container">
+
   <div class="page-header fade-in">
     <div>
       <div class="page-label">01 / Master Data</div>
-      <div class="page-title" style="color:#f87171;">Sections</div>
+      <div class="page-title">Sections</div>
       <div class="page-title-ja">セクション管理</div>
     </div>
-    <a class="page-header-back" href="/">TOP</a>
+    <a class="page-header-back" href="/textbooks">Textbooks</a>
   </div>
 
   <div class="meta-text fade-in" style="margin-bottom:20px;">
@@ -112,6 +135,7 @@
     <span style="margin-left:12px;color:var(--text-muted);">{{ textbook.subject }}</span>
   </div>
 
+  <!-- Add Section -->
   <div class="card fade-in">
     <div class="card-title">Add Section</div>
     <form method="POST" style="display:flex;gap:16px;align-items:flex-end;">
@@ -127,24 +151,41 @@
     </form>
   </div>
 
+  <!-- Section List（アコーディオン） -->
   <div class="card fade-in">
     <div class="card-title">Section List</div>
     <table class="data-table">
       <thead>
-        <tr><th>No.</th><th>Section Name</th><th>Problems</th><th></th></tr>
+        <tr>
+          <th style="width:60px;">Order</th>
+          <th>Section Name</th>
+          <th style="width:80px;">Problems</th>
+          <th style="width:60px;"></th>
+        </tr>
       </thead>
       <tbody>
       {% for s in sections %}
-      <tr>
+      <!-- セクション行 -->
+      <tr id="srow-{{ s.section_id }}">
         <td class="meta-text">{{ s.order_index }}</td>
-        <td class="left">{{ s.name }}</td>
+        <td class="left">
+          <button class="section-name-btn" type="button" data-sid="{{ s.section_id }}">
+            <span class="chevron" id="chev-{{ s.section_id }}">▶</span>
+            <span class="section-name-text">{{ s.name }}</span>
+          </button>
+        </td>
         <td class="meta-text">{{ s.problem_count }}</td>
         <td>
-          <form method="POST" action="/textbooks/sections/delete/{{ s.section_id }}"
-            style="display:inline;"
-            onsubmit="return confirm('Delete this section?')">
-            <button class="btn btn-danger btn-sm">×</button>
-          </form>
+          <button class="btn btn-danger btn-sm del-btn" type="button" data-msg=
+              '「{{ s.name }}」を削除しますか？\n関連付けは解除されますが問題は削除されません。' data-action='/textbooks/sections/delete/{{ s.section_id }}'>×</button>
+        </td>
+      </tr>
+      <!-- アコーディオン行 -->
+      <tr id="acc-{{ s.section_id }}" style="display:none;">
+        <td colspan="4" class="accordion-row">
+          <div class="accordion-inner" id="acc-content-{{ s.section_id }}">
+            <span class="meta-text">Loading...</span>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -152,14 +193,15 @@
     </table>
   </div>
 
-  <!-- セクション内の問題一覧とorder管理 -->
+  <!-- Problems in this Textbook -->
   <div class="card fade-in">
     <div class="card-title">Problems in this Textbook</div>
     <div style="overflow-x:auto;">
     <table class="data-table" id="section-prob-table">
       <thead>
         <tr>
-          <th>No.</th><th>問題番号</th><th>教科</th><th>Imp</th><th>Dif</th><th>RV</th>
+          <th>No.</th><th>問題番号</th><th>教科</th>
+          <th>Imp</th><th>Dif</th><th>RV</th>
         </tr>
       </thead>
       <tbody>
@@ -179,20 +221,187 @@
         <td class="meta-text">{{ p.review_value }}</td>
       </tr>
       {% endfor %}
+      {% if not problems %}
+      <tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:11px;
+        color:var(--text-dim);padding:20px;text-align:center;">
+        No problems registered for this textbook.
+      </td></tr>
+      {% endif %}
       </tbody>
     </table>
     </div>
-    {% if not problems %}
-    <div style="font-family:'DM Mono',monospace;font-size:11px;
-      color:var(--text-dim);padding:16px 0;text-align:center;">
-      No problems registered for this textbook.
-    </div>
-    {% endif %}
   </div>
 
-  <div id="toast"></div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Confirm Delete</div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <script>
+// ── DOMContentLoaded で全イベントを設定 ──────────────
+document.addEventListener('DOMContentLoaded', function() {
+
+  // 削除確認モーダルのCancelボタン
+  var cancelBtn = document.getElementById('cancel-btn');
+  if (cancelBtn) cancelBtn.onclick = closeConfirm;
+
+  // モーダル背景クリックで閉じる
+  var modal = document.getElementById('confirm-modal');
+  if (modal) modal.onclick = function(e) {
+    if (e.target === this) closeConfirm();
+  };
+
+  // 削除ボタン
+  document.querySelectorAll('.del-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var msg    = this.getAttribute('data-msg');
+      var action = this.getAttribute('data-action');
+      confirmDelete(msg, action);
+    };
+  });
+
+  // セクション名ボタン（アコーディオン）
+  document.querySelectorAll('.section-name-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      var sid = this.getAttribute('data-sid');
+      toggleSection(sid);
+    };
+  });
+
+});
+
+// ── 削除確認モーダル ──────────────────────────────────
+function confirmDelete(message, action) {
+  var modal = document.getElementById('confirm-modal');
+  var msgEl = document.getElementById('confirm-message');
+  msgEl.textContent = message;
+  modal.classList.add('show');
+  var okBtn = document.getElementById('confirm-ok');
+  var newOk = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  newOk.onclick = function() {
+    closeConfirm();
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    document.body.appendChild(form);
+    form.submit();
+  };
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+// ── セクションアコーディオン ──────────────────────────
+var cache = {};
+
+function toggleSection(id) {
+  var accRow  = document.getElementById('acc-' + id);
+  var chevron = document.getElementById('chev-' + id);
+  if (!accRow || !chevron) return;
+
+  var isOpen = (accRow.style.display === 'table-row');
+
+  if (isOpen) {
+    accRow.style.display = 'none';
+    chevron.textContent = '▶';
+  } else {
+    accRow.style.display = 'table-row';
+    chevron.textContent = '▼';
+    loadSectionProblems(id);
+  }
+}
+
+function loadSectionProblems(id) {
+  if (cache[id]) {
+    document.getElementById('acc-content-' + id).innerHTML = cache[id];
+    return;
+  }
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/sections/' + id + '/problems', true);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var data = JSON.parse(xhr.responseText);
+      var html = buildTable(data);
+      cache[id] = html;
+      var el = document.getElementById('acc-content-' + id);
+      if (el) el.innerHTML = html;
+    } else {
+      document.getElementById('acc-content-' + id).innerHTML =
+        '<span style="color:#ef4444;font-family:monospace;font-size:11px;">Error: ' + xhr.status + '</span>';
+    }
+  };
+  xhr.onerror = function() {
+    document.getElementById('acc-content-' + id).innerHTML =
+      '<span style="color:#ef4444;font-family:monospace;font-size:11px;">Network error.</span>';
+  };
+  xhr.send();
+}
+
+// ── No.インライン編集 ─────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildTable(problems) {
+  if (!problems || !problems.length) {
+    return '<span style="font-family:monospace;font-size:10px;' +
+           'color:var(--text-dim);">No problems in this section.</span>';
+  }
+  var rows = '';
+  for (var i = 0; i < problems.length; i++) {
+    var p = problems[i];
+    var no  = (p.order_in_textbook !== null && p.order_in_textbook !== undefined)
+              ? p.order_in_textbook : '&mdash;';
+    var imp = p.importance  !== null ? p.importance  : '&mdash;';
+    var dif = p.difficulty  !== null ? p.difficulty  : '&mdash;';
+    var rv  = p.review_value !== null ? p.review_value : '&mdash;';
+    rows += '<tr>' +
+      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+             'color:var(--text-dim);text-align:center;">' + no + '</td>' +
+      '<td style="padding:5px 10px;font-size:11px;max-width:340px;' +
+             'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+             'text-align:left;">' + escHtml(p.problem_number) + '</td>' +
+      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+             'color:var(--text-dim);text-align:center;">' + imp + '</td>' +
+      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+             'color:var(--text-dim);text-align:center;">' + dif + '</td>' +
+      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+             'color:var(--text-dim);text-align:center;">' + rv  + '</td>' +
+    '</tr>';
+  }
+  var th = function(label, w) {
+    return '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
+           'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
+           'text-align:center;' + (w ? 'width:' + w + ';' : '') + '">' + label + '</th>';
+  };
+  return '<table style="width:100%;border-collapse:collapse;">' +
+    '<thead><tr style="background:var(--surface3);">' +
+      th('No.', '60px') +
+      '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
+           'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
+           'text-align:left;">Problem</th>' +
+      th('Imp', '50px') + th('Dif', '50px') + th('RV', '50px') +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
 function showToast(msg, type='success') {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'show ' + type;
@@ -200,11 +409,11 @@ function showToast(msg, type='success') {
 }
 
 function startOrderEdit(span) {
-  const cell = span.closest('.editable-cell');
+  const cell      = span.closest('.editable-cell');
   const problemId = cell.dataset.problem;
-  const current = span.textContent.trim();
+  const current   = span.textContent.trim();
   span.classList.add('editing');
-  const input = document.createElement('input');
+  const input     = document.createElement('input');
   input.type = 'number'; input.min = 1; input.max = 9999; input.step = 1;
   input.value = current === '—' ? '' : current;
   input.className = 'inline-input'; input.style.width = '64px';
@@ -225,7 +434,7 @@ function startOrderEdit(span) {
       });
       if (res.ok) {
         span.textContent = input.value;
-        showToast('✓ Order updated', 'success');
+        showToast('✓ No. updated', 'success');
       } else { showToast('Update failed.', 'warn'); }
     }
     input.remove(); span.classList.remove('editing');
@@ -237,9 +446,5 @@ function startOrderEdit(span) {
   });
 }
 </script>
-
-  <a href="/textbooks" class="btn btn-ghost">← Back to Textbooks</a>
-
-</div>
 </body>
 </html>

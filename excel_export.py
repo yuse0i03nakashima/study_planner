@@ -137,6 +137,42 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     #        目標日インデックスを設定。その日付以降で空きがあれば割り当て、
     #        なければ前に戻って探す（順番は絶対に崩さない）
     n_dates = len(dates_sorted)
+    # ─── HP問題の事前展開 ────────────────────────────
+    # total_minutes > estimated_minutes の問題を
+    # ceil(total/est) 個のセッションに事前展開して
+    # 通常の予習ロジック（後半配置）に乗せる。
+    import math as _math
+
+    expanded_yosyu = []
+    for _it in interleaved_yosyu:
+        _tot = _it.get("total_minutes")
+        _est = int(_it.get("estimated_minutes") or 15)
+        if not _tot or int(_tot) <= _est:
+            # 通常問題：1セッション
+            _d = dict(_it)
+            _d["session_index"]   = 1
+            _d["session_total"]   = 1
+            _d["progress_before"] = 0.0
+            _d["progress_after"]  = 1.0
+            expanded_yosyu.append(_d)
+        else:
+            # HP問題：固定セッション数に分割
+            _tot    = int(_tot)
+            _n_sess = _math.ceil(_tot / _est)
+            _prog   = 0.0
+            for _si in range(_n_sess):
+                _sess_m     = _est
+                _prog_after = round(min(1.0, _prog + _sess_m / _tot), 4)
+                _sd = dict(_it)
+                _sd["estimated_minutes"] = _sess_m
+                _sd["session_index"]     = _si + 1
+                _sd["session_total"]     = _n_sess
+                _sd["progress_before"]   = round(_prog, 4)
+                _sd["progress_after"]    = _prog_after
+                expanded_yosyu.append(_sd)
+                _prog = _prog_after
+    interleaved_yosyu = expanded_yosyu
+
     n_yosyu = len(interleaved_yosyu)
 
     yosyu_date_counts = {}
@@ -485,13 +521,26 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
             mastery_int = item.get("mastery_int", 1)
             mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
 
+            # HP進捗バーをProblem列に組み込む
+            _prob_text = str(item.get("problem_number", ""))
+            _stot = int(item.get("session_total", 1) or 1)
+            _sidx = int(item.get("session_index", 1) or 1)
+            if _stot > 1:
+                _pa2  = float(item.get("progress_after", 1.0) or 1.0)
+                _fil  = int(_pa2 * 8)
+                _bar2 = "█" * _fil + "░" * (8 - _fil)
+                _pct2 = int(_pa2 * 100)
+                _prob_text = (_prob_text + "  [" + _bar2 + "]"
+                              + str(_pct2) + "% ("
+                              + str(_sidx) + "/" + str(_stot) + ")")
+
             vals = [
                 date_disp if row_i == 0 else "",
                 dow       if row_i == 0 else "",
                 subj,
                 cat,
                 item.get("textbook", ""),
-                item.get("problem_number", ""),
+                _prob_text,
                 item.get("mastery", "★"),
                 item.get("estimated_minutes", ""),
                 item.get("instruction", ""),
@@ -543,11 +592,10 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
                     cell.font = font(C_MUTED, size=9)
                     cell.alignment = aln("left", "center", wrap=True)
 
-            # 行の高さを内容に応じて動的設定
-            problem_text = str(item.get("problem_number", ""))
+            # 行の高さを内容に応じて動的設定（_prob_textはvals生成時に計算済み）
             instruction_text = str(item.get("instruction", ""))
             # 問題番号：列幅34で1行≒20文字
-            prob_lines = max(1, -(-len(problem_text) // 20))
+            prob_lines = max(1, -(-len(_prob_text) // 20))
             # 学習指示：列幅44で1行≒25文字
             instr_lines = max(1, -(-len(instruction_text) // 25))
             row_h = max(prob_lines, instr_lines) * 15 + 4

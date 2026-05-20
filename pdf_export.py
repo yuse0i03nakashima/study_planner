@@ -40,6 +40,21 @@ MASTERY_COLORS = {1: C_ROSE, 2: C_AMBER, 3: C_GREEN}
 DOW_JA = ["月", "火", "水", "木", "金", "土", "日"]
 
 
+
+
+def _pdf_prob_text(item):
+    """PDFのProblem列テキストを生成（ASCII進捗バー付き）"""
+    prob = str(item.get("problem_number", ""))
+    stot = int(item.get("session_total", 1) or 1)
+    if stot <= 1:
+        return prob
+    sidx = int(item.get("session_index", 1) or 1)
+    pa   = float(item.get("progress_after", 1.0) or 1.0)
+    fil  = int(pa * 8)
+    bar  = "#" * fil + "-" * (8 - fil)
+    pct  = int(pa * 100)
+    return prob + "  [" + bar + "] " + str(pct) + "% (" + str(sidx) + "/" + str(stot) + ")"
+
 def _para(text, color=None, size=8, bold=False, align="LEFT"):
     """Paragraphオブジェクトを生成するヘルパー"""
     c = color or C_TEXT
@@ -174,7 +189,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
                 _para(subj, C_MUTED, 8, align="CENTER"),
                 _para(cat, cat_color, 8, align="CENTER"),
                 _para(item.get("textbook", ""), C_MUTED, 8),
-                _para(item.get("problem_number", ""), C_TEXT, 9),
+                _para(_pdf_prob_text(item), C_TEXT, 9),
                 _para(item.get("mastery", "★"), mastery_color, 9, align="CENTER"),
                 _para(str(item.get("estimated_minutes", "")), C_DIM, 8, align="CENTER"),
                 _para(item.get("instruction", ""), C_MUTED, 8),

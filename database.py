@@ -256,7 +256,7 @@ def get_class_dates_in_range(student_id, subject, start_date_str, end_date_str):
 
 # ─── 計画表生成（教科×授業日対応版） ─────────────────
 
-def get_plan_v2(student_id, start_date_str, end_date_str):
+def get_plan_v2(student_id, start_date_str, end_date_str, subject_filter=None):
     """
     新しい計画生成ロジック：
     ・復習は授業直後の最初の日に配置
@@ -270,7 +270,7 @@ def get_plan_v2(student_id, start_date_str, end_date_str):
     c.execute("""
         SELECT a.*, p.subject, p.textbook, p.problem_number,
                p.importance, p.difficulty, p.review_value,
-               p.estimated_minutes, p.instruction, p.problem_id,
+               p.estimated_minutes, p.total_minutes, p.instruction, p.problem_id,
                p.textbook_id, p.order_in_textbook,
                (SELECT mastery FROM history h
                 WHERE h.student_id = a.student_id AND h.problem_id = a.problem_id
@@ -300,6 +300,7 @@ def get_plan_v2(student_id, start_date_str, end_date_str):
             "difficulty": r["difficulty"],
             "review_value": r["review_value"],
             "estimated_minutes": r["estimated_minutes"],
+            "total_minutes": r["total_minutes"] if r["total_minutes"] else None,
             "mastery": "★" * mastery,
             "mastery_int": mastery,
             "last_date": r["last_date"] if r["last_date"] else "（初見）",
@@ -336,33 +337,73 @@ def get_schedule(student_id, start_date_str, end_date_str):
     return schedule
 
 
-def save_plan_history(student_id, start_date, end_date, excel_path):
+def save_plan_history(student_id, start_date, end_date, excel_path,
+                      pdf_path="", subject="", plan_data=None):
+    """
+    計画表の出力を記録する。
+    同一student_id・subject の前回出力を確定状態にしてからINSERTする。
+    """
+    import json as _json
     conn = get_connection()
     c = conn.cursor()
+    today = date.today().isoformat()
+    plan_json = _json.dumps(plan_data, ensure_ascii=False) if plan_data else ""
+
+    # ── 前回出力を確定 ────────────────────────────
+    # 同一生徒・教科で、前回のend_date < 今回のstart_date の
+    # 未確定レコードを確定状態にする
+    c.execute("""
+        SELECT history_id, start_date, end_date, plan_data
+        FROM plan_history
+        WHERE student_id=? AND subject=? AND confirmed=0
+        AND end_date < ?
+        ORDER BY end_date DESC
+    """, (student_id, subject, start_date))
+    prev_rows = c.fetchall()
+    for row in prev_rows:
+        # plan_dataが空の場合はget_plan_v2で計画を生成して保存
+        if not row["plan_data"]:
+            try:
+                prev_plan = get_plan_v2(student_id, row["start_date"], row["end_date"],
+                                        subject_filter=subject if subject else None)
+                prev_json = _json.dumps(prev_plan, ensure_ascii=False)
+            except Exception:
+                prev_json = "[]"
+            c.execute("UPDATE plan_history SET confirmed=1, plan_data=? WHERE history_id=?",
+                      (prev_json, row["history_id"]))
+        else:
+            c.execute("UPDATE plan_history SET confirmed=1 WHERE history_id=?",
+                      (row["history_id"],))
+
+    # ── 新しい出力を記録 ──────────────────────────
     c.execute("""
         INSERT INTO plan_history
-        (student_id, generated_date, start_date, end_date, excel_path)
-        VALUES (?, ?, ?, ?, ?)
-    """, (student_id, date.today().isoformat(), start_date, end_date, excel_path))
+        (student_id, generated_date, start_date, end_date,
+         excel_path, pdf_path, subject, confirmed, plan_data)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+    """, (student_id, today, start_date, end_date,
+          excel_path, pdf_path, subject, plan_json))
     conn.commit()
     conn.close()
 
-def get_plan_histories(student_id=None):
+def get_plan_histories(student_id=None, confirmed_only=False):
     conn = get_connection()
     c = conn.cursor()
+    where = []
+    params = []
     if student_id:
-        c.execute("""
-            SELECT ph.*, s.name FROM plan_history ph
-            JOIN students s ON ph.student_id = s.student_id
-            WHERE ph.student_id=?
-            ORDER BY ph.generated_date DESC
-        """, (student_id,))
-    else:
-        c.execute("""
-            SELECT ph.*, s.name FROM plan_history ph
-            JOIN students s ON ph.student_id = s.student_id
-            ORDER BY ph.generated_date DESC
-        """)
+        where.append("ph.student_id=?")
+        params.append(student_id)
+    if confirmed_only:
+        where.append("ph.confirmed=1")
+    where_sql = ("WHERE " + " AND ".join(where)) if where else ""
+    c.execute(f"""
+        SELECT ph.*, s.name as student_name
+        FROM plan_history ph
+        JOIN students s ON ph.student_id = s.student_id
+        {where_sql}
+        ORDER BY ph.generated_date DESC, ph.history_id DESC
+    """, params)
     rows = c.fetchall()
     conn.close()
     return rows

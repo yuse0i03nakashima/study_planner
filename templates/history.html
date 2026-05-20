@@ -12,183 +12,447 @@
       --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
       --border:#252838; --border-light:#2f3347;
       --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --red:#ef4444;
       --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
+      --amber-bg:rgba(245,166,35,0.10);
     }
     *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+    body { font-family:"Noto Serif JP",serif; background:var(--bg); color:var(--text);
       min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
+    body::after { content:""; position:fixed; inset:0;
+      background-image:linear-gradient(var(--border) 1px,transparent 1px),
         linear-gradient(90deg,var(--border) 1px,transparent 1px);
       background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1000px; margin:0 auto; position:relative; z-index:1; }
+    .container { max-width:1200px; margin:0 auto; position:relative; z-index:1; }
     .page-header { display:flex; align-items:flex-end; justify-content:space-between;
       margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+    .page-label { font-family:"DM Mono",monospace; font-size:9px; letter-spacing:2.5px;
       text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+    .page-title { font-family:"DM Mono",monospace; font-weight:500; font-size:18px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--green); }
+    .page-title-ja { font-family:"Noto Serif JP",serif; font-weight:300; font-size:11px;
       color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
+    .page-header-back { font-family:"DM Mono",monospace; font-size:10px; color:var(--text-muted);
       letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
+    .page-header-back::before { content:"← "; }
     .page-header-back:hover { color:var(--text); }
     .card { background:var(--surface); border:1px solid var(--border);
       padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+    .card-title { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
       text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
       padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover  { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted);
-      border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .btn-warn { background:var(--amber-bg); color:var(--amber);
-      border:1px solid rgba(245,166,35,0.3); }
-    .btn-warn:hover { background:rgba(245,166,35,0.2); }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
+    .data-table { width:100%; border-collapse:collapse; font-size:12px; }
     .data-table th { background:var(--surface2); color:var(--text-muted);
-      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
+      font-family:"DM Mono",monospace; font-size:9px; letter-spacing:1.5px;
       text-transform:uppercase; padding:10px 12px; text-align:center;
       border-bottom:1px solid var(--border-light); white-space:nowrap; }
     .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
       text-align:center; vertical-align:middle; }
     .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .grid-7 { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px;
+    .data-table td.left { text-align:left; }
+    .meta-text { font-family:"DM Mono",monospace; font-size:10px;
       color:var(--text-dim); letter-spacing:1px; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      margin-top:5px; letter-spacing:0.5px; }
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); text-decoration:none; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    /* 曜日チェックボックス */
-    .dow-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
-    .dow-btn { display:flex; flex-direction:column; align-items:center; padding:10px 6px;
-      background:var(--surface2); border:1px solid var(--border-light); cursor:pointer;
-      transition:all 0.15s; user-select:none; }
-    .dow-btn:has(input:checked) { background:var(--blue-bg); border-color:rgba(91,143,249,0.4); }
-    .dow-btn span { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted);
-      margin-top:4px; }
-    .dow-btn:has(input:checked) span { color:var(--blue); }
-    .dow-btn input { accent-color:var(--blue); }
-    /* 時間入力グリッド */
-    .time-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
-    .time-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
-    .time-cell .day-label { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-muted); letter-spacing:1px; }
-    .time-cell input { text-align:center; padding:8px 4px; }
+    .btn { font-family:"DM Mono",monospace; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
+      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px;
+      text-decoration:none; }
+    .btn-primary { background:var(--blue); color:#0c0d11; }
+    .btn-primary:hover { background:#7aaafb; }
+    .btn-success { background:var(--green); color:#0c0d11; }
+    .btn-success:hover { background:#5eddaa; }
+    .btn-ghost { background:transparent; color:var(--text-muted);
+      border:1px solid var(--border-light); }
+    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
+    .btn-danger { background:var(--red); color:white; }
+    .btn-sm { padding:5px 12px; font-size:9px; letter-spacing:1px; }
+    .badge { font-family:"DM Mono",monospace; font-size:9px; letter-spacing:1px;
+      padding:2px 8px; display:inline-block; border-radius:2px; }
+    .badge-confirmed  { background:var(--green-bg); color:var(--green);
+      border:1px solid rgba(62,207,142,0.3); }
+    .badge-pending    { background:var(--amber-bg); color:var(--amber);
+      border:1px solid rgba(245,166,35,0.3); }
+    .badge-subject    { background:var(--blue-bg); color:var(--blue);
+      border:1px solid rgba(91,143,249,0.3); font-size:9px; }
+    /* プレビューモーダル */
+    #preview-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.8); z-index:1000;
+      align-items:flex-start; justify-content:center;
+      padding:40px 20px; overflow-y:auto; }
+    #preview-modal.show { display:flex; }
+    .preview-box { background:var(--surface); border:1px solid var(--border-light);
+      border-top:2px solid var(--green); width:100%; max-width:960px;
+      padding:28px; position:relative; }
+    .preview-header { display:flex; justify-content:space-between;
+      align-items:flex-start; margin-bottom:20px;
+      padding-bottom:14px; border-bottom:1px solid var(--border); }
+    .preview-title { font-family:"DM Mono",monospace; font-size:13px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--green); }
+    .preview-meta { font-family:"DM Mono",monospace; font-size:10px;
+      color:var(--text-dim); margin-top:4px; }
+    .preview-close { font-family:"DM Mono",monospace; font-size:11px;
+      background:none; border:1px solid var(--border-light); color:var(--text-muted);
+      padding:6px 14px; cursor:pointer; letter-spacing:1px; }
+    .preview-close:hover { border-color:var(--text-muted); color:var(--text); }
+    .preview-body { max-height:70vh; overflow-y:auto; }
+    /* 日付ブロック */
+    .day-block { margin-bottom:16px; }
+    .day-label { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--text-dim);
+      padding:6px 12px; background:var(--surface2);
+      border-left:2px solid var(--border-light); margin-bottom:4px; }
+    .day-label .dow { color:var(--blue); margin-left:8px; }
+    .day-table { width:100%; border-collapse:collapse; font-size:11px; }
+    .day-table th { padding:5px 10px; font-family:"DM Mono",monospace; font-size:8px;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);
+      background:var(--surface3); text-align:center; border-bottom:1px solid var(--border); }
+    .day-table td { padding:6px 10px; border-bottom:1px solid var(--border);
+      vertical-align:middle; text-align:center; }
+    .day-table td.left { text-align:left; font-family:"Noto Serif JP",serif; }
+    .day-table tr:last-child td { border-bottom:none; }
+    .cat-badge { font-family:"DM Mono",monospace; font-size:8px; letter-spacing:1px;
+      padding:1px 6px; border-radius:1px; }
+    .cat-予習   { background:rgba(91,143,249,0.15); color:var(--blue); }
+    .cat-復習   { background:rgba(245,166,35,0.15); color:var(--amber); }
+    .cat-定着   { background:rgba(62,207,142,0.15); color:var(--green); }
+    .cat-再定着  { background:rgba(240,98,146,0.15); color:#f06292; }
+    .mastery-stars { color:var(--amber); letter-spacing:1px; }
+    select { padding:7px 10px; background:var(--surface2); border:1px solid var(--border-light);
+      color:var(--text); font-family:"Noto Serif JP",serif; font-size:13px; outline:none; }
+    select:focus { border-color:var(--blue); }
     #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
       background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
+      font-family:"DM Mono",monospace; font-size:11px; letter-spacing:1px;
+      padding:12px 24px; opacity:0; transition:all 0.3s; pointer-events:none; z-index:9999; }
     #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
     #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
     #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    .file-row { display:flex; align-items:center; gap:12px;
-      padding:12px 16px; border-bottom:1px solid var(--border);
-      transition:background 0.12s; }
-    .file-row:last-child { border-bottom:none; }
-    .file-row:hover { background:var(--surface2); }
-    .file-icon { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1px;
-      padding:3px 8px; border:1px solid var(--border-light);
-      color:var(--text-muted); flex-shrink:0; }
-    .file-icon.xlsx { color:var(--green); border-color:rgba(62,207,142,0.3);
-      background:var(--green-bg); }
-    .file-icon.pdf  { color:var(--rose);  border-color:rgba(240,98,146,0.3);
-      background:var(--rose-bg); }
-    .file-name { flex:1; font-family:'Noto Serif JP',serif; font-size:13px; }
-    .file-date { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-dim); letter-spacing:1px; flex-shrink:0; }
-    .file-actions { display:flex; gap:8px; flex-shrink:0; }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;} }
+    .empty-msg { font-family:"DM Mono",monospace; font-size:11px; color:var(--text-dim);
+      padding:20px; text-align:center; }
+    /* 確認モーダル */
+    #confirm-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); z-index:2000;
+      align-items:center; justify-content:center; }
+    #confirm-modal.show { display:flex; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
+      border-left:3px solid var(--red); padding:24px 28px; min-width:320px; max-width:460px; }
+    .confirm-title { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; color:var(--red); margin-bottom:12px; }
+    .confirm-msg { font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
+    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
   </style>
 </head>
 <body>
 <div class="container">
+
   <div class="page-header fade-in">
     <div>
       <div class="page-label">03 / Plan</div>
-      <div class="page-title" style="color:#3ecf8e;">History</div>
-      <div class="page-title-ja">過去の計画表・履歴管理</div>
+      <div class="page-title">History</div>
+      <div class="page-title-ja">計画表の履歴</div>
     </div>
     <a class="page-header-back" href="/">TOP</a>
   </div>
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% for cat, msg in messages %}
-  <div class="alert alert-{{ 'success' if cat == 'success' else 'error' }} fade-in">{{ msg }}</div>
-  {% endfor %}
-  {% endwith %}
+  <!-- フィルター -->
+  <div class="card fade-in" style="padding:14px 20px;">
+    <form method="GET" style="display:flex;gap:12px;align-items:center;">
+      <select name="student_id" onchange="this.form.submit()" style="width:160px;">
+        <option value="">— 全生徒 —</option>
+        {% for s in students %}
+        <option value="{{ s.student_id }}"
+          {% if s.student_id == selected_student %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <span class="meta-text" style="margin-left:auto;">
+        {{ unconfirmed|length + confirmed|length }} 件
+      </span>
+    </form>
+  </div>
 
+  <!-- ── Archived Plans（出力記録）── -->
   <div class="card fade-in">
-    <div class="card-title">Archived Plans — {{ archives|length }} files</div>
-
-    {% if archives %}
-    <div>
-      {% for f in archives %}
-      {% set ext = f.filename.split('.')[-1].lower() %}
-      <div class="file-row">
-        <span class="file-icon {{ ext }}">{{ ext.upper() }}</span>
-        <span class="file-name">{{ f.filename }}</span>
-        <span class="file-date">{{ f.created_at or '—' }}</span>
-        <div class="file-actions">
-          <a href="/history/download/{{ f.history_id }}"
-            class="btn btn-ghost btn-sm">↓ Download</a>
-          <form method="POST" action="/history/delete/{{ f.history_id }}"
-            style="display:inline;" onsubmit="return confirm('Delete this file?')">
-            <button class="btn btn-danger btn-sm">×</button>
-          </form>
-          <form method="POST" action="/history/reset/{{ f.history_id }}"
-            style="display:inline;"
-            onsubmit="return confirm('履歴リセット：授業記録・出題予定も削除されます。続行しますか？')">
-            <button class="btn btn-warn btn-sm">Reset</button>
-          </form>
-        </div>
-      </div>
-      {% endfor %}
+    <div class="card-title">Archived Plans
+      <span class="meta-text" style="margin-left:8px;">出力記録</span>
     </div>
+    {% if unconfirmed %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Generated</th>
+          <th>Student</th>
+          <th>Subject</th>
+          <th>Period</th>
+          <th>Status</th>
+          <th colspan="3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for h in unconfirmed %}
+      <tr>
+        <td class="meta-text">{{ h.generated_date }}</td>
+        <td style="font-family:'Noto Serif JP',serif;font-size:12px;">
+          {{ h.student_name }}
+        </td>
+        <td>
+          {% if h.subject %}
+          <span class="badge badge-subject">{{ h.subject }}</span>
+          {% else %}
+          <span class="meta-text">全教科</span>
+          {% endif %}
+        </td>
+        <td class="meta-text">{{ h.start_date }} ~ {{ h.end_date }}</td>
+        <td>
+          <span class="badge badge-pending">Pending</span>
+        </td>
+        <td>
+          {% if h.excel_path %}
+          <a href="/history/download/{{ h.history_id }}?type=excel"
+             class="btn btn-ghost btn-sm">Excel↓</a>
+          {% endif %}
+        </td>
+        <td>
+          {% if h.pdf_path %}
+          <a href="/history/download/{{ h.history_id }}?type=pdf"
+             class="btn btn-ghost btn-sm">PDF↓</a>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-danger btn-sm"
+            onclick="confirmDelete({{ h.history_id }})">×</button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
     {% else %}
-    <div style="font-family:'DM Mono',monospace;font-size:11px;
-      color:var(--text-dim);letter-spacing:1px;padding:20px 0;text-align:center;">
-      No archived plans yet.
+    <div class="empty-msg">No archived plans yet.</div>
+    {% endif %}
+  </div>
+
+  <!-- ── Confirmed Plans（確定済み）── -->
+  <div class="card fade-in">
+    <div class="card-title">Confirmed Plans
+      <span class="meta-text" style="margin-left:8px;">確定済み計画表</span>
+    </div>
+    {% if confirmed %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Generated</th>
+          <th>Student</th>
+          <th>Subject</th>
+          <th>Period</th>
+          <th>Status</th>
+          <th colspan="3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for h in confirmed %}
+      <tr>
+        <td class="meta-text">{{ h.generated_date }}</td>
+        <td style="font-family:'Noto Serif JP',serif;font-size:12px;">
+          {{ h.student_name }}
+        </td>
+        <td>
+          {% if h.subject %}
+          <span class="badge badge-subject">{{ h.subject }}</span>
+          {% else %}
+          <span class="meta-text">全教科</span>
+          {% endif %}
+        </td>
+        <td class="meta-text">{{ h.start_date }} ~ {{ h.end_date }}</td>
+        <td>
+          <span class="badge badge-confirmed">Confirmed</span>
+        </td>
+        <td>
+          {% if h.excel_path %}
+          <a href="/history/download/{{ h.history_id }}?type=excel"
+             class="btn btn-ghost btn-sm">Excel↓</a>
+          {% endif %}
+        </td>
+        <td>
+          {% if h.pdf_path %}
+          <a href="/history/download/{{ h.history_id }}?type=pdf"
+             class="btn btn-ghost btn-sm">PDF↓</a>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-primary btn-sm"
+            onclick="openPreview({{ h.history_id }})">Preview</button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-msg">No confirmed plans yet.
+      <span class="meta-text" style="display:block;margin-top:4px;">
+        次の期間の計画表を出力すると前の期間が確定します。
+      </span>
     </div>
     {% endif %}
   </div>
 
-  <div style="margin-top:8px;">
-    <a href="/preview" class="btn btn-primary">→ Preview &amp; Export</a>
-  </div>
-
 </div>
+
+<!-- プレビューモーダル -->
+<div id="preview-modal">
+  <div class="preview-box">
+    <div class="preview-header">
+      <div>
+        <div class="preview-title" id="preview-title">Plan Preview</div>
+        <div class="preview-meta" id="preview-meta"></div>
+      </div>
+      <button class="preview-close" onclick="closePreview()">× Close</button>
+    </div>
+    <div class="preview-body" id="preview-body">
+      <div class="empty-msg">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Confirm Delete</div>
+    <div class="confirm-msg" id="confirm-msg">この出力記録を削除しますか？</div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm"
+        onclick="document.getElementById('confirm-modal').classList.remove('show')">
+        Cancel
+      </button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── 削除確認 ──────────────────────────────────────────
+function confirmDelete(historyId) {
+  document.getElementById("confirm-modal").classList.add("show");
+  document.getElementById("confirm-ok").onclick = function() {
+    document.getElementById("confirm-modal").classList.remove("show");
+    var form = document.createElement("form");
+    form.method = "POST";
+    form.action = "/history/delete/" + historyId;
+    document.body.appendChild(form);
+    form.submit();
+  };
+}
+
+// ── プレビューモーダル ─────────────────────────────────
+function openPreview(historyId) {
+  document.getElementById("preview-modal").classList.add("show");
+  document.getElementById("preview-title").textContent = "Plan Preview";
+  document.getElementById("preview-meta").textContent = "";
+  document.getElementById("preview-body").innerHTML =
+    "<div class='empty-msg'>Loading...</div>";
+
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", "/history/preview/" + historyId, true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) {
+      document.getElementById("preview-body").innerHTML =
+        "<div class='empty-msg'>Error loading data.</div>";
+      return;
+    }
+    var data = JSON.parse(xhr.responseText);
+    document.getElementById("preview-title").textContent =
+      data.student_name + " — " + (data.subject || "全教科");
+    document.getElementById("preview-meta").textContent =
+      data.start_date + " ~ " + data.end_date +
+      "  (出力: " + data.generated_date + ")";
+    document.getElementById("preview-body").innerHTML =
+      buildPreview(data.plan);
+  };
+  xhr.onerror = function() {
+    document.getElementById("preview-body").innerHTML =
+      "<div class='empty-msg'>Network error.</div>";
+  };
+  xhr.send();
+}
+
+function closePreview() {
+  document.getElementById("preview-modal").classList.remove("show");
+}
+
+document.getElementById("preview-modal").addEventListener("click", function(e) {
+  if (e.target === this) closePreview();
+});
+
+// ── プレビューHTML生成 ────────────────────────────────
+function buildPreview(plan) {
+  if (!plan || !plan.length) {
+    return "<div class='empty-msg'>No plan data recorded.</div>";
+  }
+
+  // 日付でグループ化
+  var byDate = {};
+  var dateOrder = [];
+  plan.forEach(function(item) {
+    var d = item.assigned_date || item.date || "未定";
+    if (!byDate[d]) { byDate[d] = []; dateOrder.push(d); }
+    byDate[d].push(item);
+  });
+  dateOrder.sort();
+
+  var DOW = ["日","月","火","水","木","金","土"];
+
+  var html = "";
+  dateOrder.forEach(function(d) {
+    var items = byDate[d];
+    var dowStr = "";
+    if (d !== "未定") {
+      try {
+        var dt = new Date(d);
+        dowStr = DOW[dt.getDay()];
+      } catch(e) {}
+    }
+    html += "<div class='day-block'>";
+    html += "<div class='day-label'>" + d +
+            (dowStr ? "<span class='dow'>(" + dowStr + ")</span>" : "") +
+            "</div>";
+    html += "<table class='day-table'><thead><tr>" +
+      "<th>Subject</th><th>Category</th>" +
+      "<th style='text-align:left;'>Problem</th>" +
+      "<th>Mastery</th><th>Min</th>" +
+      "</tr></thead><tbody>";
+    items.forEach(function(item) {
+      var cat = item.category || "";
+      var mastery = item.mastery || "★";
+      html += "<tr>" +
+        "<td class='meta-text'>" + escHtml(item.subject || "") + "</td>" +
+        "<td><span class='cat-badge cat-" + escHtml(cat) + "'>" + escHtml(cat) + "</span></td>" +
+        "<td class='left'><span style='font-size:10px;color:var(--text-dim);margin-right:6px;font-family:monospace;'>" +
+          escHtml(item.textbook || "") + "</span>" +
+          escHtml(item.problem_number || "") + "</td>" +
+        "<td><span class='mastery-stars'>" + escHtml(mastery) + "</span></td>" +
+        "<td class='meta-text'>" + (item.estimated_minutes || "—") + "</td>" +
+        "</tr>";
+    });
+    html += "</tbody></table></div>";
+  });
+  return html;
+}
+
+function escHtml(str) {
+  return String(str || "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function showToast(msg, type) {
+  type = type || "success";
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.className = "show " + type;
+  setTimeout(function() { t.className = ""; }, 3000);
+}
+</script>
 </body>
 </html>

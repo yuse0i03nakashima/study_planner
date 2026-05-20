@@ -136,7 +136,7 @@
       <div class="page-title">Add Problem</div>
       <div class="page-title-ja">問題マスタへの新規登録</div>
     </div>
-    <a class="page-header-back" href="/">TOP</a>
+    <a class="page-header-back" href="/problems/list">Problem List</a>
   </div>
 
   <!-- AI提案ボックス -->
@@ -229,12 +229,18 @@
           </select>
         </div>
         <div>
-          <label>Est. Minutes</label>
+          <label>Est. Minutes <span style="color:var(--text-dim);font-size:9px;">1回あたり</span></label>
           <select name="estimated_minutes" id="f-estimated_minutes">
             {% for m in range(5, 125, 5) %}
             <option value="{{ m }}" {% if m == 15 %}selected{% endif %}>{{ m }} min</option>
             {% endfor %}
           </select>
+        </div>
+        <div>
+          <label>Total Minutes <span style="color:var(--text-dim);font-size:9px;">総HP（空欄=1回完結）</span></label>
+          <input type="number" name="total_minutes" id="f-total_minutes"
+            min="5" max="999" step="5" placeholder="空欄=通常問題">
+          <div class="hint" id="hp-hint" style="margin-top:4px;color:var(--green);"></div>
         </div>
       </div>
 
@@ -626,6 +632,29 @@ function showToast(msg, type='success') {
   t.textContent = msg; t.className = 'show ' + type;
   setTimeout(() => { t.className = ''; }, 3000);
 }
+
+// HP計算のリアルタイム表示
+function updateHpHint() {
+  var est  = parseInt(document.getElementById('f-estimated_minutes').value) || 0;
+  var tot  = parseInt(document.getElementById('f-total_minutes').value)     || 0;
+  var hint = document.getElementById('hp-hint');
+  if (!hint) return;
+  if (!tot || tot <= est) {
+    hint.textContent = '';
+    return;
+  }
+  var minM = Math.max(5, Math.floor(est * 0.5));
+  var maxM = est;
+  var nMin = Math.ceil(tot / maxM);
+  var nMax = Math.ceil(tot / minM);
+  hint.textContent = '→ 約' + nMin + '〜' + nMax + 'セッションに分割';
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var estEl = document.getElementById('f-estimated_minutes');
+  var totEl = document.getElementById('f-total_minutes');
+  if (estEl) estEl.addEventListener('input', updateHpHint);
+  if (totEl) totEl.addEventListener('input', updateHpHint);
+});
 </script>
 </body>
 </html>

@@ -210,6 +210,11 @@
             <td style="font-size:11px;max-width:160px;overflow:hidden;
               text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
               {{ prob.problem_number }}
+              {% if prob.session_total and prob.session_total > 1 %}
+              {% set _pct = (prob.progress_after * 100)|int %}
+              {% set _f = (prob.progress_after * 8)|int %}
+              <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--green);margin-left:8px;letter-spacing:0;">[{% for _i in range(_f) %}█{% endfor %}{% for _i in range(8 - _f) %}░{% endfor %}] {{ _pct }}% ({{ prob.session_index }}/{{ prob.session_total }})</span>
+              {% endif %}
             </td>
             <td style="color:
               {%- if prob.mastery_int == 1 %} var(--rose)

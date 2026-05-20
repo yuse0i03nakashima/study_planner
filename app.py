@@ -45,13 +45,16 @@ def problems():
             """, (textbook_id,))
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
+            total_minutes_raw = request.form.get("total_minutes", "").strip()
+            total_minutes = int(total_minutes_raw) if total_minutes_raw else None
 
         c.execute("""
             INSERT INTO problems
             (subject, textbook, textbook_id, problem_number,
              importance, difficulty, review_value,
-             estimated_minutes, instruction, type, order_in_textbook)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             estimated_minutes, instruction, type, order_in_textbook,
+             total_minutes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             subject, textbook, textbook_id,
             request.form["problem_number"],
@@ -61,7 +64,8 @@ def problems():
             request.form["estimated_minutes"],
             request.form.get("instruction", ""),
             "標準",
-            order_in_textbook
+            order_in_textbook,
+            total_minutes
         ))
         conn.commit()
         problem_id = c.lastrowid
@@ -371,7 +375,9 @@ def export():
         export_excel(target_date, output_path,
                      student_id=student_id, start_date=start_date,
                      subject_filter=subject_filter if subject_filter else None)
-        save_plan_history(student_id, start_date, target_date, output_path)
+        subject_filter = request.form.get("subject_filter", "")
+        save_plan_history(student_id, start_date, target_date, output_path,
+                          pdf_path="", subject=subject_filter)
         return send_file(output_path, as_attachment=True)
 
     return render_template("export.html", students=students)
@@ -442,6 +448,9 @@ def preview():
             path = export_excel(student_id, start_date, end_date,
                                 subject_filter if subject_filter else None)
             if path:
+                save_plan_history(student_id, start_date, end_date,
+                                  excel_path=path, pdf_path="",
+                                  subject=subject_filter)
                 import subprocess
                 subprocess.Popen(["start", "", path], shell=True)
             return redirect("/preview")
@@ -449,8 +458,11 @@ def preview():
         if action == "pdf":
             from pdf_export import export_pdf
             path = export_pdf(student_id, start_date, end_date,
-                                subject_filter if subject_filter else None)
+                              subject_filter if subject_filter else None)
             if path:
+                save_plan_history(student_id, start_date, end_date,
+                                  excel_path="", pdf_path=path,
+                                  subject=subject_filter)
                 import subprocess
                 subprocess.Popen(["start", "", path], shell=True)
             return redirect("/preview")
@@ -523,26 +535,69 @@ def schedule():
 
 @app.route("/history")
 def history():
-    student_id = request.args.get("student_id")
+    student_id = request.args.get("student_id", "")
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
     conn.close()
-    histories = get_plan_histories(student_id)
-    return render_template("history.html", students=students,
-                           histories=histories, selected_student=student_id)
+    all_histories   = get_plan_histories(student_id)
+    confirmed       = [h for h in all_histories if h["confirmed"] == 1]
+    unconfirmed     = [h for h in all_histories if h["confirmed"] == 0]
+    return render_template("history.html",
+                           students=students,
+                           confirmed=confirmed,
+                           unconfirmed=unconfirmed,
+                           selected_student=student_id)
+
+@app.route("/history/preview/<int:history_id>")
+def history_preview(history_id):
+    """確定済み計画表のプレビュー（JSON返却）"""
+    import json as _json
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""SELECT ph.*, s.name as student_name
+                 FROM plan_history ph
+                 JOIN students s ON ph.student_id=s.student_id
+                 WHERE ph.history_id=?""", (history_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    plan_data = []
+    if row["plan_data"]:
+        try:
+            plan_data = _json.loads(row["plan_data"])
+        except Exception:
+            plan_data = []
+    return jsonify({
+        "history_id":   history_id,
+        "student_name": row["student_name"],
+        "start_date":   row["start_date"],
+        "end_date":     row["end_date"],
+        "subject":      row["subject"],
+        "generated_date": row["generated_date"],
+        "plan":         plan_data
+    })
 
 
 @app.route("/history/download/<int:history_id>")
 def history_download(history_id):
+    file_type = request.args.get("type", "excel")
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM plan_history WHERE history_id=?", (history_id,))
     row = c.fetchone()
     conn.close()
-    if row and os.path.exists(row["excel_path"]):
-        return send_file(row["excel_path"], as_attachment=True)
+    if not row:
+        return "記録が見つかりません", 404
+    path = row["pdf_path"] if file_type == "pdf" else row["excel_path"]
+    if path and os.path.exists(path):
+        return send_file(path, as_attachment=True)
+    # もう一方を試みる
+    fallback = row["excel_path"] if file_type == "pdf" else row["pdf_path"]
+    if fallback and os.path.exists(fallback):
+        return send_file(fallback, as_attachment=True)
     return "ファイルが見つかりません", 404
 
 
@@ -568,7 +623,10 @@ def export_pdf_route():
     export_pdf(target_date, output_path,
                student_id=student_id, start_date=start_date,
                subject_filter=subject_filter if subject_filter else None)
-    save_plan_history(student_id, start_date, target_date, output_path)
+    subject_filter_pdf = request.form.get("subject_filter", "")
+    save_plan_history(student_id, start_date, target_date,
+                      excel_path="", pdf_path=output_path,
+                      subject=subject_filter_pdf)
     return send_file(output_path, as_attachment=True)
 
 
@@ -576,51 +634,61 @@ def export_pdf_route():
 def problems_list():
     conn = get_connection()
     c = conn.cursor()
-    student_id = request.args.get("student_id", "")
-    subject = request.args.get("subject", "")
-    keyword = request.args.get("keyword", "")
 
-    query = "SELECT * FROM problems WHERE 1=1"
+    subject     = request.args.get("subject", "")
+    textbook_id = request.args.get("textbook_id", "")
+
+    # 問題クエリ
+    query = """
+        SELECT p.problem_id, p.subject, p.textbook, p.textbook_id,
+               p.problem_number, p.importance, p.difficulty, p.review_value,
+               p.estimated_minutes, p.instruction, p.order_in_textbook
+        FROM problems p
+        WHERE 1=1
+    """
     params = []
-
-    if student_id:
-        query = """SELECT DISTINCT p.* FROM problems p
-                   JOIN assignments a ON p.problem_id = a.problem_id
-                   WHERE a.student_id = ?"""
-        params.append(student_id)
-        if subject:
-            query += " AND p.subject=?"
-            params.append(subject)
-        if keyword:
-            query += " AND (p.textbook LIKE ? OR p.problem_number LIKE ?)"
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
-    else:
-        if subject:
-            query += " AND subject=?"
-            params.append(subject)
-        if keyword:
-            query += " AND (textbook LIKE ? OR problem_number LIKE ?)"
-            params.extend([f"%{keyword}%", f"%{keyword}%"])
-
-    query += " ORDER BY problem_id DESC"
+    if subject:
+        query += " AND p.subject=?"
+        params.append(subject)
+    if textbook_id:
+        query += " AND p.textbook_id=?"
+        params.append(textbook_id)
+    query += " ORDER BY p.order_in_textbook, p.problem_id"
     c.execute(query, params)
     problems = c.fetchall()
 
-    c.execute("SELECT * FROM students ORDER BY student_id")
-    students = c.fetchall()
-
+    # フィルター用データ
     c.execute("SELECT DISTINCT subject FROM problems ORDER BY subject")
-    subjects = [row["subject"] for row in c.fetchall()]
-    conn.close()
+    all_subjects = [r["subject"] for r in c.fetchall()]
 
+    # 教科フィルターがある場合はそのテキストのみ、なければ全テキスト
+    if subject:
+        c.execute("""
+            SELECT t.textbook_id, t.name, t.subject
+            FROM textbooks t
+            WHERE t.subject=?
+            ORDER BY t.name
+        """, (subject,))
+    else:
+        c.execute("""
+            SELECT t.textbook_id, t.name, t.subject
+            FROM textbooks t
+            ORDER BY t.subject, t.name
+        """)
+    all_textbooks = c.fetchall()
+
+    # 生徒一覧（出題予定追加モーダル用）
+    c.execute("SELECT * FROM students ORDER BY student_id")
+    students_list = c.fetchall()
+
+    conn.close()
     return render_template("problems_list.html",
                            problems=problems,
-                           students=students,
-                           subjects=subjects,
-                           selected_student=student_id,
+                           all_subjects=all_subjects,
+                           all_textbooks=all_textbooks,
                            selected_subject=subject,
-                           keyword=keyword)
-
+                           selected_textbook=textbook_id,
+                           students=students_list)
 
 @app.route("/class_schedule", methods=["GET", "POST"])
 def class_schedule():
@@ -1562,7 +1630,8 @@ def api_next_order():
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
-        SELECT MAX(order_in_textbook) as max_order
+        SELECT MAX(order_in_textbook,
+              total_minutes)) as max_order
         FROM problems WHERE textbook_id=?
     """, (textbook_id,))
     row = c.fetchone()
@@ -1581,6 +1650,22 @@ def favicon():
         else "favicon.svg",
         mimetype="image/x-icon"
     )
+
+
+@app.route("/api/sections/<int:section_id>/problems")
+def api_section_problems(section_id):
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT problem_id, problem_number, textbook_id,
+               importance, difficulty, review_value, order_in_textbook
+        FROM problems
+        WHERE section_id=?
+        ORDER BY order_in_textbook, problem_id
+    """, (section_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
 
 if __name__ == "__main__":
     init_db()

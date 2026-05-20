@@ -175,7 +175,16 @@
       <tr>
         <td class="meta-text">{{ t.textbook_id }}</td>
         <td class="meta-text">{{ t.series_name or '—' }}</td>
-        <td class="left">{{ t.name }}</td>
+        <td class="left">
+          <a href="/problems/list?textbook_id={{ t.textbook_id }}"
+             style="color:var(--text);text-decoration:none;
+                    border-bottom:1px dashed var(--border-light);
+                    transition:color 0.15s;"
+             onmouseover="this.style.color='var(--blue)'"
+             onmouseout="this.style.color='var(--text)'">
+            {{ t.name }}
+          </a>
+        </td>
         <td class="meta-text">{{ t.subject }}</td>
         <td class="meta-text">{{ t.problem_count }}</td>
         <td class="meta-text" style="font-size:11px;">{{ t.students or '—' }}</td>
