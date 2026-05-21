@@ -125,7 +125,7 @@
     <div>
       <div class="page-label">01 / Master Data</div>
       <div class="page-title">Sections</div>
-      <div class="page-title-ja">セクション管理</div>
+      <div class="page-title-ja">Section Management</div>
     </div>
     <a class="page-header-back" href="/textbooks">Textbooks</a>
   </div>
@@ -141,7 +141,7 @@
     <form method="POST" style="display:flex;gap:16px;align-items:flex-end;">
       <div style="flex:1;">
         <label>Section Name</label>
-        <input type="text" name="name" placeholder="例：第1章 展開と因数分解" required>
+        <input type="text" name="name" placeholder="e.g. Chapter 1: Expansion and Factorization" required>
       </div>
       <div style="width:120px;">
         <label>Order</label>
@@ -177,7 +177,7 @@
         <td class="meta-text">{{ s.problem_count }}</td>
         <td>
           <button class="btn btn-danger btn-sm del-btn" type="button" data-msg=
-              '「{{ s.name }}」を削除しますか？\n関連付けは解除されますが問題は削除されません。' data-action='/textbooks/sections/delete/{{ s.section_id }}'>×</button>
+              'Delete section "{{ s.name }}"?\nProblems will be unlinked but not deleted.' data-action='/textbooks/sections/delete/{{ s.section_id }}'>×</button>
         </td>
       </tr>
       <!-- アコーディオン行 -->

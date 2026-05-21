@@ -123,7 +123,7 @@
     <div>
       <div class="page-label">02 / Schedule</div>
       <div class="page-title" style="color:var(--green);">Hours per Subject</div>
-      <div class="page-title-ja">勉強時間登録（教科別）</div>
+      <div class="page-title-ja">Subject Schedule</div>
     </div>
     <a class="page-header-back" href="/">TOP</a>
   </div>
@@ -153,13 +153,13 @@
 
   {% for subject in subjects %}
   <div class="card fade-in">
-    <div class="card-title">{{ subject }} — 教科別スケジュール</div>
+    <div class="card-title">{{ subject }} — Subject Schedule</div>
 
     <!-- ベース -->
     <form method="POST" action="/schedule_subject/base">
       <input type="hidden" name="student_id" value="{{ selected_student }}">
       <input type="hidden" name="subject" value="{{ subject }}">
-      <label>Base Schedule — 曜日別（分）</label>
+      <label>Base Schedule — Minutes by day</label>
       <div class="time-grid">
         {% set days_en = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
         {% set days_val = ['mon','tue','wed','thu','fri','sat','sun'] %}
@@ -181,7 +181,7 @@
     <form method="POST" action="/schedule_subject/override" style="margin-top:20px;">
       <input type="hidden" name="student_id" value="{{ selected_student }}">
       <input type="hidden" name="subject" value="{{ subject }}">
-      <label>Date Override — 特定日の上書き</label>
+      <label>Date Override — Override for specific dates</label>
       <div class="grid-3">
         <div>
           <label style="margin-top:0;">Date</label>

@@ -4,7 +4,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <meta charset="UTF-8">
-  <title>計画表出力</title>
+  <title>Export Plan — Study Planner</title>
   <style>
     body { font-family: sans-serif; max-width: 500px; margin: 60px auto; background: #f5f7fa; }
     h1 { color: #2c3e50; }
@@ -24,17 +24,17 @@
   <h1>③ 計画表出力</h1>
   <div class="form-box">
     <form method="POST" id="export-form" action="/export">
-      <label>生徒</label>
+      <label>Student</label>
       <select name="student_id">
         {% for s in students %}
         <option value="{{ s.student_id }}">{{ s.name }}</option>
         {% endfor %}
       </select>
 
-      <label>次回授業日（計画終了日）</label>
+      <label>End Date (next class)</label>
       <input type="date" name="date" required>
 
-      <label>計画開始日（任意）</label>
+      <label>Start Date (optional)</label>
       <input type="date" name="start_date">
       <p class="note">空欄の場合は今日の日付が自動的に使われます。</p>
 

@@ -134,7 +134,7 @@
     <div>
       <div class="page-label">01 / Master Data</div>
       <div class="page-title">Add Problem</div>
-      <div class="page-title-ja">問題マスタへの新規登録</div>
+      <div class="page-title-ja">Add New Problem</div>
     </div>
     <a class="page-header-back" href="/problems/list">Problem List</a>
   </div>
@@ -150,7 +150,7 @@
     </div>
     <div class="ai-result" id="ai-result"></div>
     <div style="margin-top:12px;display:none;" id="apply-row">
-      <button class="btn btn-success btn-sm" onclick="applyAI()">↓ フォームに反映する</button>
+      <button class="btn btn-success btn-sm" onclick="applyAI()">↓ Apply to Form</button>
     </div>
   </div>
 
@@ -187,13 +187,13 @@
         <div>
           <label>Problem Number / Name</label>
           <input type="text" name="problem_number" id="f-problem_number"
-            placeholder="例：大問5（因数分解の応用）" required>
+            placeholder="e.g. Problem 5 (Factorization)" required>
         </div>
         <div>
           <label>No. in Textbook</label>
           <input type="number" name="order_in_textbook" id="f-order_in_textbook"
             min="1" max="9999" placeholder="e.g. 42">
-          <p class="hint">空欄→同テキスト内の最大No.+1を自動設定</p>
+          <p class="hint">空欄→auto-set to next No. in textbook</p>
         </div>
       </div>
 
@@ -240,7 +240,7 @@
           </select>
         </div>
         <div>
-          <label>Total Min. <span style="color:var(--text-dim);font-size:9px;">空欄=1回で完結</span></label>
+          <label>Total Min. <span style="color:var(--text-dim);font-size:9px;">blank = single session</span></label>
           <input type="number" name="total_minutes" id="f-total_minutes"
             min="5" max="999" step="5" placeholder="e.g. 180">
           <div class="hint" id="hp-hint" style="margin-top:4px;color:var(--green);"></div>
@@ -268,13 +268,13 @@
               letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
               margin:0;cursor:pointer;">Undecided</label>
           </div>
-          <p class="hint">空欄→授業曜日から自動計算 / Undecided→計画表に出さない</p>
+          <p class="hint">空欄→auto from class schedule / Undecided→excluded from plan</p>
         </div>
       </div>
 
       <label>Instruction</label>
       <textarea name="instruction" id="f-instruction"
-        placeholder="例：因数分解の手順を意識して解くこと。"></textarea>
+        placeholder="e.g. Focus on the factorization procedure."></textarea>
 
       <label>Students</label>
       <div class="student-checks">
@@ -351,7 +351,7 @@
         <td>
           <button class="btn btn-ghost btn-sm"
             onclick="showAddAssignment({{ p.problem_id }})"
-            title="出題予定を追加">+</button>
+            title="Add to assignments">+</button>
           <button class="btn btn-danger btn-sm"
             onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
         </td>
@@ -482,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // AI提案
 async function askAI() {
   const input = document.getElementById('ai-input').value.trim();
-  if (!input) { showToast('問題の説明を入力してください', 'warn'); return; }
+  if (!input) { showToast('Please enter a problem description', 'warn'); return; }
   document.getElementById('ai-loading').style.display = 'inline';
   document.getElementById('ai-result').style.display = 'none';
   document.getElementById('apply-row').style.display = 'none';
@@ -508,7 +508,7 @@ async function askAI() {
       `instruction    : ${data.instruction || '（なし）'}`;
     document.getElementById('apply-row').style.display = 'block';
   } catch(e) {
-    showToast('AI呼び出しに失敗しました', 'warn');
+    showToast('AI suggestion failed', 'warn');
   } finally {
     document.getElementById('ai-loading').style.display = 'none';
   }
@@ -521,7 +521,7 @@ function applyAI() {
   document.getElementById('f-review_value').value    = aiData.review_value;
   document.getElementById('f-estimated_minutes').value = aiData.estimated_minutes;
   document.getElementById('f-instruction').value     = aiData.instruction || '';
-  showToast('↓ フォームに反映しました', 'success');
+  showToast('↓ Applied to form', 'success');
 }
 
 // ── インライン編集：数値 ──
@@ -636,7 +636,7 @@ function toggleDate(cb) {
 }
 
 async function deleteProblem(id, btn) {
-  if (!confirm('Problem ' + id + ' を削除しますか？')) return;
+  if (!confirm('Delete Problem ' + id + '?')) return;
   const res = await fetch('/problems/delete/' + id, { method: 'POST' });
   if (res.ok) {
     document.getElementById('row-' + id)?.remove();
@@ -664,7 +664,7 @@ function updateHpHint() {
   var maxM = est;
   var nMin = Math.ceil(tot / maxM);
   var nMax = Math.ceil(tot / minM);
-  hint.textContent = '→ 約' + nMin + '〜' + nMax + 'セッションに分割';
+  hint.textContent = '→ approx. ' + nMin + '–' + nMax + ' sessions';
 }
 document.addEventListener('DOMContentLoaded', function() {
   var estEl = document.getElementById('f-estimated_minutes');

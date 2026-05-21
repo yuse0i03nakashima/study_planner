@@ -97,7 +97,7 @@
     <div>
       <div class="page-label">04 / Records</div>
       <div class="page-title">Add Record</div>
-      <div class="page-title-ja">授業記録入力</div>
+      <div class="page-title-ja">Add Record</div>
     </div>
     <a class="page-header-back" href="/">TOP</a>
   </div>
@@ -196,7 +196,7 @@ function filterProblems() {
 
   if (assigned.length > 0) {
     const grp1 = document.createElement('optgroup');
-    grp1.label = '── 今期の問題 ──';
+    grp1.label = '── This term ──';
     assigned.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;
@@ -208,7 +208,7 @@ function filterProblems() {
 
   if (others.length > 0) {
     const grp2 = document.createElement('optgroup');
-    grp2.label = '── 全問題 ──';
+    grp2.label = '── All problems ──';
     others.forEach(p => {
       const opt = document.createElement('option');
       opt.value = p.id;

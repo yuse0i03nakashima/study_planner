@@ -111,7 +111,7 @@
     <div>
       <div class="page-label">01 / Master Data</div>
       <div class="page-title" style="color:#f87171;">Problem List</div>
-      <div class="page-title-ja">問題一覧・編集・削除</div>
+      <div class="page-title-ja">Problem List</div>
     </div>
     {% if selected_textbook %}
     <a class="page-header-back" href="/textbooks/{{ selected_textbook }}/sections">Sections</a>
@@ -221,7 +221,7 @@
       <td>
         <button class="btn btn-ghost btn-sm"
           onclick="showAddAssignment({{ p.problem_id }})"
-          title="出題予定を追加">+</button>
+          title="Add to assignments">+</button>
         <button class="btn btn-danger btn-sm"
           onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
       </td>

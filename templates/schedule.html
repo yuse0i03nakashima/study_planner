@@ -123,7 +123,7 @@
     <div>
       <div class="page-label">02 / Schedule</div>
       <div class="page-title" style="color:var(--green);">Study Hours</div>
-      <div class="page-title-ja">勉強時間登録（全体）</div>
+      <div class="page-title-ja">Study Schedule</div>
     </div>
     <a class="page-header-back" href="/">TOP</a>
   </div>
@@ -153,7 +153,7 @@
 
   <!-- ベーススケジュール（曜日別） -->
   <div class="card fade-in">
-    <div class="card-title">Base Schedule — 曜日別デフォルト（分）</div>
+    <div class="card-title">Base Schedule — Default minutes by day</div>
     <form method="POST" action="/schedule/base">
       <input type="hidden" name="student_id" value="{{ selected_student }}">
       <div class="time-grid">
@@ -176,7 +176,7 @@
 
   <!-- オーバーライド（日付別） -->
   <div class="card fade-in">
-    <div class="card-title">Date Override — 特定日の上書き</div>
+    <div class="card-title">Date Override — Override for specific dates</div>
     <form method="POST" action="/schedule/override">
       <input type="hidden" name="student_id" value="{{ selected_student }}">
       <div class="grid-3">

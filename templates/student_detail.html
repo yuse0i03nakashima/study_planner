@@ -183,7 +183,7 @@
 
     <!-- 全体スケジュール -->
     <div class="card">
-      <div class="card-title">Overall — 全体勉強時間（分／曜日）</div>
+      <div class="card-title">Overall — Study minutes by day</div>
       <form method="POST" action="/schedule/base">
         <input type="hidden" name="student_id" value="{{ student.student_id }}">
         <div class="time-grid">
@@ -205,7 +205,7 @@
 
     <!-- 全体オーバーライド -->
     <div class="card">
-      <div class="card-title">Overall Override — 特定日の上書き</div>
+      <div class="card-title">Overall Override — Specific date overrides</div>
       <form method="POST" action="/schedule/override">
         <input type="hidden" name="student_id" value="{{ student.student_id }}">
         <div class="grid-3">

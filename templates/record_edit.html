@@ -4,7 +4,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <meta charset="UTF-8">
-  <title>授業記録編集</title>
+  <title>Edit Record — Study Planner</title>
   <style>
     body { font-family: sans-serif; max-width: 500px; margin: 60px auto; background: #f5f7fa; }
     h1 { color: #2c3e50; }
@@ -24,9 +24,9 @@
       <strong>【{{ record.subject }}】{{ record.textbook }} {{ record.problem_number }}</strong>
     </div>
     <form method="POST">
-      <label>日付</label>
+      <label>Date</label>
       <input type="date" name="date" value="{{ record.date }}" required>
-      <label>正誤</label>
+      <label>Score</label>
       <select name="correct">
         <option value="1" {% if record.correct %}selected{% endif %}>正答</option>
         <option value="0" {% if not record.correct %}selected{% endif %}>誤答</option>

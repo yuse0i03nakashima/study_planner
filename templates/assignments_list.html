@@ -120,7 +120,7 @@
     <div>
       <div class="page-label">04 / Records</div>
       <div class="page-title">Assignments</div>
-      <div class="page-title-ja">出題予定管理</div>
+      <div class="page-title-ja">Assignment Management</div>
     </div>
     <a class="page-header-back" href="/">TOP</a>
   </div>
@@ -322,7 +322,7 @@ function showToast(msg, type='success') {
 function updateSelectedCount() {
   const checked = document.querySelectorAll('.row-check:checked').length;
   const el = document.getElementById('selected-count');
-  if (el) el.textContent = checked > 0 ? checked + ' 行選択中' : '';
+  if (el) el.textContent = checked > 0 ? checked + ' rows selected' : '';
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -503,7 +503,7 @@ function startMasteryEdit(span, current) {
         span.textContent = STARS[newVal];
         span.className = 'editable mastery-' + newVal;
         span.ondblclick = () => startMasteryEdit(span, newVal);
-        showToast('✓ 習熟度を更新しました', 'success');
+        showToast('✓ Mastery updated', 'success');
       } else { showToast('Update failed.', 'warn'); }
     }
     sel.remove();
@@ -553,7 +553,7 @@ function selectProblem(id, label) {
 
 function validateAssign() {
   if (!document.getElementById('al-problem-id').value) {
-    showToast('問題を選択してください', 'warn'); return false;
+    showToast('Select a problem first', 'warn'); return false;
   }
   return true;
 }

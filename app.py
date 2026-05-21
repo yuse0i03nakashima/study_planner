@@ -648,7 +648,7 @@ def history_download(history_id):
     row = c.fetchone()
     conn.close()
     if not row:
-        return "記録が見つかりません", 404
+        return "Record not found", 404
     path = row["pdf_path"] if file_type == "pdf" else row["excel_path"]
     if path and os.path.exists(path):
         return send_file(path, as_attachment=True)
@@ -656,7 +656,7 @@ def history_download(history_id):
     fallback = row["excel_path"] if file_type == "pdf" else row["pdf_path"]
     if fallback and os.path.exists(fallback):
         return send_file(fallback, as_attachment=True)
-    return "ファイルが見つかりません", 404
+    return "File not found", 404
 
 
 
@@ -1101,7 +1101,7 @@ def textbook_delete(textbook_id):
               (textbook_id,))
     if c.fetchone()["cnt"] > 0:
         conn.close()
-        return "このテキストには問題が登録されているため削除できません。", 400
+        return "Cannot delete: this textbook has registered problems.", 400
     c.execute("DELETE FROM student_textbooks WHERE textbook_id=?", (textbook_id,))
     c.execute("DELETE FROM textbooks WHERE textbook_id=?", (textbook_id,))
     conn.commit()
