@@ -1800,6 +1800,30 @@ def api_sections_by_subject():
     conn.close()
     return jsonify(rows)
 
+
+@app.route("/history/update_score", methods=["POST"])
+def history_update_score():
+    """Edit RecordsページからScoreを更新する"""
+    data = request.get_json()
+    history_id = data.get("history_id")
+    score      = data.get("score")
+    if not history_id or score is None:
+        return jsonify({"ok": False, "message": "missing params"}), 400
+    score = int(score)
+    if not (1 <= score <= 5):
+        return jsonify({"ok": False, "message": "invalid score"}), 400
+    # scoreに応じてcorrectも更新（4〜5=正答、1〜3=誤答）
+    correct = 1 if score >= 4 else 0
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        "UPDATE history SET score=?, correct=? WHERE history_id=?",
+        (score, correct, history_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
 if __name__ == "__main__":
     init_db()
 

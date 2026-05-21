@@ -177,7 +177,7 @@
 
   <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);
     margin-bottom:8px;letter-spacing:0.5px;">
-    ※ Double-click to edit Mastery
+    ※ Double-click to edit Score or Mastery
   </div>
 
 
@@ -200,19 +200,18 @@
       <td class="left" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         {{ r.problem_number }}
       </td>
-      <td>
-        {%- set sc = r.score if r.score else (5 if r.correct == 1 else 1) %}
-        {%- if sc == 5 %}
-        <span style="color:var(--green);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">5 Perfect</span>
-        {%- elif sc == 4 %}
-        <span style="color:var(--blue);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">4 Good</span>
-        {%- elif sc == 3 %}
-        <span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Recall</span>
-        {%- elif sc == 2 %}
-        <span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">2 Retry</span>
-        {%- else %}
-        <span style="color:var(--red);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">1 Failed</span>
-        {%- endif %}
+      {%- set sc = r.score if r.score else (5 if r.correct == 1 else 1) %}
+      <td class="score-cell" data-id="{{ r.history_id }}" data-score="{{ sc }}">
+        <span class="editable score-{{ sc }}"
+          ondblclick="startScoreEdit(this, {{ r.history_id }}, {{ sc }})"
+          style="cursor:pointer;">
+          {%- if sc == 5 %}<span style="color:var(--green);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">5 Perfect</span>
+          {%- elif sc == 4 %}<span style="color:var(--blue);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">4 Good</span>
+          {%- elif sc == 3 %}<span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Recall</span>
+          {%- elif sc == 2 %}<span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">2 Retry</span>
+          {%- else %}<span style="color:var(--red);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">1 Failed</span>
+          {%- endif %}
+        </span>
       </td>
       <td class="mastery-cell" data-id="{{ r.history_id }}" data-mastery="{{ r.mastery }}">
         {%- set m = r.mastery %}
@@ -239,6 +238,68 @@ function showToast(msg, type='success') {
   t.className = 'show ' + type;
   setTimeout(function(){ t.className = ''; }, 3000);
 }
+// ── Score：ダブルクリックで即時保存 ──
+const SCORE_LABELS = {
+  5: '5 Perfect', 4: '4 Good', 3: '3 Recall', 2: '2 Retry', 1: '1 Failed'
+};
+const SCORE_COLORS = {
+  5: 'var(--green)', 4: 'var(--blue)', 3: 'var(--amber)',
+  2: 'var(--rose)',  1: 'var(--red)'
+};
+
+function startScoreEdit(outer, historyId, current) {
+  const cell = outer.closest('.score-cell');
+  if (cell.querySelector('select')) return;
+
+  const sel = document.createElement('select');
+  sel.className = 'inline-select';
+  sel.style.width = '100px';
+  [5, 4, 3, 2, 1].forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = SCORE_LABELS[s];
+    if (s === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  outer.classList.add('editing');
+  cell.appendChild(sel);
+  sel.focus();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return; done = true;
+    const newVal = parseInt(sel.value);
+    if (save && newVal !== current) {
+      try {
+        const res = await fetch('/history/update_score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ history_id: historyId, score: newVal })
+        });
+        if (res.ok) {
+          outer.innerHTML = '<span style="color:' + SCORE_COLORS[newVal]
+            + ';font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">'
+            + SCORE_LABELS[newVal] + '</span>';
+          outer.ondblclick = () => startScoreEdit(outer, historyId, newVal);
+          showToast('✓ Score updated', 'success');
+        } else {
+          showToast('Update failed', 'warn');
+        }
+      } catch(e) {
+        showToast('Network error', 'warn');
+      }
+    }
+    sel.remove();
+    outer.classList.remove('editing');
+  };
+
+  sel.addEventListener('change', () => setTimeout(() => finish(true), 50));
+  sel.addEventListener('blur',   () => setTimeout(() => finish(true), 100));
+  sel.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+}
+
 // ── Mastery：ダブルクリックで即時保存 ──
 function startMasteryEdit(span, historyId, current) {
   const cell = span.closest('.mastery-cell');
