@@ -127,7 +127,7 @@
         <div>
           <label>Series</label>
           <select name="series_id">
-            <option value="">— なし —</option>
+            <option value="">— None —</option>
             {% for s in series_list %}
             <option value="{{ s.series_id }}">{{ s.name }}</option>
             {% endfor %}
@@ -148,7 +148,7 @@
       </div>
       <label>Student</label>
       <select name="student_ids">
-        <option value="">— なし —</option>
+        <option value="">— None —</option>
         {% for s in all_students %}
         <option value="{{ s.student_id }}">{{ s.name }}</option>
         {% endfor %}
@@ -230,7 +230,7 @@
             style="width:100%;background:var(--surface);
               border:1px solid var(--border-light);
               color:var(--text);padding:8px 12px;font-size:13px;outline:none;">
-            <option value="">— なし —</option>
+            <option value="">— None —</option>
             {% for s in all_students %}
             <option value="{{ s.student_id }}"
               {% if s.student_id in t.student_ids_list %}selected{% endif %}>

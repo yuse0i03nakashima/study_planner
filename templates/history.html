@@ -282,7 +282,7 @@
         </td>
         <td>
           <button class="btn btn-primary btn-sm"
-            onclick="openPreview({{ h.history_id }})">Preview</button>
+            onclick="openNew({{ h.history_id }})">New</button>
         </td>
       </tr>
       {% endfor %}
@@ -304,10 +304,10 @@
   <div class="preview-box">
     <div class="preview-header">
       <div>
-        <div class="preview-title" id="preview-title">Plan Preview</div>
+        <div class="preview-title" id="preview-title">Plan New</div>
         <div class="preview-meta" id="preview-meta"></div>
       </div>
-      <button class="preview-close" onclick="closePreview()">× Close</button>
+      <button class="preview-close" onclick="closeNew()">× Close</button>
     </div>
     <div class="preview-body" id="preview-body">
       <div class="empty-msg">Loading...</div>
@@ -347,9 +347,9 @@ function confirmDelete(historyId) {
 }
 
 // ── プレビューモーダル ─────────────────────────────────
-function openPreview(historyId) {
+function openNew(historyId) {
   document.getElementById("preview-modal").classList.add("show");
-  document.getElementById("preview-title").textContent = "Plan Preview";
+  document.getElementById("preview-title").textContent = "Plan New";
   document.getElementById("preview-meta").textContent = "";
   document.getElementById("preview-body").innerHTML =
     "<div class='empty-msg'>Loading...</div>";
@@ -369,7 +369,7 @@ function openPreview(historyId) {
       data.start_date + " ~ " + data.end_date +
       "  (出力: " + data.generated_date + ")";
     document.getElementById("preview-body").innerHTML =
-      buildPreview(data.plan);
+      buildNew(data.plan);
   };
   xhr.onerror = function() {
     document.getElementById("preview-body").innerHTML =
@@ -378,16 +378,16 @@ function openPreview(historyId) {
   xhr.send();
 }
 
-function closePreview() {
+function closeNew() {
   document.getElementById("preview-modal").classList.remove("show");
 }
 
 document.getElementById("preview-modal").addEventListener("click", function(e) {
-  if (e.target === this) closePreview();
+  if (e.target === this) closeNew();
 });
 
 // ── プレビューHTML生成 ────────────────────────────────
-function buildPreview(plan) {
+function buildNew(plan) {
   if (!plan || !plan.length) {
     return "<div class='empty-msg'>No plan data recorded.</div>";
   }

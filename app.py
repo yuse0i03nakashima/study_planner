@@ -7,6 +7,28 @@ from datetime import date, timedelta
 import os
 
 app = Flask(__name__)
+
+# カテゴリ・記録種別の英語化フィルター
+CAT_EN = {
+    "予習": "New", "復習": "Recall", "定着": "Drill",
+    "再定着": "Reinforce", "記録": "Record", "手動修正": "Manual",
+    "自動登録": "Auto"
+}
+SCORE_EN = {
+    5: "Perfect", 4: "Good", 3: "Review", 2: "Retry", 1: "Failed"
+}
+
+@app.template_filter("cat_en")
+def cat_en_filter(v):
+    return CAT_EN.get(v, v)
+
+@app.template_filter("score_en")
+def score_en_filter(v):
+    try:
+        return SCORE_EN.get(int(v), str(v))
+    except Exception:
+        return str(v) if v else "—"
+
 app.secret_key = "study-planner-secret-2024"
 
 
@@ -75,6 +97,13 @@ def problems():
         student_ids    = request.form.getlist("student_ids")
         scheduled_date = request.form.get("scheduled_date", "").strip()
         category       = request.form.get("category", "予習")
+
+        # Students未選択の場合はテキストに紐づく生徒を自動対象にする
+        if not student_ids:
+            c.execute(
+                "SELECT student_id FROM student_textbooks WHERE textbook_id=?",
+                (textbook_id,))
+            student_ids = [r["student_id"] for r in c.fetchall()]
 
         undecided = request.form.get("undecided") == "1"
         for sid in student_ids:
@@ -443,10 +472,12 @@ def preview():
         from excel_export import build_plan_data
         action = request.form.get("action", "preview")
 
+        section_filter = request.form.get("section_filter", "").strip()
         if action == "excel":
             from excel_export import export_excel
             path = export_excel(student_id, start_date, end_date,
-                                subject_filter if subject_filter else None)
+                                subject_filter if subject_filter else None,
+                                section_id=int(section_filter) if section_filter else None)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path=path, pdf_path="",
@@ -458,7 +489,8 @@ def preview():
         if action == "pdf":
             from pdf_export import export_pdf
             path = export_pdf(student_id, start_date, end_date,
-                              subject_filter if subject_filter else None)
+                              subject_filter if subject_filter else None,
+                              section_id=int(section_filter) if section_filter else None)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path="", pdf_path=path,
@@ -467,9 +499,11 @@ def preview():
                 subprocess.Popen(["start", "", path], shell=True)
             return redirect("/preview")
 
+        section_filter = request.form.get("section_filter", "").strip()
         preview_data = build_plan_data(
             student_id, start_date, end_date,
-            subject_filter if subject_filter else None)
+            subject_filter if subject_filter else None,
+            section_id=int(section_filter) if section_filter else None)
 
     # テンプレート変数を整理
     selected_student     = selected.get("student_id",
@@ -487,6 +521,26 @@ def preview():
             subjects = info.get("subjects", [])
             break
 
+    # Section一覧を取得してプレビューに渡す
+    _sec_filter = request.form.get("section_filter", "").strip() if request.method == "POST" else ""
+    _conn_sec = get_connection()
+    _c_sec = _conn_sec.cursor()
+    if selected_subject and selected_student:
+        _c_sec.execute("""
+            SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
+                   t.name as textbook_name
+            FROM textbook_sections ts
+            JOIN textbooks t ON ts.textbook_id = t.textbook_id
+            JOIN problems p ON p.section_id = ts.section_id
+            JOIN assignments a ON a.problem_id = p.problem_id
+            WHERE t.subject=? AND a.student_id=?
+            ORDER BY t.name, ts.order_index
+        """, (selected_subject, selected_student))
+    else:
+        _c_sec.execute("SELECT section_id, name, order_index, '' as textbook_name FROM textbook_sections LIMIT 0")
+    _selected_sections = [dict(r) for r in _c_sec.fetchall()]
+    _conn_sec.close()
+
     return render_template("preview.html",
                            students=students,
                            preview_data=preview_data,
@@ -499,6 +553,8 @@ def preview():
                            start_date=start_date,
                            end_date=end_date,
                            subjects=subjects,
+                           selected_sections=_selected_sections,
+                           selected_section_id=_sec_filter,
                            unassigned=preview_data.get("unassigned", {}) if preview_data else {})
 
 
@@ -787,7 +843,7 @@ def assignments_list():
                    (SELECT mastery FROM history h
                     WHERE h.student_id = a.student_id
                     AND h.problem_id = a.problem_id
-                    ORDER BY h.date DESC LIMIT 1) as mastery
+                    ORDER BY h.date DESC, h.history_id DESC LIMIT 1) as mastery
             FROM assignments a
             JOIN problems p ON a.problem_id = p.problem_id
             WHERE a.student_id = ?
@@ -1207,8 +1263,9 @@ def mastery_single_update():
     student_id = data.get("student_id")
     problem_id = data.get("problem_id")
     mastery = data.get("mastery")
-    if not all([student_id, problem_id, mastery]):
-        return jsonify({"status": "error"}), 400
+    if not student_id or problem_id is None or mastery is None:
+        return jsonify({"ok": False, "message": "missing params"}), 400
+    problem_id = int(problem_id)
     mastery = int(mastery)
     today = __import__("datetime").date.today().isoformat()
     conn = get_connection()
@@ -1219,7 +1276,7 @@ def mastery_single_update():
     """, (student_id, problem_id, today, 1, mastery, "手動修正"))
     conn.commit()
     conn.close()
-    return jsonify({"status": "ok"})
+    return jsonify({"ok": True})
 
 
 @app.route("/problems/update_instruction", methods=["POST"])
@@ -1684,6 +1741,47 @@ def api_section_problems(section_id):
         WHERE section_id=?
         ORDER BY order_in_textbook, problem_id
     """, (section_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/sections_by_subject")
+def api_sections_by_subject():
+    """指定教科のセクション一覧を返す（Preview絞り込み用）"""
+    subject = request.args.get("subject", "")
+    student_id = request.args.get("student_id", "")
+    conn = get_connection()
+    c = conn.cursor()
+    if student_id and subject:
+        # その生徒がアサインされている問題のセクションのみ
+        c.execute("""
+            SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
+                   t.name as textbook_name
+            FROM textbook_sections ts
+            JOIN textbooks t ON ts.textbook_id = t.textbook_id
+            JOIN problems p ON p.section_id = ts.section_id
+            JOIN assignments a ON a.problem_id = p.problem_id
+            WHERE t.subject=? AND a.student_id=?
+            ORDER BY t.name, ts.order_index
+        """, (subject, student_id))
+    elif subject:
+        c.execute("""
+            SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
+                   t.name as textbook_name
+            FROM textbook_sections ts
+            JOIN textbooks t ON ts.textbook_id = t.textbook_id
+            WHERE t.subject=?
+            ORDER BY t.name, ts.order_index
+        """, (subject,))
+    else:
+        c.execute("""
+            SELECT ts.section_id, ts.name, ts.order_index,
+                   t.name as textbook_name
+            FROM textbook_sections ts
+            JOIN textbooks t ON ts.textbook_id = t.textbook_id
+            ORDER BY t.subject, t.name, ts.order_index
+        """)
     rows = [dict(r) for r in c.fetchall()]
     conn.close()
     return jsonify(rows)

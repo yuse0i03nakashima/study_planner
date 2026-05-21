@@ -127,8 +127,8 @@
       <div>
         <label>Subject</label>
         <select name="subject" id="filter-subject" style="width:130px;"
-                onchange="updateTextbooks()">
-          <option value="">— 全教科 —</option>
+                onchange="updateTextbooks(); this.form.submit();">
+          <option value="">— All Subjects —</option>
           {% for subj in all_subjects %}
           <option value="{{ subj }}"
             {% if subj == selected_subject %}selected{% endif %}>
@@ -139,8 +139,8 @@
       </div>
       <div>
         <label>Textbook</label>
-        <select name="textbook_id" id="filter-textbook" style="width:200px;">
-          <option value="">— 全テキスト —</option>
+        <select name="textbook_id" id="filter-textbook" style="width:200px;" onchange="this.form.submit();">
+          <option value="">— All Textbooks —</option>
           {% for t in all_textbooks %}
           <option value="{{ t.textbook_id }}"
             {% if t.textbook_id|string == selected_textbook %}selected{% endif %}
@@ -150,7 +150,6 @@
           {% endfor %}
         </select>
       </div>
-      <button type="submit" class="btn btn-primary btn-sm">Filter →</button>
       {% if selected_subject or selected_textbook %}
       <a href="/problems/list" class="btn btn-ghost btn-sm">Clear</a>
       {% endif %}
@@ -161,16 +160,16 @@
   </div>
 
   <div class="meta-text fade-in" style="margin-bottom:8px;">
-    ※ Imp・Dif・RV・所要時間・学習指示はセルをダブルクリックで編集できます
+    ※ Double-click to edit: No. / Textbook / Problem name / Imp / Dif / RV / Min / Total / Instruction
   </div>
 
   <div class="fade-in" style="overflow-x:auto;">
   <table class="data-table" id="problem-table">
     <thead>
       <tr>
-        <th>No.</th><th>教科</th><th>テキスト</th><th>問題番号</th>
-        <th>Imp</th><th>Dif</th><th>RV</th><th>分</th><th>Total</th>
-        <th>学習指示</th><th></th>
+        <th>No.</th><th>Subject</th><th>Textbook</th><th>Problem</th>
+        <th>Imp</th><th>Dif</th><th>RV</th><th>Min</th><th>Total</th>
+        <th>Instruction</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -276,10 +275,10 @@
           <select name="category"
             style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
               color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
-            <option value="予習">予習</option>
-            <option value="復習">復習</option>
-            <option value="定着">定着</option>
-            <option value="再定着">再定着</option>
+            <option value="予習">New</option>
+            <option value="復習">Recall</option>
+            <option value="定着">Drill</option>
+            <option value="再定着">Reinforce</option>
           </select>
         </div>
         <div>

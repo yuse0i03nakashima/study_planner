@@ -292,7 +292,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
 
 def build_plan_data(student_id, start_date_str, target_date_str,
-                    subject_filter=None):
+                    subject_filter=None, section_id=None):
     conn = get_connection()
     c = conn.cursor()
     c.execute(
@@ -314,6 +314,16 @@ def build_plan_data(student_id, start_date_str, target_date_str,
     else:
         subjects = all_subjects
         plan = all_plan
+
+    # セクションフィルター（テスト範囲の絞り込み）
+    if section_id:
+        # section_idに属するproblem_idを取得してplanを絞り込む
+        conn2 = get_connection()
+        c2 = conn2.cursor()
+        c2.execute("SELECT problem_id FROM problems WHERE section_id=?", (section_id,))
+        section_pids = {r["problem_id"] for r in c2.fetchall()}
+        conn2.close()
+        plan = [p for p in plan if p.get("problem_id") in section_pids]
 
     # 教科別スケジュールがあるか確認
     # 全て0分の場合はNoneとみなしてglobal_scheduleを使用
@@ -384,8 +394,11 @@ def build_plan_data(student_id, start_date_str, target_date_str,
     }
 
 
+_CAT_EN = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}
+
 def _make_problem_text(item):
-    return ("【" + item["category"] + "】"
+    cat_en = _CAT_EN.get(item.get("category",""), item.get("category",""))
+    return ("[" + cat_en + "] "
             + item["textbook"] + " " + item["problem_number"])
 
 
@@ -417,6 +430,10 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     CAT_COLORS = {
         "予習": C_BLUE, "復習": C_GREEN,
         "定着": C_AMBER, "再定着": C_ROSE,
+    "New":       C_BLUE,
+    "Recall":    C_GREEN,
+    "Drill":     C_AMBER,
+    "Reinforce": C_ROSE,
     }
     MASTERY_COLORS = {1: C_ROSE, 2: C_AMBER, 3: C_GREEN}
     DOW_JA = ["月", "火", "水", "木", "金", "土", "日"]
@@ -516,7 +533,8 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
         dow_color = C_ROSE if is_weekend else C_MUTED
 
         for row_i, (subj, item) in enumerate(day_items):
-            cat = item.get("category", "")
+            cat_raw = item.get("category", "")
+            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
             cat_color = CAT_COLORS.get(cat, C_DIM)
             mastery_int = item.get("mastery_int", 1)
             mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
@@ -621,7 +639,9 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
         cur += 1
 
         for subj, item in all_unassigned:
-            cat = item.get("category", "")
+            cat_raw = item.get("category", "")
+            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
+            cat_color = CAT_COLORS.get(cat, C_DIM)
             vals = ["—", "—", subj, cat,
                     item.get("textbook", ""),
                     item.get("problem_number", ""),
@@ -643,7 +663,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     ws.auto_filter.ref = f"A2:{get_column_letter(N_COLS)}{cur - 1}"
 
 
-def export_excel(student_id, start_date_str, end_date_str, subject_filter=None):
+def export_excel(student_id, start_date_str, end_date_str, subject_filter=None, section_id=None):
     """計画表をExcelファイルに出力して保存パスを返す"""
     import openpyxl
     import os

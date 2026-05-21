@@ -6,7 +6,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Preview & Export — Study Planner</title>
+  <title>New & Export — Study Planner</title>
   <style>
     :root {
       --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b;
@@ -81,10 +81,10 @@
       color:var(--text-muted); white-space:nowrap; }
     .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
       padding:2px 8px; display:inline-block; }
-    .badge-予習  { background:rgba(91,143,249,0.10);  color:#5b8ff9;  border:1px solid rgba(91,143,249,0.3); }
-    .badge-復習  { background:rgba(62,207,142,0.10);  color:#3ecf8e;  border:1px solid rgba(62,207,142,0.3); }
-    .badge-定着  { background:rgba(245,166,35,0.10);  color:#f5a623;  border:1px solid rgba(245,166,35,0.3); }
-    .badge-再定着 { background:rgba(240,98,146,0.10); color:#f06292;  border:1px solid rgba(240,98,146,0.3); }
+    .badge-予習, .badge-New      { background:rgba(91,143,249,0.10);  color:#5b8ff9;  border:1px solid rgba(91,143,249,0.3); }
+    .badge-復習, .badge-Recall   { background:rgba(62,207,142,0.10);  color:#3ecf8e;  border:1px solid rgba(62,207,142,0.3); }
+    .badge-定着, .badge-Drill    { background:rgba(245,166,35,0.10);  color:#f5a623;  border:1px solid rgba(245,166,35,0.3); }
+    .badge-再定着, .badge-Reinforce { background:rgba(240,98,146,0.10); color:#f06292;  border:1px solid rgba(240,98,146,0.3); }
     .fade-in { animation:fadeIn 0.3s ease both; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
     a { color:var(--blue); }
@@ -130,6 +130,23 @@
             </option>
             {% endfor %}
           </select>
+          </div>
+          <div>
+            <label>Section <span style="color:var(--text-dim);font-size:9px;">for exam prep</span></label>
+            <select name="section_filter" id="section-filter"
+              style="padding:8px 12px;background:var(--surface2);
+                border:1px solid var(--border-light);color:var(--text);
+                font-family:'Noto Serif JP',serif;font-size:13px;min-width:220px;">
+              <option value="">— All Sections —</option>
+              {% if selected_sections %}
+              {% for sec in selected_sections %}
+              <option value="{{ sec.section_id }}"
+                {% if sec.section_id|string == selected_section_id %}selected{% endif %}>
+                {{ sec.textbook_name }} / {{ sec.name }}
+              </option>
+              {% endfor %}
+              {% endif %}
+            </select>
           <input type="hidden" name="mode" value="per_subject">
         </div>
       </div>
@@ -201,7 +218,7 @@
           <tr>
             <td class="date-col" style="white-space:nowrap;">{{ day.date }}</td>
             <td>
-              <span class="badge badge-{{ prob.category }}">{{ prob.category }}</span>
+              <span class="badge badge-{{ prob.category }}">{{ prob.category | cat_en }}</span>
             </td>
             <td style="font-size:11px;max-width:130px;overflow:hidden;
               text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
@@ -271,6 +288,47 @@ function updateSubjects() {
     opt.value = s; opt.textContent = s;
     sel.appendChild(opt);
   });
+}
+</script>
+<script>
+// ── Section動的読み込み ──
+document.addEventListener('DOMContentLoaded', function() {
+  var subjectSel = document.getElementById('sel-subject');
+  if (subjectSel) {
+    subjectSel.addEventListener('change', loadSections);
+    // ページ読み込み時にも実行（選択状態を反映）
+    loadSections();
+  }
+});
+
+function loadSections() {
+  var subjectSel = document.getElementById('sel-subject');
+  var secSel     = document.getElementById('section-filter');
+  if (!subjectSel || !secSel) return;
+
+  var subj = subjectSel.value;
+  // Studentセレクトを探す
+  var sidEl = document.querySelector('select[name="student_id"]');
+  var sid   = sidEl ? sidEl.value : '';
+
+  var currentVal = secSel.value;
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/sections_by_subject?subject=' + encodeURIComponent(subj)
+           + '&student_id=' + encodeURIComponent(sid), true);
+  xhr.onload = function() {
+    if (xhr.status !== 200) return;
+    var data = JSON.parse(xhr.responseText);
+    secSel.innerHTML = '<option value="">— All Sections —</option>';
+    data.forEach(function(sec) {
+      var opt = document.createElement('option');
+      opt.value = sec.section_id;
+      opt.textContent = sec.textbook_name + ' / ' + sec.name;
+      if (String(sec.section_id) === currentVal) opt.selected = true;
+      secSel.appendChild(opt);
+    });
+  };
+  xhr.send();
 }
 </script>
 </body>

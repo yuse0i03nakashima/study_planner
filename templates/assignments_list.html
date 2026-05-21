@@ -71,6 +71,11 @@
     .row-定着  { border-left:2px solid var(--amber); }
     .row-再定着 { border-left:2px solid var(--rose); }
     .changed-row td { box-shadow:inset 0 0 0 1px var(--amber); }
+    @keyframes rowFlash {
+      0%   { background:rgba(245,166,35,0.25); }
+      100% { background:transparent; }
+    }
+    .flash-row td { animation:rowFlash 0.6s ease-out forwards; }
     /* 編集可能セル（点線枠） */
     .editable {
       cursor:pointer; padding:3px 6px; display:inline-block; min-width:24px;
@@ -151,7 +156,7 @@
           text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
           Problem Search
         </label>
-        <input type="text" id="al-search" placeholder="問題番号・テキスト名・IDで検索..."
+        <input type="text" id="al-search" placeholder="Search by problem name, textbook, or No. ..."
           autocomplete="off"
           style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
             color:var(--text);padding:7px 10px;font-size:12px;outline:none;"
@@ -173,10 +178,10 @@
         <select name="category"
           style="background:var(--surface2);border:1px solid var(--border-light);
             color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
-          <option value="予習">予習</option>
-          <option value="復習">復習</option>
-          <option value="定着">定着</option>
-          <option value="再定着">再定着</option>
+          <option value="予習">New</option>
+          <option value="復習">Recall</option>
+          <option value="定着">Drill</option>
+          <option value="再定着">Reinforce</option>
         </select>
       </div>
       <div>
@@ -193,11 +198,31 @@
     </form>
   </div>
 
-  <div class="bulk-bar fade-in">
+  <div class="bulk-bar fade-in" style="flex-wrap:wrap;gap:10px;">
     <span class="bulk-label">Bulk Edit</span>
-    <span class="meta-text">カテゴリ・出題日を変更後に保存</span>
-    <button class="btn btn-success" onclick="bulkUpdate()">✓ Apply Changes</button>
-    <span id="change-count" class="meta-text"></span>
+
+    <!-- 区切り -->
+    <span class="meta-text">Selected:</span>
+
+    <!-- カテゴリ一括セット -->
+    <select id="bulk-category" style="padding:5px 8px;background:var(--surface2);
+      border:1px solid var(--border-light);color:var(--text);
+      font-family:'DM Mono',monospace;font-size:10px;">
+      <option value="">— Category —</option>
+      <option value="予習">New</option>
+      <option value="復習">Recall</option>
+      <option value="定着">Drill</option>
+      <option value="再定着">Reinforce</option>
+    </select>
+
+    <!-- 出題日一括セット -->
+    <input type="date" id="bulk-date" style="padding:5px 8px;background:var(--surface2);
+      border:1px solid var(--border-light);color:var(--text);
+      font-family:'DM Mono',monospace;font-size:10px;">
+
+    <button class="btn btn-primary btn-sm" onclick="applyToSelected()">→ Apply to Selected</button>
+
+    <span id="selected-count" class="meta-text"></span>
   </div>
 
   <div class="fade-in" style="overflow-x:auto;">
@@ -205,17 +230,17 @@
     <thead>
       <tr>
         <th style="width:32px;"><input type="checkbox" id="check-all" onchange="toggleAll(this)"></th>
-        <th>教科</th>
-        <th>テキスト</th>
-        <th>問題番号</th>
+        <th>Subject</th>
+        <th>Textbook</th>
+        <th>Problem</th>
         <th>Imp</th>
         <th>Dif</th>
         <th>RV</th>
         <th>Min</th>
         <th>Total</th>
-        <th>習熟度</th>
-        <th>カテゴリ</th>
-        <th>出題日</th>
+        <th>Mastery</th>
+        <th>Category</th>
+        <th>Date</th>
         <th></th>
       </tr>
     </thead>
@@ -259,7 +284,7 @@
           style="width:76px;"
           onchange="markChanged(this, {{ a.assignment_id }})">
           {%- for cat in ['予習','復習','定着','再定着'] %}
-          <option value="{{ cat }}" {%- if cat == a.category %} selected{%- endif %}>{{ cat }}</option>
+          <option value="{{ cat }}" {%- if cat == a.category %} selected{%- endif %}>{{ cat | cat_en }}</option>
           {%- endfor %}
         </select>
       </td>
@@ -293,79 +318,153 @@ function showToast(msg, type='success') {
   setTimeout(() => { t.className = ''; }, 3000);
 }
 
-// ── 生徒固有：カテゴリ・出題日の一括更新 ──
-const changedRows = new Map();
+// ── チェックボックス：選択数カウント更新 ──
+function updateSelectedCount() {
+  const checked = document.querySelectorAll('.row-check:checked').length;
+  const el = document.getElementById('selected-count');
+  if (el) el.textContent = checked > 0 ? checked + ' 行選択中' : '';
+}
 
-function markChanged(el, id) {
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.row-check').forEach(cb => {
+    cb.addEventListener('change', updateSelectedCount);
+  });
+});
+
+// ── 選択行に一括適用 ──
+function applyToSelected() {
+  const checked = document.querySelectorAll('.row-check:checked');
+  if (checked.length === 0) {
+    showToast('Select rows first', 'warn');
+    return;
+  }
+  const cat  = document.getElementById('bulk-category').value;
+  const date = document.getElementById('bulk-date').value;
+  if (!cat && !date) {
+    showToast('Set a category or date first', 'warn');
+    return;
+  }
+  checked.forEach(cb => {
+    const id  = parseInt(cb.value);
+    const row = document.getElementById('row-' + id);
+    if (!row) return;
+    if (cat) {
+      const sel = row.querySelector('select.edit-field[data-field="category"]');
+      if (sel) { sel.value = cat; markChanged(sel, id); }
+    }
+    if (date) {
+      const inp = row.querySelector('input.edit-field[data-field="scheduled_date"]');
+      if (inp) { inp.value = date; markChanged(inp, id); }
+    }
+  });
+  checked.forEach(cb => {
+    const id  = parseInt(cb.value);
+    const row = document.getElementById('row-' + id);
+    if (row) {
+      row.classList.remove('changed-row');
+      row.classList.add('flash-row');
+      setTimeout(() => row.classList.remove('flash-row'), 700);
+    }
+    cb.checked = false;
+  });
+  updateSelectedCount();
+  showToast(checked.length + ' rows updated — click Apply Changes to save', 'success');
+}
+
+// ── 生徒固有：カテゴリ・出題日を変更した瞬間に自動保存 ──
+async function autoSave(el, id) {
   const row = document.getElementById('row-' + id);
   const fields = row.querySelectorAll('.edit-field');
   const data = {};
   fields.forEach(f => { data[f.dataset.field] = f.value; });
-  changedRows.set(id, data);
-  row.classList.add('changed-row');
-  document.getElementById('change-count').textContent =
-    changedRows.size + ' row(s) pending';
-}
 
-async function bulkUpdate() {
-  if (changedRows.size === 0) {
-    showToast('No changes to apply.', 'info');
-    return;
-  }
-  const updates = [];
-  changedRows.forEach((data, id) => updates.push({ assignment_id: id, ...data }));
+  const updates = [{ assignment_id: id, ...data }];
   const res = await fetch('/assignments/bulk_update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ student_id: '{{ selected_student }}', updates })
   });
   if (res.ok) {
-    changedRows.forEach((data, id) => {
-      const row = document.getElementById('row-' + id);
-      if (row) { row.classList.remove('changed-row'); row.className = 'row-' + data.category; }
-    });
-    changedRows.clear();
-    document.getElementById('change-count').textContent = '';
-    showToast('✓ Changes saved', 'success');
-  } else { showToast('Error saving changes.', 'warn'); }
+    // カテゴリに応じた行クラスを更新
+    const cat = data.category || '';
+    row.className = 'row-' + (data.category || '');
+    row.classList.add('flash-row');
+    setTimeout(() => row.classList.remove('flash-row'), 600);
+    showToast('✓ Saved', 'success');
+  } else {
+    showToast('Save failed.', 'warn');
+  }
+}
+
+// applyToSelectedからもautoSaveを使う（markChangedの代替）
+function markChanged(el, id) {
+  autoSave(el, id);
 }
 
 // ── 問題固有：数値ダブルクリック編集（Imp/Dif/RV）──
 function startNumEdit(span) {
-  const cell = span.closest('.editable-cell');
-  const field = cell.dataset.field;
+  const cell      = span.closest('.editable-cell');
+  const field     = cell.dataset.field;
   const problemId = cell.dataset.problem;
-  const current = span.textContent.trim();
+  const current   = span.textContent.trim();
+
+  // すでに入力中なら何もしない
+  if (cell.querySelector('input.inline-input')) return;
+
   span.classList.add('editing');
 
   const input = document.createElement('input');
-  input.type = 'number'; input.min = 1; input.max = 5;
-  input.value = current; input.className = 'inline-input';
+  input.type = 'number';
+  if (field === 'total_minutes') {
+    input.min = 5; input.max = 999; input.step = 5;
+  } else {
+    input.min = 1; input.max = 5; input.step = 1;
+  }
+  input.value = (current === '—' || current === '') ? '' : current;
+  input.className = 'inline-input';
+  input.style.width = '52px';
   cell.appendChild(input);
-  input.focus(); input.select();
+  input.focus();
+  input.select();
 
-  let done = false;
-  const finish = async (save) => {
-    if (done) return; done = true;
-    if (save && input.value !== current) {
+  async function doSave() {
+    const newVal = input.value.trim();
+    if (!newVal || newVal === current) {
+      cleanup();
+      return;
+    }
+    const sendVal = (field === 'total_minutes' && newVal === '') ? null : parseInt(newVal);
+    try {
       const res = await fetch('/problems/update_field', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_id: problemId, field: field, value: input.value })
+        body: JSON.stringify({ problem_id: parseInt(problemId), field: field, value: sendVal })
       });
-      if (res.ok) {
-        span.textContent = input.value;
-        showToast('✓ ' + field + ' updated', 'success');
-      } else { showToast('Update failed.', 'warn'); }
+      const data = await res.json();
+      if (data.ok) {
+        span.textContent = newVal;
+        showToast('✓ Updated', 'success');
+      } else {
+        showToast('Error: ' + (data.message || 'failed'), 'warn');
+      }
+    } catch(e) {
+      showToast('Network error', 'warn');
     }
-    input.remove();
-    span.classList.remove('editing');
-  };
+    cleanup();
+  }
 
-  input.addEventListener('blur', () => finish(true));
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') finish(true);
-    if (e.key === 'Escape') finish(false);
+  function cleanup() {
+    if (input.parentNode) input.remove();
+    span.classList.remove('editing');
+  }
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter')  { e.preventDefault(); doSave(); }
+    if (e.key === 'Escape') { cleanup(); }
+  });
+  input.addEventListener('blur', function() {
+    // blur後に少し待ってからsave（clickイベントが先に来る場合を考慮）
+    setTimeout(doSave, 150);
   });
 }
 
@@ -469,6 +568,7 @@ document.addEventListener('click', (e) => {
 
 function toggleAll(cb) {
   document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+  updateSelectedCount();
 }
 
 async function deleteAssignment(id, btn) {

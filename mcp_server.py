@@ -243,7 +243,7 @@ async def list_tools():
                         "items": {"type": "string"},
                         "description": "出題する生徒IDのリスト（任意）"
                     },
-                    "category":       {"type": "string",  "description": "カテゴリ：予習/復習/定着/再定着（省略時は予習）"},
+                    "category":       {"type": "string",  "description": "Category: New/Recall/Drill/Reinforce (default: New)"},
                     "scheduled_date": {"type": "string",  "description": "出題日YYYY-MM-DD（省略→授業曜日から自動計算）"},
                     "undecided":      {"type": "boolean", "description": "true=授業日未定として登録（計画表に出さない）"},
                     "total_minutes":  {"type": "integer", "description": "総HP（省略=通常問題=1回完結）。古文精読など複数セッションに分割したい場合に設定。estimated_minutesより大きな値を設定する"}
@@ -260,7 +260,7 @@ async def list_tools():
                 "properties": {
                     "student_id":     {"type": "string",  "description": "生徒ID"},
                     "problem_id":     {"type": "integer", "description": "問題ID"},
-                    "category":       {"type": "string",  "description": "カテゴリ：予習/復習/定着/再定着"},
+                    "category":       {"type": "string",  "description": "Category: New/Recall/Drill/Reinforce"},
                     "scheduled_date": {"type": "string",  "description": "出題日YYYY-MM-DD（省略→自動計算）"}
                 },
                 "required": ["student_id", "problem_id", "category"]
@@ -331,7 +331,7 @@ async def list_tools():
                 "type": "object",
                 "properties": {
                     "assignment_id": {"type": "integer", "description": "出題予定ID"},
-                    "category":      {"type": "string",  "description": "新しいカテゴリ：予習/復習/定着/再定着"}
+                    "category":      {"type": "string",  "description": "New category: New/Recall/Drill/Reinforce"}
                 },
                 "required": ["assignment_id", "category"]
             }

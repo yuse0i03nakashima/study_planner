@@ -167,7 +167,7 @@
 
   <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);
     margin-bottom:8px;letter-spacing:0.5px;">
-    ※ 習熟度セルをダブルクリックで直接編集できます
+    ※ Double-click Mastery to edit
   </div>
 
   <div class="bulk-bar fade-in">
@@ -181,8 +181,8 @@
   <table class="data-table">
     <thead>
       <tr>
-        <th>Date</th><th>教科</th><th>テキスト</th><th>問題番号</th>
-        <th>正誤</th><th title="ダブルクリックで編集">習熟度 ✎</th><th>カテゴリ</th>
+        <th>Date</th><th>Subject</th><th>Textbook</th><th>Problem</th>
+        <th>Score</th><th title="Double-click to edit">Mastery ✎</th><th>Source</th>
       </tr>
     </thead>
     <tbody>
@@ -203,7 +203,7 @@
         {%- elif sc == 4 %}
         <span style="color:var(--blue);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">4 Good</span>
         {%- elif sc == 3 %}
-        <span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Review</span>
+        <span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Recall</span>
         {%- elif sc == 2 %}
         <span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">2 Retry</span>
         {%- else %}
@@ -218,7 +218,7 @@
         </span>
       </td>
       <td>
-        <span class="badge badge-{{ r.category or '' }}">{{ r.category or '—' }}</span>
+        {{ r.category | cat_en }}
       </td>
     </tr>
     {%- endfor %}

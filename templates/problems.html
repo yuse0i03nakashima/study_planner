@@ -192,8 +192,8 @@
         <div>
           <label>No. in Textbook</label>
           <input type="number" name="order_in_textbook" id="f-order_in_textbook"
-            min="1" max="9999" placeholder="空欄 → 同テキスト最大+1を自動設定">
-          <p class="hint">空欄 → 同テキストの最大Order+1を自動設定</p>
+            min="1" max="9999" placeholder="e.g. 42">
+          <p class="hint">空欄→同テキスト内の最大No.+1を自動設定</p>
         </div>
       </div>
 
@@ -219,7 +219,7 @@
           </select>
         </div>
         <div>
-          <label>Review Value</label>
+          <label>Recall Value</label>
           <select name="review_value" id="f-review_value">
             <option value="5">5 — 最高</option>
             <option value="4">4 — 高</option>
@@ -228,8 +228,11 @@
             <option value="1">1 — 最低</option>
           </select>
         </div>
+      </div>
+
+      <div class="grid-2" style="margin-top:0;">
         <div>
-          <label>Est. Minutes <span style="color:var(--text-dim);font-size:9px;">1回あたり</span></label>
+          <label>Min. / Session</label>
           <select name="estimated_minutes" id="f-estimated_minutes">
             {% for m in range(5, 125, 5) %}
             <option value="{{ m }}" {% if m == 15 %}selected{% endif %}>{{ m }} min</option>
@@ -237,9 +240,9 @@
           </select>
         </div>
         <div>
-          <label>Total Minutes <span style="color:var(--text-dim);font-size:9px;">総HP（空欄=1回完結）</span></label>
+          <label>Total Min. <span style="color:var(--text-dim);font-size:9px;">空欄=1回で完結</span></label>
           <input type="number" name="total_minutes" id="f-total_minutes"
-            min="5" max="999" step="5" placeholder="空欄=通常問題">
+            min="5" max="999" step="5" placeholder="e.g. 180">
           <div class="hint" id="hp-hint" style="margin-top:4px;color:var(--green);"></div>
         </div>
       </div>
@@ -248,10 +251,10 @@
         <div>
           <label>Category</label>
           <select name="category" id="f-category">
-            <option value="予習" selected>予習</option>
-            <option value="復習">復習</option>
-            <option value="定着">定着</option>
-            <option value="再定着">再定着</option>
+            <option value="予習" selected>New</option>
+            <option value="復習">New</option>
+            <option value="定着">New</option>
+            <option value="再定着">New</option>
           </select>
         </div>
         <div>
@@ -263,9 +266,9 @@
               onchange="toggleDate(this)">
             <label for="f-undecided" style="font-family:'DM Mono',monospace;font-size:10px;
               letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
-              margin:0;cursor:pointer;">Undecided（授業日未定）</label>
+              margin:0;cursor:pointer;">Undecided</label>
           </div>
-          <p class="hint">空欄 → 授業曜日から自動計算 / Undecided → 計画表に出さない</p>
+          <p class="hint">空欄→授業曜日から自動計算 / Undecided→計画表に出さない</p>
         </div>
       </div>
 
@@ -298,8 +301,8 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>No.</th><th>教科</th><th>テキスト</th><th>問題番号</th>
-          <th>Imp</th><th>Dif</th><th>RV</th><th>分</th><th>Total</th><th>学習指示</th><th></th>
+          <th>No.</th><th>Subject</th><th>Textbook</th><th>Problem</th>
+          <th>Imp</th><th>Dif</th><th>RV</th><th>Min</th><th>Total</th><th>Instruction</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -399,10 +402,10 @@
           <select name="category"
             style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
               color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
-            <option value="予習">予習</option>
-            <option value="復習">復習</option>
-            <option value="定着">定着</option>
-            <option value="再定着">再定着</option>
+            <option value="予習">New</option>
+            <option value="復習">New</option>
+            <option value="定着">New</option>
+            <option value="再定着">New</option>
           </select>
         </div>
         <div>
