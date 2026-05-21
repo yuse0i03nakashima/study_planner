@@ -77,7 +77,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
 
     plan_data = build_plan_data(
         student_id, start_date_str, end_date_str, subject_filter,
-        section_id=section_id)
+        section_ids=section_ids)
     if not plan_data:
         return None
 

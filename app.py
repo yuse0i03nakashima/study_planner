@@ -472,12 +472,13 @@ def preview():
         from excel_export import build_plan_data
         action = request.form.get("action", "preview")
 
-        section_filter = request.form.get("section_filter", "").strip()
+        section_filters = request.form.getlist("section_filter")
+        section_ids = [int(s) for s in section_filters if s.strip()]
         if action == "excel":
             from excel_export import export_excel
             path = export_excel(student_id, start_date, end_date,
                                 subject_filter if subject_filter else None,
-                                section_id=int(section_filter) if section_filter else None)
+                                section_ids=section_ids if section_ids else None)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path=path, pdf_path="",
@@ -490,7 +491,7 @@ def preview():
             from pdf_export import export_pdf
             path = export_pdf(student_id, start_date, end_date,
                               subject_filter if subject_filter else None,
-                              section_id=int(section_filter) if section_filter else None)
+                              section_ids=section_ids if section_ids else None)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path="", pdf_path=path,
@@ -499,11 +500,12 @@ def preview():
                 subprocess.Popen(["start", "", path], shell=True)
             return redirect("/preview")
 
-        section_filter = request.form.get("section_filter", "").strip()
+        section_filters = request.form.getlist("section_filter")
+        section_ids = [int(s) for s in section_filters if s.strip()]
         preview_data = build_plan_data(
             student_id, start_date, end_date,
             subject_filter if subject_filter else None,
-            section_id=int(section_filter) if section_filter else None)
+            section_ids=section_ids if section_ids else None)
 
     # テンプレート変数を整理
     selected_student     = selected.get("student_id",
@@ -522,7 +524,7 @@ def preview():
             break
 
     # Section一覧を取得してプレビューに渡す
-    _sec_filter = request.form.get("section_filter", "").strip() if request.method == "POST" else ""
+    _sec_filters = request.form.getlist("section_filter") if request.method == "POST" else []
     _conn_sec = get_connection()
     _c_sec = _conn_sec.cursor()
     if selected_subject and selected_student:
@@ -554,7 +556,7 @@ def preview():
                            end_date=end_date,
                            subjects=subjects,
                            selected_sections=_selected_sections,
-                           selected_section_id=_sec_filter,
+                           selected_section_ids=_sec_filters,
                            unassigned=preview_data.get("unassigned", {}) if preview_data else {})
 
 
@@ -1748,23 +1750,35 @@ def api_section_problems(section_id):
 
 @app.route("/api/sections_by_subject")
 def api_sections_by_subject():
-    """指定教科のセクション一覧を返す（Preview絞り込み用）"""
-    subject = request.args.get("subject", "")
+    """指定教科のセクション一覧を返す（Preview絞り込み用）
+    student_idが指定された場合はstudent_textbooksで紐づくテキストのセクションのみ返す。
+    """
+    subject    = request.args.get("subject", "")
     student_id = request.args.get("student_id", "")
     conn = get_connection()
     c = conn.cursor()
     if student_id and subject:
-        # その生徒がアサインされている問題のセクションのみ
+        # 生徒に紐づくテキスト（student_textbooks）のセクションのみ
         c.execute("""
             SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
                    t.name as textbook_name
             FROM textbook_sections ts
             JOIN textbooks t ON ts.textbook_id = t.textbook_id
-            JOIN problems p ON p.section_id = ts.section_id
-            JOIN assignments a ON a.problem_id = p.problem_id
-            WHERE t.subject=? AND a.student_id=?
+            JOIN student_textbooks st ON st.textbook_id = t.textbook_id
+            WHERE t.subject=? AND st.student_id=?
             ORDER BY t.name, ts.order_index
         """, (subject, student_id))
+    elif student_id:
+        # 教科指定なし：生徒に紐づく全セクション
+        c.execute("""
+            SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
+                   t.name as textbook_name, t.subject
+            FROM textbook_sections ts
+            JOIN textbooks t ON ts.textbook_id = t.textbook_id
+            JOIN student_textbooks st ON st.textbook_id = t.textbook_id
+            WHERE st.student_id=?
+            ORDER BY t.subject, t.name, ts.order_index
+        """, (student_id,))
     elif subject:
         c.execute("""
             SELECT DISTINCT ts.section_id, ts.name, ts.order_index,

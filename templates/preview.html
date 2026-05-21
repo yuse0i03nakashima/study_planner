@@ -106,11 +106,11 @@
     <div class="card-title">Export Settings</div>
     <form method="POST" action="/preview" id="preview-form">
 
-      <div class="grid-3">
+      <div class="grid-2">
         <div>
           <label>Student</label>
           <select name="student_id" id="sel-student"
-            onchange="updateSubjects()">
+            onchange="updateSubjects(); setTimeout(loadSections, 300);">
             {% for s in students %}
             <option value="{{ s.student_id }}"
               {% if selected_student == s.student_id %}selected{% endif %}>
@@ -130,28 +130,10 @@
             </option>
             {% endfor %}
           </select>
-          </div>
-          <div>
-            <label>Section <span style="color:var(--text-dim);font-size:9px;">for exam prep</span></label>
-            <select name="section_filter" id="section-filter"
-              style="padding:8px 12px;background:var(--surface2);
-                border:1px solid var(--border-light);color:var(--text);
-                font-family:'Noto Serif JP',serif;font-size:13px;min-width:220px;">
-              <option value="">— All Sections —</option>
-              {% if selected_sections %}
-              {% for sec in selected_sections %}
-              <option value="{{ sec.section_id }}"
-                {% if sec.section_id|string == selected_section_id %}selected{% endif %}>
-                {{ sec.textbook_name }} / {{ sec.name }}
-              </option>
-              {% endfor %}
-              {% endif %}
-            </select>
-          <input type="hidden" name="mode" value="per_subject">
         </div>
       </div>
 
-      <div class="grid-2">
+      <div class="grid-2" style="margin-top:0;">
         <div>
           <label>Start Date</label>
           <input type="date" name="start_date" value="{{ start_date }}">
@@ -163,6 +145,54 @@
           <p class="hint">空欄 → 次回授業日を自動設定</p>
         </div>
       </div>
+
+      <!-- Section for exam prep（折りたたみ） -->
+      <div style="margin-top:12px;">
+        <button type="button" onclick="toggleSectionPanel()"
+          id="sec-toggle-btn"
+          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-dim);background:none;border:none;
+            cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;">
+          <span id="sec-toggle-arrow" style="display:inline-block;transition:transform 0.2s;">
+            {%- if selected_section_ids %}▼{%- else %}▶{%- endif %}
+          </span>
+          Section for exam prep
+          {%- if selected_section_ids %}
+          <span style="color:var(--blue);font-size:9px;">({{ selected_section_ids|length }} selected)</span>
+          {%- endif %}
+        </button>
+        <div id="sec-panel" style="display:{%- if selected_section_ids %}block{%- else %}none{%- endif %};margin-top:6px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+            margin-bottom:4px;">Click to toggle selection</div>
+          <select name="section_filter" id="section-filter"
+            multiple size="5"
+            style="padding:4px 8px;background:var(--surface2);
+              border:1px solid var(--border-light);color:var(--text);
+              font-family:'Noto Serif JP',serif;font-size:12px;
+              width:100%;max-width:400px;min-height:80px;max-height:160px;">
+            {% if selected_sections %}
+            {% for sec in selected_sections %}
+            <option value="{{ sec.section_id }}"
+              {% if sec.section_id|string in selected_section_ids %}selected{% endif %}>
+              {{ sec.textbook_name }} / {{ sec.name }}
+            </option>
+            {% endfor %}
+            {% endif %}
+          </select>
+          <div style="margin-top:4px;display:flex;gap:8px;align-items:center;">
+            <button type="button" onclick="selectAllSections()"
+              style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+                background:none;border:none;cursor:pointer;
+                letter-spacing:1px;text-transform:uppercase;">✓ All</button>
+            <button type="button" onclick="clearSections()"
+              style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+                background:none;border:none;cursor:pointer;
+                letter-spacing:1px;text-transform:uppercase;">✕ Clear</button>
+          </div>
+        </div>
+        <input type="hidden" name="mode" value="per_subject">
+      </div>
+
 
       <div class="action-row">
         <button type="submit" class="btn btn-preview">
@@ -278,11 +308,12 @@
 const studentSubjects = {{ student_subjects | tojson }};
 
 function updateSubjects() {
+  setTimeout(loadSections, 200);
   const sid  = document.getElementById('sel-student').value;
   const sel  = document.getElementById('sel-subject');
   const info = studentSubjects[sid] || {};
   const subjs = info.subjects || [];
-  sel.innerHTML = '<option value="">— 全教科 —</option>';
+  sel.innerHTML = '<option value="">— All Subjects —</option>';
   subjs.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s; opt.textContent = s;
@@ -301,6 +332,34 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 
+function toggleSectionPanel() {
+  var panel  = document.getElementById('sec-panel');
+  var arrow  = document.getElementById('sec-toggle-arrow');
+  var isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(90deg)';
+  arrow.textContent = isOpen ? '▶' : '▼';
+  if (!isOpen) loadSections();
+}
+
+function clearSections() {
+  var sel = document.getElementById('section-filter');
+  if (sel) {
+    for (var i = 0; i < sel.options.length; i++) {
+      sel.options[i].selected = false;
+    }
+  }
+}
+
+function selectAllSections() {
+  var sel = document.getElementById('section-filter');
+  if (sel) {
+    for (var i = 0; i < sel.options.length; i++) {
+      sel.options[i].selected = true;
+    }
+  }
+}
+
 function loadSections() {
   var subjectSel = document.getElementById('sel-subject');
   var secSel     = document.getElementById('section-filter');
@@ -311,7 +370,7 @@ function loadSections() {
   var sidEl = document.querySelector('select[name="student_id"]');
   var sid   = sidEl ? sidEl.value : '';
 
-  var currentVal = secSel.value;
+  var currentVals = Array.from(secSel.selectedOptions).map(function(o){ return o.value; });
 
   var xhr = new XMLHttpRequest();
   xhr.open('GET', '/api/sections_by_subject?subject=' + encodeURIComponent(subj)
@@ -319,12 +378,12 @@ function loadSections() {
   xhr.onload = function() {
     if (xhr.status !== 200) return;
     var data = JSON.parse(xhr.responseText);
-    secSel.innerHTML = '<option value="">— All Sections —</option>';
+    secSel.innerHTML = '';
     data.forEach(function(sec) {
       var opt = document.createElement('option');
       opt.value = sec.section_id;
       opt.textContent = sec.textbook_name + ' / ' + sec.name;
-      if (String(sec.section_id) === currentVal) opt.selected = true;
+      if (currentVals.indexOf(String(sec.section_id)) !== -1) opt.selected = true;
       secSel.appendChild(opt);
     });
   };

@@ -292,7 +292,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
 
 def build_plan_data(student_id, start_date_str, target_date_str,
-                    subject_filter=None, section_id=None):
+                    subject_filter=None, section_ids=None):
     conn = get_connection()
     c = conn.cursor()
     c.execute(
@@ -315,12 +315,13 @@ def build_plan_data(student_id, start_date_str, target_date_str,
         subjects = all_subjects
         plan = all_plan
 
-    # セクションフィルター（テスト範囲の絞り込み）
-    if section_id:
-        # section_idに属するproblem_idを取得してplanを絞り込む
+    # セクションフィルター（テスト範囲の絞り込み・複数選択対応）
+    if section_ids:
         conn2 = get_connection()
         c2 = conn2.cursor()
-        c2.execute("SELECT problem_id FROM problems WHERE section_id=?", (section_id,))
+        placeholders = ",".join("?" * len(section_ids))
+        c2.execute(f"SELECT problem_id FROM problems WHERE section_id IN ({placeholders})",
+                   section_ids)
         section_pids = {r["problem_id"] for r in c2.fetchall()}
         conn2.close()
         plan = [p for p in plan if p.get("problem_id") in section_pids]
@@ -663,7 +664,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     ws.auto_filter.ref = f"A2:{get_column_letter(N_COLS)}{cur - 1}"
 
 
-def export_excel(student_id, start_date_str, end_date_str, subject_filter=None, section_id=None):
+def export_excel(student_id, start_date_str, end_date_str, subject_filter=None, section_ids=None):
     """計画表をExcelファイルに出力して保存パスを返す"""
     import openpyxl
     import os
