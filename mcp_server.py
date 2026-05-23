@@ -224,7 +224,7 @@ async def list_tools():
                 "scheduled_dateを省略すると授業曜日から次回授業日を自動計算。"
                 "undecided=trueで授業日未定として登録（計画表に出さない）。"
                 "order_in_textbookを省略すると同テキスト内の最大No.+1を自動設定。"
-                "categoryは予習/復習/定着/再定着を指定可能（省略時は予習）。"
+                "Specify category: New/Recall/Drill/Reinforce (default: New)."
             ),
             inputSchema={
                 "type": "object",
@@ -685,7 +685,7 @@ async def call_tool(name: str, arguments: dict):
         estimated_minutes = arguments["estimated_minutes"]
         instruction       = arguments.get("instruction", "")
         student_ids       = arguments.get("student_ids", [])
-        category          = arguments.get("category", "予習")
+        category          = arguments.get("category", "New")
         scheduled_date    = arguments.get("scheduled_date", "").strip()
         undecided         = arguments.get("undecided", False)
         order_in_textbook = arguments.get("order_in_textbook")
@@ -794,7 +794,7 @@ async def call_tool(name: str, arguments: dict):
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category, score)
             VALUES (?,?,?,?,?,?,?)
-        """, (student_id, problem_id, record_date, correct, new_mastery, "記録", score))
+        """, (student_id, problem_id, record_date, correct, new_mastery, "Record", score))
         conn.commit()
         conn.close()
 
@@ -880,7 +880,7 @@ async def call_tool(name: str, arguments: dict):
         c.execute("""
             INSERT INTO history (student_id, problem_id, date, correct, mastery, category)
             VALUES (?,?,?,?,?,?)
-        """, (student_id, problem_id, today, 1, mastery, "手動修正"))
+        """, (student_id, problem_id, today, 1, mastery, "Manual"))
         conn.commit()
         conn.close()
         return [TextContent(type="text", text=json.dumps(

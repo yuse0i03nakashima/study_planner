@@ -58,6 +58,9 @@ def problems():
             textbook = request.form.get("textbook", "")
 
         # order_in_textbook: 入力があればそれを使い、なければ同テキスト最大+1
+        total_minutes_raw = request.form.get("total_minutes", "").strip()
+        total_minutes = int(total_minutes_raw) if total_minutes_raw else None
+
         order_input = request.form.get("order_in_textbook", "").strip()
         if order_input:
             order_in_textbook = int(order_input)
@@ -67,8 +70,6 @@ def problems():
             """, (textbook_id,))
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
-            total_minutes_raw = request.form.get("total_minutes", "").strip()
-            total_minutes = int(total_minutes_raw) if total_minutes_raw else None
 
         c.execute("""
             INSERT INTO problems

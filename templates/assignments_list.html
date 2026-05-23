@@ -66,10 +66,10 @@
     .data-table tr:hover td { background:var(--surface2); }
     .data-table td.left { text-align:left; }
     /* カテゴリ行色 */
-    .row-予習  { border-left:2px solid var(--blue); }
-    .row-復習  { border-left:2px solid var(--green); }
-    .row-定着  { border-left:2px solid var(--amber); }
-    .row-再定着 { border-left:2px solid var(--rose); }
+    .row-予習, .row-New       { border-left:2px solid var(--blue); }
+    .row-復習, .row-Recall    { border-left:2px solid var(--green); }
+    .row-定着, .row-Drill     { border-left:2px solid var(--amber); }
+    .row-再定着, .row-Reinforce { border-left:2px solid var(--rose); }
     .changed-row td { box-shadow:inset 0 0 0 1px var(--amber); }
     @keyframes rowFlash {
       0%   { background:rgba(245,166,35,0.25); }
@@ -99,6 +99,17 @@
     .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; }
     .fade-in { animation:fadeIn 0.3s ease both; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    .past-toggle-bar {
+      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--text-dim);
+      background:var(--surface); border:1px solid var(--border);
+      padding:8px 16px; margin:8px 0; cursor:pointer;
+      display:flex; align-items:center; gap:8px;
+      user-select:none;
+    }
+    .past-toggle-bar:hover { color:var(--text-muted); border-color:var(--border-light); }
+    .past-row { opacity:0.45; }
+    .past-row:hover { opacity:0.75; }
     /* トースト通知 */
     #toast {
       position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
@@ -570,6 +581,70 @@ function toggleAll(cb) {
   document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
   updateSelectedCount();
 }
+
+// ── 過去の出題予定を折りたたむ ──
+function initPastRows() {
+  var today = new Date().toISOString().slice(0, 10);
+  var tbody = document.querySelector('#assignments-table tbody');
+  if (!tbody) return;
+
+  var rows = Array.from(tbody.querySelectorAll('tr[id^="row-"]'));
+  var pastRows = [];
+  var futureRows = [];
+
+  rows.forEach(function(row) {
+    // data-dateを参照（後で設定）
+    var dateEl = row.querySelector('input.edit-field[data-field="scheduled_date"]');
+    var dateVal = dateEl ? dateEl.value : '9999-12-31';
+    if (dateVal && dateVal < today && dateVal !== '2099-12-31') {
+      pastRows.push(row);
+    } else {
+      futureRows.push(row);
+    }
+  });
+
+  if (pastRows.length === 0) return;
+
+  // 折りたたみバーを挿入
+  var toggleBar = document.createElement('tr');
+  toggleBar.innerHTML = '<td colspan="13"><div class="past-toggle-bar" onclick="togglePastRows(this)">'
+    + '<span id="past-arrow">▶</span>'
+    + '<span>' + pastRows.length + ' past assignment' + (pastRows.length > 1 ? 's' : '') + '</span>'
+    + '</div></td>';
+
+  // past rowsを非表示にしてバーの後に移動
+  pastRows.forEach(function(row) {
+    row.classList.add('past-row');
+    row.style.display = 'none';
+  });
+
+  // バーをfuture rowsの前に挿入
+  if (futureRows.length > 0) {
+    tbody.insertBefore(toggleBar, futureRows[0]);
+  } else {
+    tbody.insertBefore(toggleBar, tbody.firstChild);
+  }
+
+  // past rowsをバーの後に移動
+  pastRows.forEach(function(row) {
+    toggleBar.after(row);
+    toggleBar.parentNode.insertBefore(row, toggleBar.nextSibling);
+  });
+}
+
+function togglePastRows(bar) {
+  var arrow = document.getElementById('past-arrow');
+  var pastRows = document.querySelectorAll('.past-row');
+  var isHidden = pastRows.length > 0 && pastRows[0].style.display === 'none';
+  pastRows.forEach(function(row) {
+    row.style.display = isHidden ? '' : 'none';
+  });
+  arrow.textContent = isHidden ? '▼' : '▶';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPastRows();
+});
 
 async function deleteAssignment(id, btn) {
   if (!confirm('Delete this assignment?')) return;
