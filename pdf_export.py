@@ -180,8 +180,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
         dow_color = C_ROSE if is_weekend else C_MUTED
 
         for i, (subj, item) in enumerate(day_items):
-            cat_raw = item.get("category", "")
-            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
+            cat = item.get("category", "")
             cat_color = CAT_COLORS.get(cat, C_DIM)
             mastery_int = item.get("mastery_int", 1)
             mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
@@ -217,8 +216,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
         row_index += 1
 
         for subj, item in all_unassigned:
-            cat_raw = item.get("category", "")
-            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
+            cat = item.get("category", "")
             cat_color = CAT_COLORS.get(cat, C_DIM)
             row = [
                 _para("—", C_DIM, 7, align="CENTER"),

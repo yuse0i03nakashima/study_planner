@@ -109,7 +109,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
     # ─── 予習：problem_id順 × テキスト間インターリーブ ───
     yosyu_items = sorted(
-        [p for p in plan if p["category"] in ("予習", "New")],
+        [p for p in plan if p["category"] == "New"],
         key=lambda x: (
             x.get("textbook_id") or 0,
             x.get("order_in_textbook") or x.get("problem_id", 0)
@@ -224,7 +224,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
         # ─── 復習：前半優先＋均等分散 ───────────────────────
     # 前60%の日を優先し、満杯なら後半にスピルオーバー
-    fukusyu_items = [p for p in plan if p["category"] in ("復習", "Recall")]
+    fukusyu_items = [p for p in plan if p["category"] == "Recall"]
 
     # 前半60%・後半40%に分割
     n_dates_f = len(dates_sorted)
@@ -262,7 +262,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
     # ─── 定着・再定着：均等分散、代表問題優先 ──────────
     teichaku_items = [p for p in plan
-                      if p["category"] in ("定着", "再定着", "Drill", "Reinforce")]
+                      if p["category"] in ("Drill", "Reinforce")]
 
     rep_items = sorted(
         [p for p in teichaku_items
@@ -534,8 +534,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
         dow_color = C_ROSE if is_weekend else C_MUTED
 
         for row_i, (subj, item) in enumerate(day_items):
-            cat_raw = item.get("category", "")
-            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
+            cat = item.get("category", "")
             cat_color = CAT_COLORS.get(cat, C_DIM)
             mastery_int = item.get("mastery_int", 1)
             mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
@@ -640,8 +639,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
         cur += 1
 
         for subj, item in all_unassigned:
-            cat_raw = item.get("category", "")
-            cat = {"予習":"New","復習":"Recall","定着":"Drill","再定着":"Reinforce"}.get(cat_raw, cat_raw)
+            cat = item.get("category", "")
             cat_color = CAT_COLORS.get(cat, C_DIM)
             vals = ["—", "—", subj, cat,
                     item.get("textbook", ""),
