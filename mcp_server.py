@@ -302,6 +302,17 @@ async def list_tools():
             }
         ),
         Tool(
+            name="delete_assignment",
+            description="出題予定を削除する。問題マスタは削除されない。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "assignment_id": {"type": "integer", "description": "削除する出題予定のID"}
+                },
+                "required": ["assignment_id"]
+            }
+        ),
+        Tool(
             name="delete_problem",
             description="問題を削除する。関連する出題予定・授業記録も削除される。慎重に使用すること",
             inputSchema={
@@ -830,6 +841,33 @@ async def call_tool(name: str, arguments: dict):
         conn.close()
         return [TextContent(type="text", text=json.dumps(
             {"status":"ok","problem_id":problem_id}, ensure_ascii=False))]
+
+    elif name == "delete_assignment":
+        assignment_id = arguments.get("assignment_id")
+        if not assignment_id:
+            return [{"type": "text", "text": "Error: assignment_id is required"}]
+        conn = get_connection()
+        c = conn.cursor()
+        # 削除前に内容を確認
+        c.execute("""
+            SELECT a.assignment_id, a.student_id, a.category, a.scheduled_date,
+                   p.subject, p.textbook, p.problem_number
+            FROM assignments a
+            JOIN problems p ON a.problem_id = p.problem_id
+            WHERE a.assignment_id=?
+        """, (assignment_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return [{"type": "text", "text": f"Error: assignment_id {assignment_id} not found"}]
+        info = dict(row)
+        c.execute("DELETE FROM assignments WHERE assignment_id=?", (assignment_id,))
+        conn.commit()
+        conn.close()
+        return [{"type": "text", "text": json.dumps({
+            "status": "ok",
+            "deleted": info
+        }, ensure_ascii=False)}]
 
     elif name == "delete_problem":
         problem_id = arguments["problem_id"]
