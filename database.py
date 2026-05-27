@@ -183,7 +183,7 @@ def update_assignments_after_record(student_id, problem_id, today_str, new_maste
     if row:
         review_value = row["review_value"]
         next_date = get_next_date(review_value, new_mastery, today_str)
-        category = {1: "復習", 2: "定着"}.get(new_mastery, "再定着")
+        category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
         c.execute("""
             INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
             VALUES (?, ?, ?, ?)
@@ -465,7 +465,7 @@ def auto_promote_on_launch(from_date, to_date):
         JOIN problems p ON a.problem_id = p.problem_id
         WHERE a.scheduled_date BETWEEN ? AND ?
           AND a.scheduled_date != '2099-12-31'
-          AND a.category IN ('予習', '復習', '定着', '再定着')
+          AND a.category IN ('New', 'Recall', 'Drill', 'Reinforce')
     """, (from_date, to_date))
     rows = c.fetchall()
 
@@ -492,11 +492,11 @@ def auto_promote_on_launch(from_date, to_date):
             (student_id, problem_id, date, correct, mastery, category)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (student_id, problem_id, scheduled_date,
-              1, new_mastery, "自動昇格"))
+              1, new_mastery, "AutoPromotion"))
 
         review_value = row["review_value"]
         next_date = get_next_date(review_value, new_mastery, scheduled_date)
-        category = {1: "復習", 2: "定着"}.get(new_mastery, "再定着")
+        category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
 
         c.execute("DELETE FROM assignments WHERE assignment_id=?",
                   (row["assignment_id"],))
@@ -669,7 +669,7 @@ def process_representative_correct(student_id, problem_id, record_date):
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (student_id, sur_id, record_date, 1, new_mastery, "代表問題連動"))
+        """, (student_id, sur_id, record_date, 1, new_mastery, "LinkedPromotion"))
 
         # 出題予定を更新
         c2.execute("SELECT review_value FROM problems WHERE problem_id=?",
@@ -678,7 +678,7 @@ def process_representative_correct(student_id, problem_id, record_date):
         if sur_p:
             sur_next = get_next_date(sur_p["review_value"], new_mastery,
                                      record_date)
-            category = {1: "復習", 2: "定着"}.get(new_mastery, "再定着")
+            category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
             c2.execute("""
                 DELETE FROM assignments
                 WHERE student_id=? AND problem_id=?
@@ -738,7 +738,7 @@ def process_representative_wrong(student_id, problem_id, record_date):
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (student_id, sur_id, record_date, 0, new_mastery, "代表問題連動"))
+        """, (student_id, sur_id, record_date, 0, new_mastery, "LinkedPromotion"))
 
         # 出題予定を更新
         c2.execute("SELECT review_value FROM problems WHERE problem_id=?",
@@ -747,7 +747,7 @@ def process_representative_wrong(student_id, problem_id, record_date):
         if sur_p:
             sur_next = get_next_date(sur_p["review_value"], new_mastery,
                                      record_date)
-            category = {1: "復習", 2: "定着"}.get(new_mastery, "再定着")
+            category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
             c2.execute("""
                 DELETE FROM assignments WHERE student_id=? AND problem_id=?
             """, (student_id, sur_id))
@@ -905,9 +905,12 @@ def auto_record_unreported(student_id, record_date):
             (student_id, problem_id, date, correct, mastery, category, score)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (student_id, row["problem_id"], row["scheduled_date"],
-              1, new_mastery, "自動登録", score))
+              1, new_mastery, "Auto", score))
         conn2.commit()
         conn2.close()
+
+        update_assignments_after_record(
+            student_id, row["problem_id"], row["scheduled_date"], new_mastery)
 
         results.append({
             "problem_id":    row["problem_id"],

@@ -809,6 +809,10 @@ async def call_tool(name: str, arguments: dict):
         conn.commit()
         conn.close()
 
+        # 出題予定を次回日付に更新
+        from database import update_assignments_after_record
+        update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
+
         score_labels = {5:"Perfect",4:"Good",3:"Review",2:"Retry",1:"Failed"}
 
         # 未報告問題の自動登録（報告があった問題より前の出題予定を処理）
