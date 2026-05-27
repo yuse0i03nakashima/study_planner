@@ -283,31 +283,7 @@
 <div id="toast"></div>
 
 <script>
-// ── DOMContentLoaded で全イベントを設定 ──────────────
-document.addEventListener('DOMContentLoaded', function() {
-
-  // 削除確認モーダルのCancelボタン
-  var cancelBtn = document.getElementById('cancel-btn');
-  if (cancelBtn) cancelBtn.onclick = closeConfirm;
-
-  // モーダル背景クリックで閉じる
-  var modal = document.getElementById('confirm-modal');
-  if (modal) modal.onclick = function(e) {
-    if (e.target === this) closeConfirm();
-  };
-
-  // 削除ボタン
-  document.querySelectorAll('.del-btn').forEach(function(btn) {
-    btn.onclick = function() {
-      var msg    = this.getAttribute('data-msg');
-      var action = this.getAttribute('data-action');
-      confirmDelete(msg, action);
-    };
-  });
-
-  // セクション名ボタン（アコーディオン）
-
-  // ── Problems in this Textbook: 一括Section割り当て ──
+// ── グローバル関数（onclick属性から呼び出されるもの）──────
 function toggleAllSP(cb) {
   document.querySelectorAll('.sp-check').forEach(c => c.checked = cb.checked);
   updateSPCount();
@@ -322,14 +298,14 @@ function updateSPCount() {
 async function assignToSection() {
   const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
                        .map(c => parseInt(c.value));
-  const sectionId = parseInt(document.getElementById('sp-target-section').value);
+  const sectionId = document.getElementById('sp-target-section').value;
   if (!sectionId) { alert('Select a section first'); return; }
-  if (checked.length === 0) return;
+  if (checked.length === 0) { alert('Select problems first'); return; }
 
   const res = await fetch('/sections/bulk_assign', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ problem_ids: checked, section_id: sectionId })
+    body: JSON.stringify({ problem_ids: checked, section_id: parseInt(sectionId) })
   });
   const data = await res.json();
   if (res.ok && data.ok) {
@@ -342,7 +318,7 @@ async function assignToSection() {
 async function removeFromSection() {
   const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
                        .map(c => parseInt(c.value));
-  if (checked.length === 0) return;
+  if (checked.length === 0) { alert('Select problems first'); return; }
   if (!confirm('Remove ' + checked.length + ' problem(s) from their sections?')) return;
 
   const res = await fetch('/sections/bulk_assign', {
@@ -358,27 +334,18 @@ async function removeFromSection() {
   }
 }
 
-document.querySelectorAll('.section-name-btn').forEach(function(btn) {
-    btn.onclick = function() {
-      var sid = this.getAttribute('data-sid');
-      toggleSection(sid);
-    };
-  });
-
-});
-
 // ── 削除確認モーダル ──────────────────────────────────
 function confirmDelete(message, action) {
-  var modal = document.getElementById('confirm-modal');
-  var msgEl = document.getElementById('confirm-message');
+  const modal = document.getElementById('confirm-modal');
+  const msgEl = document.getElementById('confirm-message');
   msgEl.textContent = message;
   modal.classList.add('show');
-  var okBtn = document.getElementById('confirm-ok');
-  var newOk = okBtn.cloneNode(true);
+  const okBtn = document.getElementById('confirm-ok');
+  const newOk = okBtn.cloneNode(true);
   okBtn.parentNode.replaceChild(newOk, okBtn);
   newOk.onclick = function() {
     closeConfirm();
-    var form = document.createElement('form');
+    const form = document.createElement('form');
     form.method = 'POST';
     form.action = action;
     document.body.appendChild(form);
@@ -391,21 +358,22 @@ function closeConfirm() {
 }
 
 // ── セクションアコーディオン ──────────────────────────
-var cache = {};
+const cache = {};
 
 function toggleSection(id) {
-  var accRow  = document.getElementById('acc-' + id);
-  var chevron = document.getElementById('chev-' + id);
+  const accRow  = document.getElementById('acc-' + id);
+  const chevron = document.getElementById('chev-' + id);
   if (!accRow || !chevron) return;
 
-  var isOpen = (accRow.style.display === 'table-row');
-
+  const isOpen = (accRow.style.display === 'table-row');
   if (isOpen) {
     accRow.style.display = 'none';
     chevron.textContent = '▶';
+    chevron.classList.remove('open');
   } else {
     accRow.style.display = 'table-row';
     chevron.textContent = '▼';
+    chevron.classList.add('open');
     loadSectionProblems(id);
   }
 }
@@ -415,14 +383,14 @@ function loadSectionProblems(id) {
     document.getElementById('acc-content-' + id).innerHTML = cache[id];
     return;
   }
-  var xhr = new XMLHttpRequest();
+  const xhr = new XMLHttpRequest();
   xhr.open('GET', '/api/sections/' + id + '/problems', true);
   xhr.onload = function() {
     if (xhr.status === 200) {
-      var data = JSON.parse(xhr.responseText);
-      var html = buildTable(data);
+      const data = JSON.parse(xhr.responseText);
+      const html = buildTable(data);
       cache[id] = html;
-      var el = document.getElementById('acc-content-' + id);
+      const el = document.getElementById('acc-content-' + id);
       if (el) el.innerHTML = html;
     } else {
       document.getElementById('acc-content-' + id).innerHTML =
@@ -450,14 +418,14 @@ function buildTable(problems) {
     return '<span style="font-family:monospace;font-size:10px;' +
            'color:var(--text-dim);">No problems in this section.</span>';
   }
-  var rows = '';
-  for (var i = 0; i < problems.length; i++) {
-    var p = problems[i];
-    var no  = (p.order_in_textbook !== null && p.order_in_textbook !== undefined)
-              ? p.order_in_textbook : '&mdash;';
-    var imp = p.importance  !== null ? p.importance  : '&mdash;';
-    var dif = p.difficulty  !== null ? p.difficulty  : '&mdash;';
-    var rv  = p.review_value !== null ? p.review_value : '&mdash;';
+  let rows = '';
+  for (let i = 0; i < problems.length; i++) {
+    const p   = problems[i];
+    const no  = (p.order_in_textbook !== null && p.order_in_textbook !== undefined)
+                ? p.order_in_textbook : '&mdash;';
+    const imp = p.importance   !== null ? p.importance   : '&mdash;';
+    const dif = p.difficulty   !== null ? p.difficulty   : '&mdash;';
+    const rv  = p.review_value !== null ? p.review_value : '&mdash;';
     rows += '<tr>' +
       '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
              'color:var(--text-dim);text-align:center;">' + no + '</td>' +
@@ -472,11 +440,10 @@ function buildTable(problems) {
              'color:var(--text-dim);text-align:center;">' + rv  + '</td>' +
     '</tr>';
   }
-  var th = function(label, w) {
-    return '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
-           'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
-           'text-align:center;' + (w ? 'width:' + w + ';' : '') + '">' + label + '</th>';
-  };
+  const th = (label, w) =>
+    '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
+    'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
+    'text-align:center;' + (w ? 'width:' + w + ';' : '') + '">' + label + '</th>';
   return '<table style="width:100%;border-collapse:collapse;">' +
     '<thead><tr style="background:var(--surface3);">' +
       th('No.', '60px') +
@@ -488,9 +455,10 @@ function buildTable(problems) {
     '<tbody>' + rows + '</tbody></table>';
 }
 
-function showToast(msg, type='success') {
+function showToast(msg, type = 'success') {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show ' + type;
+  t.textContent = msg;
+  t.className = 'show ' + type;
   setTimeout(() => { t.className = ''; }, 3000);
 }
 
@@ -499,7 +467,7 @@ function startOrderEdit(span) {
   const problemId = cell.dataset.problem;
   const current   = span.textContent.trim();
   span.classList.add('editing');
-  const input     = document.createElement('input');
+  const input = document.createElement('input');
   input.type = 'number'; input.min = 1; input.max = 9999; input.step = 1;
   input.value = current === '—' ? '' : current;
   input.className = 'inline-input'; input.style.width = '64px';
@@ -521,9 +489,12 @@ function startOrderEdit(span) {
       if (res.ok) {
         span.textContent = input.value;
         showToast('✓ No. updated', 'success');
-      } else { showToast('Update failed.', 'warn'); }
+      } else {
+        showToast('Update failed.', 'warn');
+      }
     }
-    input.remove(); span.classList.remove('editing');
+    input.remove();
+    span.classList.remove('editing');
   };
   input.addEventListener('blur', () => finish(true));
   input.addEventListener('keydown', e => {
@@ -531,6 +502,44 @@ function startOrderEdit(span) {
     if (e.key === 'Escape') finish(false);
   });
 }
+
+// ── DOMContentLoaded: イベント登録のみ ───────────────
+document.addEventListener('DOMContentLoaded', function() {
+  // モーダルCancelボタン
+  const cancelBtn = document.getElementById('cancel-btn');
+  if (cancelBtn) cancelBtn.onclick = closeConfirm;
+
+  // モーダル背景クリックで閉じる
+  const modal = document.getElementById('confirm-modal');
+  if (modal) modal.onclick = function(e) {
+    if (e.target === this) closeConfirm();
+  };
+
+  // 削除ボタン
+  document.querySelectorAll('.del-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      confirmDelete(
+        this.getAttribute('data-msg'),
+        this.getAttribute('data-action')
+      );
+    };
+  });
+
+  // セクション名ボタン（アコーディオン）
+  document.querySelectorAll('.section-name-btn').forEach(function(btn) {
+    btn.onclick = function() {
+      toggleSection(this.getAttribute('data-sid'));
+    };
+  });
+
+  // sp-checkの変更でカウント更新（動的に追加された場合も考慮してtable委譲）
+  const probTable = document.getElementById('section-prob-table');
+  if (probTable) {
+    probTable.addEventListener('change', function(e) {
+      if (e.target.classList.contains('sp-check')) updateSPCount();
+    });
+  }
+});
 </script>
 </body>
 </html>
