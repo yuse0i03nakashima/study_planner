@@ -500,7 +500,7 @@ def preview():
             "end_date":       end_date,
         }
 
-        from excel_export import build_plan_data
+        from planner import build_plan_data
         action = request.form.get("action", "preview")
 
         section_filters = request.form.getlist("section_filter")

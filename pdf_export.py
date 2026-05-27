@@ -7,7 +7,7 @@ from reportlab.platypus import (SimpleDocTemplate, Table, TableStyle,
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
-from excel_export import build_plan_data
+from planner import build_plan_data
 import os
 
 pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
@@ -77,7 +77,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
 
     plan_data = build_plan_data(
         student_id, start_date_str, end_date_str, subject_filter,
-        section_ids=section_ids)
+        section_ids=[section_id] if section_id else None)
     if not plan_data:
         return None
 
