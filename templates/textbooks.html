@@ -210,7 +210,7 @@
         </td>
         <td>
           <button class="btn btn-danger btn-sm"
-            onclick="confirmDelete('Delete textbook?', '/textbooks/delete/{{ t.textbook_id }}')">×</button>
+            onclick="confirmDelete('{{ t.name }}{% if t.problem_count > 0 %} と登録中の問題 {{ t.problem_count }} 問{% endif %}を削除しますか？', '/textbooks/delete/{{ t.textbook_id }}')">×</button>
         </td>
       </tr>
       {% endfor %}

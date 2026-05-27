@@ -71,13 +71,13 @@ def _para(text, color=None, size=8, bold=False, align="LEFT"):
 
 
 def export_pdf(student_id, start_date_str, end_date_str,
-               subject_filter=None, output_path=None, section_id=None):
+               subject_filter=None, output_path=None, section_ids=None):
     """計画表をPDFファイルに出力して保存パスを返す"""
     from datetime import date as date_cls
 
     plan_data = build_plan_data(
         student_id, start_date_str, end_date_str, subject_filter,
-        section_ids=[section_id] if section_id else None)
+        section_ids=section_ids)
     if not plan_data:
         return None
 

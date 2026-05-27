@@ -1128,11 +1128,14 @@ def textbook_add():
 def textbook_delete(textbook_id):
     conn = get_connection()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) as cnt FROM problems WHERE textbook_id=?",
-              (textbook_id,))
-    if c.fetchone()["cnt"] > 0:
-        conn.close()
-        return "Cannot delete: this textbook has registered problems.", 400
+    c.execute("SELECT problem_id FROM problems WHERE textbook_id=?", (textbook_id,))
+    problem_ids = [r["problem_id"] for r in c.fetchall()]
+    if problem_ids:
+        ph = ",".join("?" * len(problem_ids))
+        c.execute(f"DELETE FROM history     WHERE problem_id IN ({ph})", problem_ids)
+        c.execute(f"DELETE FROM assignments WHERE problem_id IN ({ph})", problem_ids)
+        c.execute(f"DELETE FROM problems    WHERE problem_id IN ({ph})", problem_ids)
+    c.execute("DELETE FROM textbook_sections WHERE textbook_id=?", (textbook_id,))
     c.execute("DELETE FROM student_textbooks WHERE textbook_id=?", (textbook_id,))
     c.execute("DELETE FROM textbooks WHERE textbook_id=?", (textbook_id,))
     conn.commit()
