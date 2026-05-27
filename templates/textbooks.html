@@ -94,6 +94,18 @@
     #toast.success { border-left:2px solid var(--green); color:var(--green); }
     #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
     #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
+    #confirm-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); z-index:2000;
+      align-items:center; justify-content:center; }
+    #confirm-modal.show { display:flex; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
+      border-left:3px solid var(--red); padding:24px 28px;
+      min-width:320px; max-width:460px; width:90%; }
+    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
+    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
+      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
+    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
   </style>
 </head>
 <body>
@@ -197,11 +209,8 @@
             onclick="toggleStudentForm({{ t.textbook_id }})">Students</button>
         </td>
         <td>
-          <form method="POST" action="/textbooks/delete/{{ t.textbook_id }}"
-            style="display:inline;"
-            onsubmit="return confirm('Delete this textbook?')">
-            <button class="btn btn-danger btn-sm">×</button>
-          </form>
+          <button class="btn btn-danger btn-sm"
+            onclick="confirmDelete('Delete textbook?', '/textbooks/delete/{{ t.textbook_id }}')">×</button>
         </td>
       </tr>
       {% endfor %}
@@ -260,11 +269,8 @@
         <td class="left">{{ s.name }}</td>
         <td class="meta-text">{{ s.textbook_count }}</td>
         <td>
-          <form method="POST" action="/textbooks/series/delete/{{ s.series_id }}"
-            style="display:inline;"
-            onsubmit="return confirm('Delete this series?')">
-            <button class="btn btn-danger btn-sm">×</button>
-          </form>
+          <button class="btn btn-danger btn-sm"
+            onclick="confirmDelete('Delete this series?', '/textbooks/series/delete/{{ s.series_id }}')">×</button>
         </td>
       </tr>
       {% endfor %}
@@ -274,6 +280,21 @@
   </div>
 
 </div>
+
+<!-- 削除確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Confirm Delete</div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
 <script>
 function toggleStudentForm(id) {
   const el = document.getElementById('student-form-' + id);
@@ -284,6 +305,45 @@ function toggleStudentForm(id) {
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
+
+function openConfirm(message, onOk) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-message').textContent = message;
+  modal.classList.add('show');
+  const okBtn = document.getElementById('confirm-ok');
+  const newOk = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  newOk.onclick = () => { closeConfirm(); onOk(); };
+}
+
+function confirmDelete(message, action) {
+  openConfirm(message, () => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = action;
+    document.body.appendChild(form);
+    form.submit();
+  });
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('confirm-modal');
+  if (modal) {
+    modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(); });
+    document.getElementById('cancel-btn').onclick = closeConfirm;
+  }
+});
 </script>
 </body>
 </html>

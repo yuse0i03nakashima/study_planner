@@ -125,6 +125,18 @@
     .inline-textarea { background:var(--surface2); border:1px solid var(--blue);
       color:var(--text); padding:4px 8px; font-size:11px; outline:none;
       width:200px; min-height:52px; resize:both; }
+    #confirm-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); z-index:2000;
+      align-items:center; justify-content:center; }
+    #confirm-modal.show { display:flex; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
+      border-left:3px solid var(--red); padding:24px 28px;
+      min-width:320px; max-width:460px; width:90%; }
+    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
+    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
+      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
+    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
   </style>
 </head>
 <body>
@@ -261,10 +273,10 @@
         <div>
           <label>Category</label>
           <select name="category" id="f-category">
-            <option value="予習" selected>New</option>
-            <option value="復習">Recall</option>
-            <option value="定着">Drill</option>
-            <option value="再定着">Reinforce</option>
+            <option value="New" selected>New</option>
+            <option value="Recall">Recall</option>
+            <option value="Drill">Drill</option>
+            <option value="Reinforce">Reinforce</option>
           </select>
         </div>
         <div>
@@ -374,6 +386,18 @@
 
   <div id="toast"></div>
 
+<!-- 削除確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Confirm Delete</div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- 出題予定追加モーダル -->
 <div id="assign-modal" style="display:none;position:fixed;inset:0;
   background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
@@ -384,7 +408,7 @@
       padding-bottom:10px;border-bottom:1px solid var(--border);">
       Add Assignment
     </div>
-    <form method="POST" action="/assignments/add">
+    <form id="assign-form" method="POST" action="/assignments/add">
       <input type="hidden" name="problem_id" id="modal-problem-id">
       <input type="hidden" name="redirect_to" value="/problems">
       <div style="margin-bottom:14px;">
@@ -412,10 +436,10 @@
           <select name="category"
             style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
               color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
-            <option value="予習">New</option>
-            <option value="復習">Recall</option>
-            <option value="定着">Drill</option>
-            <option value="再定着">Reinforce</option>
+            <option value="New">New</option>
+            <option value="Recall">Recall</option>
+            <option value="Drill">Drill</option>
+            <option value="Reinforce">Reinforce</option>
           </select>
         </div>
         <div>
@@ -452,10 +476,18 @@ function closeModal() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const modal = document.getElementById('assign-modal');
-  if (modal) modal.addEventListener('click', e => {
-    if (e.target === modal) closeModal();
+  const assignModal = document.getElementById('assign-modal');
+  if (assignModal) assignModal.addEventListener('click', e => {
+    if (e.target === assignModal) closeModal();
   });
+
+  const confirmModal = document.getElementById('confirm-modal');
+  if (confirmModal) {
+    confirmModal.addEventListener('click', e => {
+      if (e.target === confirmModal) closeConfirm();
+    });
+    document.getElementById('cancel-btn').onclick = closeConfirm;
+  }
 });
 
 // Textbook変更時にSectionを読み込む
@@ -497,6 +529,7 @@ function filterTextbooks() {
     if (!opt.hidden && first) { opt.selected = true; first = false; }
   }
   fetchNextOrder();
+  loadProblemSections();
 }
 
 async function fetchNextOrder() {
@@ -514,7 +547,7 @@ async function fetchNextOrder() {
 document.addEventListener('DOMContentLoaded', () => {
   const tbSel = document.getElementById('f-textbook_id');
   if (tbSel) tbSel.addEventListener('change', fetchNextOrder);
-  filterTextbooks();
+  filterTextbooks();  // filterTextbooks内でloadProblemSections()も呼ぶ
   fetchNextOrder();
 });
 
@@ -674,13 +707,28 @@ function toggleDate(cb) {
   if (cb.checked) dateInput.value = '';
 }
 
-async function deleteProblem(id, btn) {
-  if (!confirm('Delete Problem ' + id + '?')) return;
-  const res = await fetch('/problems/delete/' + id, { method: 'POST' });
-  if (res.ok) {
-    document.getElementById('row-' + id)?.remove();
-    showToast('Deleted.', 'success');
-  } else { showToast('Delete failed.', 'warn'); }
+function deleteProblem(id) {
+  openConfirm('Delete Problem ' + id + '?', async () => {
+    const res = await fetch('/problems/delete/' + id, { method: 'POST' });
+    if (res.ok) {
+      document.getElementById('row-' + id)?.remove();
+      showToast('Deleted.', 'success');
+    } else { showToast('Delete failed.', 'warn'); }
+  });
+}
+
+function openConfirm(message, onOk) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-message').textContent = message;
+  modal.classList.add('show');
+  const okBtn = document.getElementById('confirm-ok');
+  const newOk = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  newOk.onclick = () => { closeConfirm(); onOk(); };
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('show');
 }
 
 function showToast(msg, type='success') {
@@ -706,13 +754,70 @@ function updateHpHint() {
   hint.textContent = '→ approx. ' + nMin + '–' + nMax + ' sessions';
 }
 document.addEventListener('DOMContentLoaded', function() {
-  loadProblemSections();
-  // 初期Textbook選択時にSectionを読み込む
-  loadProblemSections();
-  var estEl = document.getElementById('f-estimated_minutes');
-  var totEl = document.getElementById('f-total_minutes');
+  const estEl = document.getElementById('f-estimated_minutes');
+  const totEl = document.getElementById('f-total_minutes');
   if (estEl) estEl.addEventListener('input', updateHpHint);
   if (totEl) totEl.addEventListener('input', updateHpHint);
+
+  // メインフォームをfetch化（Issue #6: スクロール位置維持）
+  const form = document.getElementById('problem-form');
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const res = await fetch('/problems', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd
+    });
+    if (!res.ok) { showToast('Registration failed.', 'warn'); return; }
+    const d = await res.json();
+    if (!d.ok) { showToast('Registration failed.', 'warn'); return; }
+    showToast('✓ Registered: ' + d.problem_number, 'success');
+    form.reset();
+    filterTextbooks();
+    const tbody = document.querySelector('.data-table tbody');
+    if (tbody) {
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + d.problem_id;
+      tr.innerHTML =
+        '<td class="meta-text" style="font-family:\'DM Mono\',monospace;font-size:11px;">' + (d.order_in_textbook || '—') + '</td>' +
+        '<td class="meta-text">' + d.subject + '</td>' +
+        '<td class="left" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' + d.textbook + '</td>' +
+        '<td class="left" style="max-width:150px;">' +
+          '<span class="editable" style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">' + d.problem_number + '</span>' +
+        '</td>' +
+        '<td class="meta-text">' + d.importance + '</td>' +
+        '<td class="meta-text">' + d.difficulty + '</td>' +
+        '<td class="meta-text">' + d.review_value + '</td>' +
+        '<td class="meta-text">' + d.estimated_minutes + '</td>' +
+        '<td class="meta-text" style="color:var(--text-dim);">' + (d.total_minutes || '—') + '</td>' +
+        '<td class="left" style="max-width:140px;">' +
+          '<span class="editable" style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">' + (d.instruction || '—') + '</span>' +
+        '</td>' +
+        '<td>' +
+          '<button class="btn btn-ghost btn-sm" onclick="showAddAssignment(' + d.problem_id + ')" title="Add to assignments">+</button> ' +
+          '<button class="btn btn-danger btn-sm" onclick="deleteProblem(' + d.problem_id + ')">×</button>' +
+        '</td>';
+      tbody.prepend(tr);
+      if (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length - 1);
+    }
+  });
+
+  // Add Assignmentモーダルをfetch化（Issue #6）
+  const assignForm = document.getElementById('assign-form');
+  if (assignForm) assignForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(assignForm);
+    const res = await fetch('/assignments/add', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd
+    });
+    if (res.ok) {
+      closeModal();
+      showToast('✓ Assignment added', 'success');
+    } else { showToast('Failed to add assignment.', 'warn'); }
+  });
 });
 </script>
 </body>

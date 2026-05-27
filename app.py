@@ -112,7 +112,7 @@ def problems():
         from database import get_auto_next_class_date
         student_ids    = request.form.getlist("student_ids")
         scheduled_date = request.form.get("scheduled_date", "").strip()
-        category       = request.form.get("category", "予習")
+        category       = request.form.get("category", "New")
 
         # Students未選択の場合はテキストに紐づく生徒を自動対象にする
         if not student_ids:
@@ -146,6 +146,21 @@ def problems():
 
         conn.commit()
         conn.close()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                "ok": True,
+                "problem_id": problem_id,
+                "order_in_textbook": order_in_textbook,
+                "subject": subject,
+                "textbook": textbook,
+                "problem_number": request.form["problem_number"],
+                "importance": int(request.form["importance"]),
+                "difficulty": int(request.form["difficulty"]),
+                "review_value": int(request.form["review_value"]),
+                "estimated_minutes": int(request.form["estimated_minutes"]),
+                "total_minutes": total_minutes,
+                "instruction": request.form.get("instruction", ""),
+            })
         return redirect("/problems")
 
     # GET
@@ -1621,7 +1636,7 @@ def assignment_add():
     problem_id     = request.form.get("problem_id")
     student_ids    = request.form.getlist("student_ids")
     scheduled_date = request.form.get("scheduled_date", "").strip()
-    category       = request.form.get("category", "予習")
+    category       = request.form.get("category", "New")
     redirect_to    = request.form.get("redirect_to", "/assignments/list")
 
     if not scheduled_date:
@@ -1637,6 +1652,8 @@ def assignment_add():
         """, (sid, problem_id, scheduled_date, category))
     conn.commit()
     conn.close()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({"ok": True, "count": len(student_ids)})
     return redirect(redirect_to)
 
 

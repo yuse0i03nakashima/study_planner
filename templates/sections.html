@@ -299,8 +299,8 @@ async function assignToSection() {
   const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
                        .map(c => parseInt(c.value));
   const sectionId = document.getElementById('sp-target-section').value;
-  if (!sectionId) { alert('Select a section first'); return; }
-  if (checked.length === 0) { alert('Select problems first'); return; }
+  if (!sectionId) { showToast('Select a section first', 'warn'); return; }
+  if (checked.length === 0) { showToast('Select problems first', 'warn'); return; }
 
   const res = await fetch('/sections/bulk_assign', {
     method: 'POST',
@@ -311,46 +311,48 @@ async function assignToSection() {
   if (res.ok && data.ok) {
     location.reload();
   } else {
-    alert('Error: ' + (data.message || 'failed'));
+    showToast('Error: ' + (data.message || 'failed'), 'warn');
   }
 }
 
 async function removeFromSection() {
   const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
                        .map(c => parseInt(c.value));
-  if (checked.length === 0) { alert('Select problems first'); return; }
-  if (!confirm('Remove ' + checked.length + ' problem(s) from their sections?')) return;
-
-  const res = await fetch('/sections/bulk_assign', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ problem_ids: checked, section_id: null })
+  if (checked.length === 0) { showToast('Select problems first', 'warn'); return; }
+  openConfirm('Remove ' + checked.length + ' problem(s) from their sections?', async () => {
+    const res = await fetch('/sections/bulk_assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ problem_ids: checked, section_id: null })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      location.reload();
+    } else {
+      showToast('Error: ' + (data.message || 'failed'), 'warn');
+    }
   });
-  const data = await res.json();
-  if (res.ok && data.ok) {
-    location.reload();
-  } else {
-    alert('Error: ' + (data.message || 'failed'));
-  }
 }
 
 // ── 削除確認モーダル ──────────────────────────────────
-function confirmDelete(message, action) {
+function openConfirm(message, onOk) {
   const modal = document.getElementById('confirm-modal');
-  const msgEl = document.getElementById('confirm-message');
-  msgEl.textContent = message;
+  document.getElementById('confirm-message').textContent = message;
   modal.classList.add('show');
   const okBtn = document.getElementById('confirm-ok');
   const newOk = okBtn.cloneNode(true);
   okBtn.parentNode.replaceChild(newOk, okBtn);
-  newOk.onclick = function() {
-    closeConfirm();
+  newOk.onclick = () => { closeConfirm(); onOk(); };
+}
+
+function confirmDelete(message, action) {
+  openConfirm(message, () => {
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = action;
     document.body.appendChild(form);
     form.submit();
-  };
+  });
 }
 
 function closeConfirm() {

@@ -100,6 +100,18 @@
     .editable.editing { display:none; }
     .inline-input { background:var(--surface2); border:1px solid var(--blue);
       color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
+    #confirm-modal { display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.75); z-index:2000;
+      align-items:center; justify-content:center; }
+    #confirm-modal.show { display:flex; }
+    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
+      border-left:3px solid var(--red); padding:24px 28px;
+      min-width:320px; max-width:460px; width:90%; }
+    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
+    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
+      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
+    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
     .inline-textarea { background:var(--surface2); border:1px solid var(--blue);
       color:var(--text); padding:4px 8px; font-size:11px; outline:none;
       width:200px; min-height:48px; resize:both; }
@@ -237,6 +249,18 @@
 
 <div id="toast"></div>
 
+<!-- 削除確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title">Confirm Delete</div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    </div>
+  </div>
+</div>
+
 <!-- 出題予定追加モーダル -->
 <div id="assign-modal" style="display:none;position:fixed;inset:0;
   background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
@@ -275,10 +299,10 @@
           <select name="category"
             style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
               color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
-            <option value="予習">New</option>
-            <option value="復習">Recall</option>
-            <option value="定着">Drill</option>
-            <option value="再定着">Reinforce</option>
+            <option value="New">New</option>
+            <option value="Recall">Recall</option>
+            <option value="Drill">Drill</option>
+            <option value="Reinforce">Reinforce</option>
           </select>
         </div>
         <div>
@@ -539,14 +563,37 @@ function startTextLineEdit(span) {
   });
 }
 
-async function deleteProblem(id, btn) {
-  if (!confirm('Delete problem ' + id + '?')) return;
-  const res = await fetch('/problems/delete/' + id, { method: 'POST' });
-  if (res.ok) {
-    document.getElementById('prow-' + id)?.remove();
-    showToast('Deleted.', 'success');
-  } else { showToast('Delete failed.', 'warn'); }
+function deleteProblem(id) {
+  openConfirm('Delete Problem ' + id + '?', async () => {
+    const res = await fetch('/problems/delete/' + id, { method: 'POST' });
+    if (res.ok) {
+      document.getElementById('prow-' + id)?.remove();
+      showToast('Deleted.', 'success');
+    } else { showToast('Delete failed.', 'warn'); }
+  });
 }
+
+function openConfirm(message, onOk) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-message').textContent = message;
+  modal.classList.add('show');
+  const okBtn = document.getElementById('confirm-ok');
+  const newOk = okBtn.cloneNode(true);
+  okBtn.parentNode.replaceChild(newOk, okBtn);
+  newOk.onclick = () => { closeConfirm(); onOk(); };
+}
+
+function closeConfirm() {
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('confirm-modal');
+  if (modal) {
+    modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(); });
+    document.getElementById('cancel-btn').onclick = closeConfirm;
+  }
+});
 </script>
 </body>
 </html>
