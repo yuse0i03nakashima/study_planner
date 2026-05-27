@@ -159,7 +159,7 @@
     <div class="card-title">Problem Entry</div>
     <form method="POST" id="problem-form">
 
-      <div class="grid-2">
+      <div class="grid-3">
         <div>
           <label>Subject</label>
           <select name="subject" id="f-subject" onchange="filterTextbooks()">
@@ -170,7 +170,8 @@
         </div>
         <div>
           <label>Textbook</label>
-          <select name="textbook_id" id="f-textbook_id">
+          <select name="textbook_id" id="f-textbook_id"
+            onchange="updateOrderHint(); loadProblemSections();">
             {% for t in textbooks %}
             <option value="{{ t.textbook_id }}" data-subject="{{ t.subject }}">
               {% if t.series_name %}[{{ t.series_name }}] {% endif %}{{ t.name }}
@@ -180,6 +181,15 @@
           <p class="hint">
             <a href="/textbooks" style="color:#f87171;">+ New Textbook</a>
           </p>
+        </div>
+        <div>
+          <label>Section <span style="color:var(--text-dim);font-size:9px;">blank = same as previous</span></label>
+          <select name="section_id" id="f-section_id"
+            style="width:100%;padding:8px 12px;background:var(--surface2);
+              border:1px solid var(--border-light);color:var(--text);
+              font-size:13px;outline:none;">
+            <option value="">— Same as previous —</option>
+          </select>
         </div>
       </div>
 
@@ -448,6 +458,35 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// Textbook変更時にSectionを読み込む
+function loadProblemSections() {
+  var tbEl  = document.getElementById('f-textbook_id');
+  var secSel = document.getElementById('f-section_id');
+  if (!secSel) return;
+  // まず選択肢をクリア
+  secSel.innerHTML = '<option value="">— Same as previous —</option>';
+  if (!tbEl || !tbEl.value) return;
+  var tbId = tbEl.value;
+  fetch('/api/sections_by_textbook?textbook_id=' + encodeURIComponent(tbId))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      // 再度クリア（fetch中に変更された可能性）
+      secSel.innerHTML = '<option value="">— Same as previous —</option>';
+      data.forEach(function(s) {
+        var opt = document.createElement('option');
+        opt.value = s.section_id;
+        opt.textContent = s.name;
+        secSel.appendChild(opt);
+      });
+    })
+    .catch(function(e) { console.log('section load error:', e); });
+}
+
+// HPヒント表示（Est.MinutesとTotal Minutesから分割数を計算）
+function updateOrderHint() {
+  fetchNextOrder();
+}
+
 // 教科でテキストを絞り込む
 function filterTextbooks() {
   const subject = document.getElementById('f-subject').value;
@@ -667,6 +706,9 @@ function updateHpHint() {
   hint.textContent = '→ approx. ' + nMin + '–' + nMax + ' sessions';
 }
 document.addEventListener('DOMContentLoaded', function() {
+  loadProblemSections();
+  // 初期Textbook選択時にSectionを読み込む
+  loadProblemSections();
   var estEl = document.getElementById('f-estimated_minutes');
   var totEl = document.getElementById('f-total_minutes');
   if (estEl) estEl.addEventListener('input', updateHpHint);

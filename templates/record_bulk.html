@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>Bulk Record — Study Planner</title>
+  <style>
+    :root {
+      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
+      --border:#252838; --border-light:#2f3347;
+      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
+      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
+      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
+    body::after { content:''; position:fixed; inset:0;
+      background-image:linear-gradient(var(--border) 1px,transparent 1px),
+        linear-gradient(90deg,var(--border) 1px,transparent 1px);
+      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
+    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
+    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
+      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
+    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
+      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
+      color:#f5a623; letter-spacing:2px; text-transform:uppercase; }
+    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
+      color:var(--text-muted); margin-top:4px; }
+    .page-header-back { font-family:'DM Mono',monospace; font-size:10px;
+      color:var(--text-muted); letter-spacing:1.5px; text-decoration:none; }
+    .page-header-back::before { content:'← '; }
+    .card { background:var(--surface); border:1px solid var(--border); padding:20px 24px; margin-bottom:16px; }
+    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1.5px;
+      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px; }
+    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
+      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
+      margin-bottom:4px; }
+    select, input[type="date"] {
+      background:var(--surface2); border:1px solid var(--border-light);
+      color:var(--text); padding:8px 12px; font-size:13px; outline:none; width:100%; }
+    select:focus, input:focus { border-color:var(--blue); }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
+      text-transform:uppercase; padding:8px 20px; border:none; cursor:pointer; transition:all 0.15s; }
+    .btn-success { background:var(--green); color:#0c0d11; }
+    .btn-success:hover { background:#5eddaa; }
+    .btn-ghost { background:transparent; border:1px solid var(--border-light); color:var(--text-muted); }
+    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
+      margin-top:4px; letter-spacing:0.5px; }
+    /* Score buttons */
+    .score-btns { display:flex; gap:4px; }
+    .score-btn {
+      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
+      padding:4px 8px; border:1px solid var(--border-light); cursor:pointer;
+      background:var(--surface2); color:var(--text-muted); transition:all 0.12s;
+      white-space:nowrap;
+    }
+    .score-btn:hover { border-color:var(--text-muted); }
+    .score-btn.sel-5 { background:rgba(62,207,142,0.15); border-color:var(--green); color:var(--green); }
+    .score-btn.sel-4 { background:rgba(91,143,249,0.15); border-color:var(--blue); color:var(--blue); }
+    .score-btn.sel-3 { background:rgba(245,166,35,0.15); border-color:var(--amber); color:var(--amber); }
+    .score-btn.sel-2 { background:rgba(240,98,146,0.15); border-color:var(--rose); color:var(--rose); }
+    .score-btn.sel-1 { background:rgba(239,68,68,0.15); border-color:var(--red); color:var(--red); }
+    .prob-row { display:flex; align-items:center; gap:12px; padding:10px 14px;
+      border-bottom:1px solid var(--border); font-size:12px; }
+    .prob-row:last-child { border-bottom:none; }
+    .prob-name { font-family:'Noto Serif JP',serif; flex:1; }
+    .prob-meta { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); min-width:120px; }
+    .prob-skip { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
+      cursor:pointer; padding:4px 8px; border:1px solid var(--border); background:none; }
+    .prob-row.skipped { opacity:0.35; }
+    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
+      background:var(--surface2); border:1px solid var(--border-light);
+      color:var(--text); font-family:'DM Mono',monospace; font-size:11px;
+      letter-spacing:1px; padding:12px 24px; opacity:0;
+      transition:all 0.3s ease; pointer-events:none; z-index:9999; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    #toast.success { border-left:2px solid var(--green); color:var(--green); }
+    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
+    .fade-in { animation:fadeIn 0.3s ease both; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="page-header fade-in">
+    <div>
+      <div class="page-label">04 / Records</div>
+      <div class="page-title">Add Record</div>
+      <div class="page-title-ja">Add Records</div>
+    </div>
+    <div style="display:flex;gap:16px;"><a class="page-header-back" href="/">TOP</a><a style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-decoration:none;" href="/record/list">Edit Records →</a></div>
+  </div>
+
+  <div class="card fade-in">
+    <div class="card-title">Session Settings</div>
+    <div class="grid-3">
+      <div>
+        <label>Student</label>
+        <select id="br-student" onchange="loadBrTextbooks()">
+          {% for s in students %}
+          <option value="{{ s.student_id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Date</label>
+        <input type="date" id="br-date" value="{{ today }}">
+      </div>
+      <div>
+        <label>Textbook</label>
+        <select id="br-textbook" onchange="loadBrSections()">
+          <option value="">— Select —</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label>Section <span style="color:var(--text-dim);font-size:9px;">(optional)</span></label>
+        <select id="br-section" onchange="loadBrProblems()">
+          <option value="">— All Sections —</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:8px;">
+        <button type="button" class="btn btn-ghost" onclick="loadBrProblems()">Load Problems</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="br-problems-card" style="display:none;" class="card fade-in">
+    <div style="display:flex;align-items:center;margin-bottom:12px;gap:12px;">
+      <div class="card-title" style="margin:0;">Problems</div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+        <button type="button" onclick="setAllScores(5)"
+          class="score-btn" style="font-size:9px;">All Perfect</button>
+        <button type="button" onclick="setDefaultScores()"
+          class="score-btn" style="font-size:9px;">Auto (by Dif)</button>
+        <button type="button" class="btn btn-success" onclick="submitBulkRecord()">
+          ✓ Register All</button>
+      </div>
+    </div>
+    <div id="br-problems-list"></div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script>
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+
+// ── データ読み込み ──
+function loadBrTextbooks() {
+  const sid = document.getElementById('br-student').value;
+  fetch('/api/textbooks_by_student?student_id=' + sid)
+    .then(r => r.json())
+    .then(data => {
+      const sel = document.getElementById('br-textbook');
+      sel.innerHTML = '<option value="">— Select —</option>';
+      data.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.textbook_id;
+        opt.textContent = '[' + t.subject + '] ' + t.name;
+        sel.appendChild(opt);
+      });
+      document.getElementById('br-section').innerHTML = '<option value="">— All Sections —</option>';
+      document.getElementById('br-problems-card').style.display = 'none';
+    });
+}
+
+function loadBrSections() {
+  const tbId = document.getElementById('br-textbook').value;
+  const secSel = document.getElementById('br-section');
+  secSel.innerHTML = '<option value="">— All Sections —</option>';
+  document.getElementById('br-problems-card').style.display = 'none';
+  if (!tbId) return;
+  fetch('/api/sections_by_textbook?textbook_id=' + tbId)
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.section_id;
+        opt.textContent = s.name;
+        secSel.appendChild(opt);
+      });
+      loadBrProblems();
+    });
+}
+
+function loadBrProblems() {
+  const sid   = document.getElementById('br-student').value;
+  const tbId  = document.getElementById('br-textbook').value;
+  const secId = document.getElementById('br-section').value;
+  if (!tbId) return;
+
+  fetch('/api/problems_for_record?student_id=' + sid
+        + '&textbook_id=' + tbId + '&section_id=' + secId)
+    .then(r => r.json())
+    .then(data => {
+      const card = document.getElementById('br-problems-card');
+      const list = document.getElementById('br-problems-list');
+      if (data.length === 0) {
+        list.innerHTML = '<div style="padding:16px;font-family:DM Mono,monospace;font-size:10px;color:var(--text-dim);">No problems found.</div>';
+        card.style.display = 'block';
+        return;
+      }
+      card.style.display = 'block';
+      list.innerHTML = data.map(p => {
+        const defScore = p.difficulty <= 3 ? 5 : 4;
+        return `
+        <div class="prob-row" id="bpr-${p.problem_id}" data-problem="${p.problem_id}"
+          data-difficulty="${p.difficulty}">
+          <input type="checkbox" class="br-check" checked
+            style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;"
+            onchange="toggleProbRow(this, ${p.problem_id})">
+          <div class="prob-name">${p.problem_number}</div>
+          <div class="prob-meta">Imp:${p.importance} Dif:${p.difficulty} ${p.estimated_minutes}min</div>
+          <div class="score-btns" id="scores-${p.problem_id}">
+            ${[5,4,3,2,1].map(s =>
+              `<button type="button" class="score-btn${s===defScore?' sel-'+s:''}"
+                data-score="${s}" onclick="setScore(${p.problem_id},${s})">
+                ${s} ${['','Failed','Retry','Recall','Good','Perfect'][s]}
+              </button>`
+            ).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    });
+}
+
+function toggleProbRow(cb, problemId) {
+  const row = document.getElementById('bpr-' + problemId);
+  row.classList.toggle('skipped', !cb.checked);
+}
+
+function setScore(problemId, score) {
+  const btns = document.querySelectorAll('#scores-' + problemId + ' .score-btn');
+  btns.forEach(b => {
+    b.className = 'score-btn';
+    if (parseInt(b.dataset.score) === score) b.classList.add('sel-' + score);
+  });
+}
+
+function setAllScores(score) {
+  document.querySelectorAll('.prob-row:not(.skipped)').forEach(row => {
+    const pid = row.dataset.problem;
+    if (pid) setScore(parseInt(pid), score);
+  });
+}
+
+function setDefaultScores() {
+  document.querySelectorAll('.prob-row:not(.skipped)').forEach(row => {
+    const pid = row.dataset.problem;
+    const dif = parseInt(row.dataset.difficulty);
+    if (pid) setScore(parseInt(pid), dif <= 3 ? 5 : 4);
+  });
+}
+
+async function submitBulkRecord() {
+  const sid  = document.getElementById('br-student').value;
+  const date = document.getElementById('br-date').value;
+  if (!date) { showToast('Select a date first', 'warn'); return; }
+
+  const records = [];
+  document.querySelectorAll('.prob-row:not(.skipped)').forEach(row => {
+    const pid = parseInt(row.dataset.problem);
+    const selectedBtn = row.querySelector('.score-btn[class*="sel-"]');
+    const score = selectedBtn ? parseInt(selectedBtn.dataset.score) : 5;
+    records.push({ problem_id: pid, score });
+  });
+
+  if (records.length === 0) { showToast('No problems selected', 'warn'); return; }
+
+  const res = await fetch('/record/bulk_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: sid, date, records })
+  });
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    showToast('✓ ' + data.added + ' records saved', 'success');
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    showToast('Error: ' + (data.message || 'failed'), 'warn');
+  }
+}
+
+// 初期化
+document.addEventListener('DOMContentLoaded', function() {
+  loadBrTextbooks();
+});
+</script>
+</body>
+</html>

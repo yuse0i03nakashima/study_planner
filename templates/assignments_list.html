@@ -153,60 +153,80 @@
     <span class="meta-text" style="margin-left:auto;">{{ assignments|length }} items</span>
   </div>
 
-  <!-- 出題予定追加 -->
-  <div style="background:var(--surface);border:1px solid var(--border);
-    border-left:2px solid var(--blue);padding:14px 20px;margin-bottom:10px;" class="fade-in">
-    <form method="POST" action="/assignments/add"
-      style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-      <input type="hidden" name="redirect_to"
-        value="/assignments/list?student_id={{ selected_student }}">
-      <input type="hidden" name="student_ids" value="{{ selected_student }}">
-      <input type="hidden" name="problem_id" id="al-problem-id">
-      <div style="flex:1;min-width:220px;">
-        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
-          Problem Search
-        </label>
-        <input type="text" id="al-search" placeholder="Search by problem name, textbook, or No. ..."
-          autocomplete="off"
-          style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
-            color:var(--text);padding:7px 10px;font-size:12px;outline:none;"
-          oninput="searchProblems(this.value)">
-        <div id="al-search-results"
-          style="display:none;position:absolute;z-index:100;
-            background:var(--surface2);border:1px solid var(--border-light);
-            max-height:200px;overflow-y:auto;min-width:320px;"></div>
-        <div id="al-selected-problem"
-          style="font-family:'DM Mono',monospace;font-size:10px;
-            color:var(--green);margin-top:4px;min-height:16px;letter-spacing:0.5px;">
-        </div>
-      </div>
+  <!-- 出題予定追加（一括） -->
+  <div class="card fade-in" style="background:var(--surface);border:1px solid var(--border);
+    border-left:2px solid var(--blue);padding:16px 20px;margin-bottom:10px;">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+      text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;">Add Assignments</div>
+
+    <div class="grid-3" style="margin-bottom:10px;">
       <div>
         <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
-          Category
-        </label>
-        <select name="category"
-          style="background:var(--surface2);border:1px solid var(--border-light);
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Textbook</label>
+        <select id="add-textbook" onchange="loadAddSections()"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
             color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
-          <option value="予習">New</option>
-          <option value="復習">Recall</option>
-          <option value="定着">Drill</option>
-          <option value="再定着">Reinforce</option>
+          <option value="">— Select Textbook —</option>
+          <!-- テキストは生徒選択後にJSで動的に更新 -->
         </select>
       </div>
       <div>
         <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">
-          Date
-        </label>
-        <input type="date" name="scheduled_date"
-          style="background:var(--surface2);border:1px solid var(--border-light);
-            color:var(--text);padding:7px 10px;font-size:12px;outline:none;width:140px;">
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Section <span style="color:var(--text-dim);">(optional)</span></label>
+        <select id="add-section" onchange="loadAddProblems()"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+          <option value="">— All Sections —</option>
+        </select>
       </div>
-      <button type="submit" class="btn btn-primary btn-sm"
-        onclick="return validateAssign()">+ Add</button>
-    </form>
+      <div style="display:flex;gap:8px;align-items:flex-end;">
+        <div style="flex:1;">
+          <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Category</label>
+          <select id="add-category"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+            <option value="New">New</option>
+            <option value="Recall">Recall</option>
+            <option value="Drill">Drill</option>
+            <option value="Reinforce">Reinforce</option>
+          </select>
+        </div>
+        <div style="flex:1;">
+          <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Date <span style="color:var(--text-dim);">(optional)</span></label>
+          <input type="date" id="add-date"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
+              color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+        </div>
+      </div>
+    </div>
+
+    <!-- 問題チェックリスト -->
+    <div id="add-problems-area" style="display:none;margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <button type="button" onclick="selectAllAddProblems()"
+          style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+            background:none;border:none;cursor:pointer;letter-spacing:1px;text-transform:uppercase;">
+          ✓ All</button>
+        <button type="button" onclick="clearAllAddProblems()"
+          style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+            background:none;border:none;cursor:pointer;letter-spacing:1px;text-transform:uppercase;">
+          ✕ Clear</button>
+        <span id="add-selected-count" class="meta-text"></span>
+        <button type="button" onclick="submitBulkAssignment()"
+          class="btn btn-success btn-sm" style="margin-left:auto;">+ Add Selected</button>
+      </div>
+      <div id="add-problems-list"
+        style="max-height:240px;overflow-y:auto;border:1px solid var(--border);
+          background:var(--surface2);">
+        <!-- JSで動的に生成 -->
+      </div>
+    </div>
+    <div id="add-empty-msg" style="display:none;font-family:'DM Mono',monospace;
+      font-size:10px;color:var(--text-dim);margin-top:8px;">
+      No problems found.
+    </div>
   </div>
 
   <div class="bulk-bar fade-in" style="flex-wrap:wrap;gap:10px;">
@@ -220,10 +240,10 @@
       border:1px solid var(--border-light);color:var(--text);
       font-family:'DM Mono',monospace;font-size:10px;">
       <option value="">— Category —</option>
-      <option value="予習">New</option>
-      <option value="復習">Recall</option>
-      <option value="定着">Drill</option>
-      <option value="再定着">Reinforce</option>
+      <option value="New">New</option>
+      <option value="Recall">Recall</option>
+      <option value="Drill">Drill</option>
+      <option value="Reinforce">Reinforce</option>
     </select>
 
     <!-- 出題日一括セット -->
@@ -294,7 +314,7 @@
           data-id="{{ a.assignment_id }}" data-field="category"
           style="width:76px;"
           onchange="markChanged(this, {{ a.assignment_id }})">
-          {%- for cat in ['予習','復習','定着','再定着'] %}
+          {%- for cat in ['New','Recall','Drill','Reinforce'] %}
           <option value="{{ cat }}" {%- if cat == a.category %} selected{%- endif %}>{{ cat | cat_en }}</option>
           {%- endfor %}
         </select>
@@ -528,6 +548,120 @@ function startMasteryEdit(span, current) {
     if (e.key === 'Escape') finish(false);
   });
 }
+
+// ── Bulk Add Assignment ──
+function loadStudentTextbooks() {
+  const sid = '{{ selected_student }}';
+  fetch('/api/textbooks_by_student?student_id=' + sid)
+    .then(r => r.json())
+    .then(data => {
+      const sel = document.getElementById('add-textbook');
+      sel.innerHTML = '<option value="">— Select Textbook —</option>';
+      data.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.textbook_id;
+        opt.textContent = '[' + t.subject + '] ' + t.name;
+        sel.appendChild(opt);
+      });
+    });
+}
+
+function loadAddSections() {
+  const tbId = document.getElementById('add-textbook').value;
+  const secSel = document.getElementById('add-section');
+  secSel.innerHTML = '<option value="">— All Sections —</option>';
+  document.getElementById('add-problems-area').style.display = 'none';
+  if (!tbId) return;
+  fetch('/api/sections_by_textbook?textbook_id=' + tbId)
+    .then(r => r.json())
+    .then(data => {
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.section_id;
+        opt.textContent = s.name;
+        secSel.appendChild(opt);
+      });
+      loadAddProblems();
+    });
+}
+
+function loadAddProblems() {
+  const tbId  = document.getElementById('add-textbook').value;
+  const secId = document.getElementById('add-section').value;
+  const sid   = '{{ selected_student }}';
+  if (!tbId) return;
+
+  fetch('/api/problems_for_assignment?textbook_id=' + tbId
+        + '&section_id=' + secId + '&student_id=' + sid)
+    .then(r => r.json())
+    .then(data => {
+      const area = document.getElementById('add-problems-area');
+      const list = document.getElementById('add-problems-list');
+      const empty = document.getElementById('add-empty-msg');
+      if (data.length === 0) {
+        area.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+      area.style.display = 'block';
+      empty.style.display = 'none';
+      list.innerHTML = data.map(p => `
+        <label style="display:flex;align-items:center;gap:10px;padding:7px 12px;
+          border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;"
+          onmouseover="this.style.background='var(--surface3)'"
+          onmouseout="this.style.background=''">
+          <input type="checkbox" class="add-prob-check" value="${p.problem_id}"
+            style="accent-color:var(--blue);width:14px;height:14px;"
+            onchange="updateAddCount()">
+          <span style="font-family:'Noto Serif JP',serif;">${p.problem_number}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);margin-left:auto;">
+            Imp:${p.importance} Dif:${p.difficulty} ${p.estimated_minutes}min
+          </span>
+        </label>
+      `).join('');
+      updateAddCount();
+    });
+}
+
+function updateAddCount() {
+  const n = document.querySelectorAll('.add-prob-check:checked').length;
+  document.getElementById('add-selected-count').textContent =
+    n > 0 ? n + ' selected' : '';
+}
+
+function selectAllAddProblems() {
+  document.querySelectorAll('.add-prob-check').forEach(c => c.checked = true);
+  updateAddCount();
+}
+
+function clearAllAddProblems() {
+  document.querySelectorAll('.add-prob-check').forEach(c => c.checked = false);
+  updateAddCount();
+}
+
+async function submitBulkAssignment() {
+  const checked = Array.from(document.querySelectorAll('.add-prob-check:checked'))
+                       .map(c => parseInt(c.value));
+  if (checked.length === 0) { showToast('Select problems first', 'warn'); return; }
+  const cat  = document.getElementById('add-category').value;
+  const date = document.getElementById('add-date').value;
+  const sid  = '{{ selected_student }}';
+
+  const res = await fetch('/assignments/bulk_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: sid, problem_ids: checked, category: cat, scheduled_date: date })
+  });
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    showToast('✓ ' + data.added + ' assignments added', 'success');
+    setTimeout(() => location.reload(), 1000);
+  } else {
+    showToast('Error: ' + (data.message || 'failed'), 'warn');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadStudentTextbooks);
 
 let alSearchTimer = null;
 

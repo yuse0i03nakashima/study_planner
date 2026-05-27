@@ -195,18 +195,49 @@
 
   <!-- Problems in this Textbook -->
   <div class="card fade-in">
-    <div class="card-title">Problems in this Textbook</div>
+    <div style="display:flex;align-items:center;margin-bottom:12px;gap:12px;">
+      <div class="card-title" style="margin:0;">Problems in this Textbook</div>
+      <div id="bulk-section-bar" style="display:flex;margin-left:auto;align-items:center;gap:8px;">
+        <span id="sp-sel-count" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);"></span>
+        <select id="sp-target-section"
+          style="background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:5px 8px;font-family:'DM Mono',monospace;
+            font-size:10px;outline:none;">
+          <option value="">— Assign to Section —</option>
+          {% for s in sections %}
+          <option value="{{ s.section_id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" onclick="assignToSection()"
+          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+            text-transform:uppercase;background:var(--green);color:#0c0d11;
+            border:none;padding:6px 14px;cursor:pointer;">→ Assign</button>
+        <button type="button" onclick="removeFromSection()"
+          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+            text-transform:uppercase;background:var(--surface2);color:var(--text-dim);
+            border:1px solid var(--border-light);padding:6px 14px;cursor:pointer;">
+          ✕ Remove</button>
+      </div>
+    </div>
     <div style="overflow-x:auto;">
     <table class="data-table" id="section-prob-table">
-      <thead>
-        <tr>
-          <th>No.</th><th>問題番号</th><th>教科</th>
-          <th>Imp</th><th>Dif</th><th>RV</th>
-        </tr>
-      </thead>
+      <thead><tr>
+        <th style="width:32px;">
+          <input type="checkbox" id="sp-check-all"
+            onchange="toggleAllSP(this)"
+            style="accent-color:var(--blue);width:14px;height:14px;">
+        </th>
+        <th>No.</th><th>Problem</th><th>Section</th>
+        <th>Subject</th><th>Imp</th><th>Dif</th><th>RV</th>
+      </tr></thead>
       <tbody>
       {% for p in problems %}
       <tr id="sp-{{ p.problem_id }}">
+        <td>
+          <input type="checkbox" class="sp-check" value="{{ p.problem_id }}"
+            onchange="updateSPCount()"
+            style="accent-color:var(--blue);width:14px;height:14px;">
+        </td>
         <td class="editable-cell" data-problem="{{ p.problem_id }}"
           data-field="order_in_textbook">
           <span class="editable" ondblclick="startOrderEdit(this)"
@@ -215,6 +246,9 @@
           </span>
         </td>
         <td class="left" style="font-size:11px;">{{ p.problem_number }}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);">
+          {{ p.section_name or '—' }}
+        </td>
         <td class="meta-text">{{ p.subject }}</td>
         <td class="meta-text">{{ p.importance }}</td>
         <td class="meta-text">{{ p.difficulty }}</td>
@@ -222,7 +256,7 @@
       </tr>
       {% endfor %}
       {% if not problems %}
-      <tr><td colspan="6" style="font-family:'DM Mono',monospace;font-size:11px;
+      <tr><td colspan="8" style="font-family:'DM Mono',monospace;font-size:11px;
         color:var(--text-dim);padding:20px;text-align:center;">
         No problems registered for this textbook.
       </td></tr>
@@ -272,7 +306,59 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // セクション名ボタン（アコーディオン）
-  document.querySelectorAll('.section-name-btn').forEach(function(btn) {
+
+  // ── Problems in this Textbook: 一括Section割り当て ──
+function toggleAllSP(cb) {
+  document.querySelectorAll('.sp-check').forEach(c => c.checked = cb.checked);
+  updateSPCount();
+}
+
+function updateSPCount() {
+  const n = document.querySelectorAll('.sp-check:checked').length;
+  const countEl = document.getElementById('sp-sel-count');
+  if (countEl) countEl.textContent = n > 0 ? n + ' selected' : '';
+}
+
+async function assignToSection() {
+  const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
+                       .map(c => parseInt(c.value));
+  const sectionId = parseInt(document.getElementById('sp-target-section').value);
+  if (!sectionId) { alert('Select a section first'); return; }
+  if (checked.length === 0) return;
+
+  const res = await fetch('/sections/bulk_assign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problem_ids: checked, section_id: sectionId })
+  });
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    location.reload();
+  } else {
+    alert('Error: ' + (data.message || 'failed'));
+  }
+}
+
+async function removeFromSection() {
+  const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
+                       .map(c => parseInt(c.value));
+  if (checked.length === 0) return;
+  if (!confirm('Remove ' + checked.length + ' problem(s) from their sections?')) return;
+
+  const res = await fetch('/sections/bulk_assign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problem_ids: checked, section_id: null })
+  });
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    location.reload();
+  } else {
+    alert('Error: ' + (data.message || 'failed'));
+  }
+}
+
+document.querySelectorAll('.section-name-btn').forEach(function(btn) {
     btn.onclick = function() {
       var sid = this.getAttribute('data-sid');
       toggleSection(sid);

@@ -8,7 +8,7 @@ import os
 
 app = Flask(__name__)
 
-# カテゴリ・記録種別の英語化フィルター
+# カテゴリ/記録種別の英語化フィルター
 CAT_EN = {
     "予習": "New", "復習": "Recall", "定着": "Drill",
     "再定着": "Reinforce", "記録": "Record", "手動修正": "Manual",
@@ -45,7 +45,7 @@ def problems():
     c = conn.cursor()
 
     if request.method == "POST":
-        # textbook_idからsubject・textbook名を取得
+        # textbook_idからsubject/textbook名を取得
         textbook_id = request.form.get("textbook_id")
         if textbook_id:
             c.execute("SELECT subject, name FROM textbooks WHERE textbook_id=?",
@@ -57,7 +57,7 @@ def problems():
             subject  = request.form.get("subject", "")
             textbook = request.form.get("textbook", "")
 
-        # order_in_textbook: 入力があればそれを使い、なければ同テキスト最大+1
+        # order_in_textbook: 入力があればそれを使い, なければ同テキスト最大+1
         total_minutes_raw = request.form.get("total_minutes", "").strip()
         total_minutes = int(total_minutes_raw) if total_minutes_raw else None
 
@@ -71,13 +71,27 @@ def problems():
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
 
+        # section_id: 選択があればそれを使い, なければ前の問題と同じSectionを使用
+        section_id_raw = request.form.get("section_id", "").strip()
+        if section_id_raw:
+            section_id_val = int(section_id_raw)
+        else:
+            # 同テキスト内の直前の問題のsection_idを取得
+            c.execute("""
+                SELECT section_id FROM problems
+                WHERE textbook_id=? AND section_id IS NOT NULL
+                ORDER BY order_in_textbook DESC, problem_id DESC LIMIT 1
+            """, (textbook_id,))
+            prev = c.fetchone()
+            section_id_val = prev["section_id"] if prev else None
+
         c.execute("""
             INSERT INTO problems
             (subject, textbook, textbook_id, problem_number,
              importance, difficulty, review_value,
              estimated_minutes, instruction, type, order_in_textbook,
-             total_minutes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             total_minutes, section_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             subject, textbook, textbook_id,
             request.form["problem_number"],
@@ -88,7 +102,8 @@ def problems():
             request.form.get("instruction", ""),
             "標準",
             order_in_textbook,
-            total_minutes
+            total_minutes,
+            section_id_val
         ))
         conn.commit()
         problem_id = c.lastrowid
@@ -146,7 +161,7 @@ def problems():
     """)
     probs = c.fetchall()
 
-    # テキスト一覧（教科でフィルタできるようにdata-subjectを付与）
+    # テキスト一覧(教科でフィルタできるようにdata-subjectを付与)
     c.execute("""
         SELECT t.textbook_id, t.name, t.subject,
                s.name as series_name
@@ -156,7 +171,7 @@ def problems():
     """)
     textbooks_list = c.fetchall()
 
-    # 教科一覧（studentsのsubjectsから生成）
+    # 教科一覧(studentsのsubjectsから生成)
     c.execute("SELECT DISTINCT subjects FROM students ORDER BY subjects")
     all_subjects = []
     for row in c.fetchall():
@@ -255,8 +270,8 @@ def record():
         score_label = {5: "Perfect", 4: "Good", 3: "Review",
                        2: "Retry", 1: "Failed"}
         flash(
-            f"記録しました（評価：{score}／{score_label[score]}"
-            f"　習熟度：{'★' * new_mastery}）",
+            f"記録しました(評価:{score}／{score_label[score]}"
+            f"　習熟度:{'★' * new_mastery})",
             "success"
         )
         return redirect("/record")
@@ -264,7 +279,7 @@ def record():
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
 
-    # 今期の問題（assignments）を優先表示
+    # 今期の問題(assignments)を優先表示
     c.execute("""
         SELECT DISTINCT p.problem_id, p.subject, p.textbook, p.problem_number,
                a.student_id as assigned_student,
@@ -421,7 +436,7 @@ def preview():
     c.execute("SELECT * FROM students ORDER BY student_id")
     students = c.fetchall()
 
-    # 各生徒の教科・plan_mode
+    # 各生徒の教科/plan_mode
     c.execute("SELECT student_id, subjects, plan_mode FROM students")
     student_subjects = {
         r["student_id"]: {
@@ -611,7 +626,7 @@ def history():
 
 @app.route("/history/preview/<int:history_id>")
 def history_preview(history_id):
-    """確定済み計画表のプレビュー（JSON返却）"""
+    """確定済み計画表のプレビュー(JSON返却)"""
     import json as _json
     conn = get_connection()
     c = conn.cursor()
@@ -720,7 +735,7 @@ def problems_list():
     c.execute("SELECT DISTINCT subject FROM problems ORDER BY subject")
     all_subjects = [r["subject"] for r in c.fetchall()]
 
-    # 教科フィルターがある場合はそのテキストのみ、なければ全テキスト
+    # 教科フィルターがある場合はそのテキストのみ, なければ全テキスト
     if subject:
         c.execute("""
             SELECT t.textbook_id, t.name, t.subject
@@ -736,7 +751,7 @@ def problems_list():
         """)
     all_textbooks = c.fetchall()
 
-    # 生徒一覧（出題予定追加モーダル用）
+    # 生徒一覧(出題予定追加モーダル用)
     c.execute("SELECT * FROM students ORDER BY student_id")
     students_list = c.fetchall()
 
@@ -797,7 +812,7 @@ def problem_assign(problem_id):
             VALUES (?, ?, ?, ?)
         """, (student_id, problem_id, scheduled_date, category))
     else:
-        # 日付未定の場合は遠い未来日付で仮登録（計画表には出ないが一覧には表示）
+        # 日付未定の場合は遠い未来日付で仮登録(計画表には出ないが一覧には表示)
         c.execute("""
             INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
             VALUES (?, ?, ?, ?)
@@ -907,7 +922,7 @@ def history_delete(history_id):
         start_date = row["start_date"]
         end_date = row["end_date"]
 
-        # 当該期間の授業記録（historyテーブル）のみ削除
+        # 当該期間の授業記録(historyテーブル)のみ削除
         # ※problemsテーブルは削除しない
         c.execute("""
             DELETE FROM history
@@ -915,16 +930,16 @@ def history_delete(history_id):
             AND date BETWEEN ? AND ?
         """, (student_id, start_date, end_date))
 
-        # 当該期間の出題予定（assignmentsテーブル）を削除
-        # → 授業記録が消えたので、出題予定も初期状態に戻す
+        # 当該期間の出題予定(assignmentsテーブル)を削除
+        # → 授業記録が消えたので, 出題予定も初期状態に戻す
         c.execute("""
             DELETE FROM assignments
             WHERE student_id=?
             AND scheduled_date BETWEEN ? AND ?
         """, (student_id, start_date, end_date))
 
-        # 問題マスタに登録された問題を「予習未定」として出題予定に戻す
-        # （assignments に存在しない問題のみ）
+        # 問題マスタに登録された問題を"予習未定"として出題予定に戻す
+        # (assignments に存在しない問題のみ)
         c.execute("""
             INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
             SELECT ?, p.problem_id, ?, '復習'
@@ -938,7 +953,7 @@ def history_delete(history_id):
             )
         """, (student_id, start_date, student_id, student_id))
 
-    # Excelファイルを削除（ファイルのみ・DBレコードは残す）
+    # Excelファイルを削除(ファイルのみ/DBレコードは残す)
     if row:
         try:
             if os.path.exists(row["excel_path"]):
@@ -1239,14 +1254,14 @@ def problem_update_field():
             if not (1 <= value <= 9999):
                 raise ValueError
         elif field == "total_minutes":
-            # 空欄・null・「—」はNULLに
+            # 空欄/null/"—"はNULLに
             if value is None or value == "" or value == "—":
                 value = None
             else:
                 value = int(value)
                 if value < 5:
                     raise ValueError
-        # instruction・problem_numberはそのまま文字列
+        # instruction/problem_numberはそのまま文字列
     except (ValueError, TypeError):
         return jsonify({"ok": False, "message": "Invalid value"}), 400
 
@@ -1519,7 +1534,7 @@ def student_detail(student_id):
             schedule_map[r["subject"]] = {}
         schedule_map[r["subject"]][r["dow"]] = True
 
-    # 次回授業日（override）
+    # 次回授業日(override)
     next_class_map = {}
     c.execute("SELECT subject, next_class_date FROM class_schedule_override WHERE student_id=?",
               (student_id,))
@@ -1602,7 +1617,7 @@ def textbook_students_update(textbook_id):
 
 @app.route("/assignments/add", methods=["POST"])
 def assignment_add():
-    """出題予定を手動で追加する（複数生徒対応）"""
+    """出題予定を手動で追加する(複数生徒対応)"""
     problem_id     = request.form.get("problem_id")
     student_ids    = request.form.getlist("student_ids")
     scheduled_date = request.form.get("scheduled_date", "").strip()
@@ -1627,7 +1642,7 @@ def assignment_add():
 
 @app.route("/api/problems/search")
 def api_problems_search():
-    """問題番号・テキスト名で問題を検索するAPI"""
+    """問題番号/テキスト名で問題を検索するAPI"""
     q = request.args.get("q", "").strip()
     student_id = request.args.get("student_id", "")
     if not q:
@@ -1711,8 +1726,7 @@ def api_next_order():
     conn = get_connection()
     c = conn.cursor()
     c.execute("""
-        SELECT MAX(order_in_textbook,
-              total_minutes)) as max_order
+        SELECT MAX(order_in_textbook) as max_order
         FROM problems WHERE textbook_id=?
     """, (textbook_id,))
     row = c.fetchone()
@@ -1751,15 +1765,15 @@ def api_section_problems(section_id):
 
 @app.route("/api/sections_by_subject")
 def api_sections_by_subject():
-    """指定教科のセクション一覧を返す（Preview絞り込み用）
-    student_idが指定された場合はstudent_textbooksで紐づくテキストのセクションのみ返す。
+    """指定教科のセクション一覧を返す(Preview絞り込み用)
+    student_idが指定された場合はstudent_textbooksで紐づくテキストのセクションのみ返す.
     """
     subject    = request.args.get("subject", "")
     student_id = request.args.get("student_id", "")
     conn = get_connection()
     c = conn.cursor()
     if student_id and subject:
-        # 生徒に紐づくテキスト（student_textbooks）のセクションのみ
+        # 生徒に紐づくテキスト(student_textbooks)のセクションのみ
         c.execute("""
             SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
                    t.name as textbook_name
@@ -1770,7 +1784,7 @@ def api_sections_by_subject():
             ORDER BY t.name, ts.order_index
         """, (subject, student_id))
     elif student_id:
-        # 教科指定なし：生徒に紐づく全セクション
+        # 教科指定なし:生徒に紐づく全セクション
         c.execute("""
             SELECT DISTINCT ts.section_id, ts.name, ts.order_index,
                    t.name as textbook_name, t.subject
@@ -1813,7 +1827,7 @@ def history_update_score():
     score = int(score)
     if not (1 <= score <= 5):
         return jsonify({"ok": False, "message": "invalid score"}), 400
-    # scoreに応じてcorrectも更新（4〜5=正答、1〜3=誤答）
+    # scoreに応じてcorrectも更新(4〜5=正答, 1〜3=誤答)
     correct = 1 if score >= 4 else 0
     conn = get_connection()
     c = conn.cursor()
@@ -1824,6 +1838,202 @@ def history_update_score():
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/textbooks_by_student")
+def api_textbooks_by_student():
+    """生徒に紐づくテキスト一覧を返す"""
+    student_id = request.args.get("student_id", "")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT t.textbook_id, t.name, t.subject
+        FROM textbooks t
+        JOIN student_textbooks st ON st.textbook_id = t.textbook_id
+        WHERE st.student_id=?
+        ORDER BY t.subject, t.name
+    """, (student_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/sections_by_textbook")
+def api_sections_by_textbook():
+    """テキストのセクション一覧を返す"""
+    textbook_id = request.args.get("textbook_id", "")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT section_id, name, order_index
+        FROM textbook_sections
+        WHERE textbook_id=?
+        ORDER BY order_index
+    """, (textbook_id,))
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/problems_for_assignment")
+def api_problems_for_assignment():
+    """Assignment一括追加用の問題リストを返す(未アサインの問題のみ)"""
+    textbook_id = request.args.get("textbook_id", "")
+    section_id  = request.args.get("section_id", "")
+    student_id  = request.args.get("student_id", "")
+    conn = get_connection()
+    c = conn.cursor()
+    query = """
+        SELECT p.problem_id, p.problem_number, p.importance,
+               p.difficulty, p.review_value, p.estimated_minutes
+        FROM problems p
+        WHERE p.textbook_id=?
+    """
+    params = [textbook_id]
+    if section_id:
+        query += " AND p.section_id=?"
+        params.append(section_id)
+    if student_id:
+        # すでにアサイン済みの問題を除外
+        query += """
+          AND p.problem_id NOT IN (
+            SELECT problem_id FROM assignments WHERE student_id=?
+          )
+        """
+        params.append(student_id)
+    query += " ORDER BY p.order_in_textbook, p.problem_id"
+    c.execute(query, params)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/api/problems_for_record")
+def api_problems_for_record():
+    """Bulk Record用の問題リストを返す(その生徒にアサイン済みの問題)"""
+    textbook_id = request.args.get("textbook_id", "")
+    section_id  = request.args.get("section_id", "")
+    student_id  = request.args.get("student_id", "")
+    conn = get_connection()
+    c = conn.cursor()
+    query = """
+        SELECT DISTINCT p.problem_id, p.problem_number, p.importance,
+               p.difficulty, p.review_value, p.estimated_minutes
+        FROM problems p
+        JOIN assignments a ON a.problem_id = p.problem_id
+        WHERE p.textbook_id=? AND a.student_id=?
+    """
+    params = [textbook_id, student_id]
+    if section_id:
+        query += " AND p.section_id=?"
+        params.append(section_id)
+    query += " ORDER BY p.order_in_textbook, p.problem_id"
+    c.execute(query, params)
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route("/assignments/bulk_add", methods=["POST"])
+def assignments_bulk_add():
+    """出題予定を一括登録する"""
+    from database import get_auto_next_class_date
+    data        = request.get_json()
+    student_id  = data.get("student_id")
+    problem_ids = data.get("problem_ids", [])
+    category    = data.get("category", "New")
+    sched_date  = data.get("scheduled_date", "").strip()
+    if not student_id or not problem_ids:
+        return jsonify({"ok": False, "message": "missing params"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    added = 0
+    for pid in problem_ids:
+        # 重複チェック
+        c.execute("SELECT 1 FROM assignments WHERE student_id=? AND problem_id=?",
+                  (student_id, pid))
+        if c.fetchone():
+            continue
+        # 出題日の決定
+        if sched_date:
+            effective_date = sched_date
+        else:
+            c.execute("SELECT subject FROM problems WHERE problem_id=?", (pid,))
+            row = c.fetchone()
+            subj = row["subject"] if row else ""
+            auto = get_auto_next_class_date(student_id, subj)
+            effective_date = auto if auto else "2099-12-31"
+        c.execute("""
+            INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
+            VALUES (?, ?, ?, ?)
+        """, (student_id, pid, effective_date, category))
+        added += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "added": added})
+
+
+@app.route("/record/bulk", methods=["GET"])
+def record_bulk():
+    """Bulk Record ページ"""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT student_id, name FROM students ORDER BY student_id")
+    students = c.fetchall()
+    conn.close()
+    from datetime import date
+    return render_template("record_bulk.html",
+                           students=students,
+                           today=date.today().isoformat())
+
+
+@app.route("/record/bulk_add", methods=["POST"])
+def record_bulk_add():
+    """授業記録を一括登録する"""
+    from database import calc_new_mastery
+    data       = request.get_json()
+    student_id = data.get("student_id")
+    date_str   = data.get("date")
+    records    = data.get("records", [])
+    if not student_id or not date_str or not records:
+        return jsonify({"ok": False, "message": "missing params"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    added = 0
+    for rec in records:
+        pid   = rec.get("problem_id")
+        score = int(rec.get("score", 5))
+        if not pid:
+            continue
+        correct     = 1 if score >= 4 else 0
+        new_mastery = calc_new_mastery(student_id, pid, score, date_str)
+        c.execute("""
+            INSERT INTO history
+            (student_id, problem_id, date, correct, mastery, category, score)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (student_id, pid, date_str, correct, new_mastery, "Record", score))
+        added += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "added": added})
+
+
+@app.route("/sections/bulk_assign", methods=["POST"])
+def sections_bulk_assign():
+    """複数の問題を一括でSectionに割り当てる(section_id=nullで解除)"""
+    data        = request.get_json()
+    problem_ids = data.get("problem_ids", [])
+    section_id  = data.get("section_id")  # nullの場合は解除
+    if not problem_ids:
+        return jsonify({"ok": False, "message": "no problems"}), 400
+    conn = get_connection()
+    c = conn.cursor()
+    for pid in problem_ids:
+        c.execute("UPDATE problems SET section_id=? WHERE problem_id=?",
+                  (section_id, pid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "updated": len(problem_ids)})
 
 if __name__ == "__main__":
     init_db()
@@ -1837,7 +2047,7 @@ if __name__ == "__main__":
     today = _date.today().isoformat()
     if last_launch < today:
         # 前回起動日の翌日から昨日までを昇格対象とする
-        # （今日のは今日の授業が終わってから昇格すべきなので除く）
+        # (今日のは今日の授業が終わってから昇格すべきなので除く)
         from_date = (
             _date.fromisoformat(last_launch) + _timedelta(days=1)
         ).isoformat()
@@ -1846,8 +2056,8 @@ if __name__ == "__main__":
         ).isoformat()
         if from_date <= to_date:
             promoted = auto_promote_on_launch(from_date, to_date)
-            print(f"自動昇格：{promoted}問を処理しました"
-                  f"（{from_date}〜{to_date}）")
+            print(f"自動昇格:{promoted}問を処理しました"
+                  f"({from_date}〜{to_date})")
     update_last_launch_date()
 
     app.run(debug=True)
