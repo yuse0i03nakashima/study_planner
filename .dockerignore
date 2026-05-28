@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.git/
+study_planner.db
+plan_archives/
+*.xlsx
+*.pdf
+mcp_server.py
+.env
