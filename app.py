@@ -60,6 +60,31 @@ def logout():
     return redirect('/login')
 
 
+@app.route('/admin/db-restore', methods=['GET', 'POST'])
+def db_restore():
+    token = os.environ.get('DB_RESTORE_TOKEN', '')
+    if not token or request.args.get('token') != token:
+        return 'Not found', 404
+    if request.method == 'POST':
+        f = request.files.get('db')
+        if not f or not f.filename.endswith('.db'):
+            return 'SQLite .db ファイルを選択してください', 400
+        import shutil
+        from database import DB_PATH
+        tmp = DB_PATH + '.tmp'
+        f.save(tmp)
+        shutil.move(tmp, DB_PATH)
+        return '<p>アップロード完了。<a href="/">TOPへ</a></p>'
+    from database import DB_PATH
+    return f'''<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px">
+<h2>DB Restore</h2>
+<p>現在のDBパス: <code>{DB_PATH}</code></p>
+<form method="POST" enctype="multipart/form-data">
+  <input type="file" name="db" accept=".db" required>
+  <button type="submit">アップロード</button>
+</form></body></html>'''
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
