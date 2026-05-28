@@ -567,8 +567,7 @@ def preview():
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path=path, pdf_path="",
                                   subject=subject_filter)
-                import subprocess
-                subprocess.Popen(["start", "", path], shell=True)
+                return send_file(path, as_attachment=True)
             return redirect("/preview")
 
         if action == "pdf":
@@ -580,8 +579,7 @@ def preview():
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path="", pdf_path=path,
                                   subject=subject_filter)
-                import subprocess
-                subprocess.Popen(["start", "", path], shell=True)
+                return send_file(path, as_attachment=True)
             return redirect("/preview")
 
         section_filters = request.form.getlist("section_filter")
