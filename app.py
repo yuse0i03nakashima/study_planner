@@ -37,7 +37,7 @@ def require_login():
     password = os.environ.get('APP_PASSWORD', '')
     if not password:
         return
-    if request.endpoint in ('login', 'logout', 'static'):
+    if request.endpoint in ('login', 'logout', 'static', 'api_tool'):
         return
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -2134,3 +2134,19 @@ if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(host='0.0.0.0', port=port, debug=debug)
+
+
+@app.route('/api/tool', methods=['POST'])
+def api_tool():
+    api_key = os.environ.get('RAILWAY_API_KEY', '')
+    if not api_key or request.headers.get('X-API-Key') != api_key:
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(force=True)
+    name = data.get('name', '')
+    arguments = data.get('arguments', {})
+    from tool_handlers import handle_tool
+    try:
+        result = handle_tool(name, arguments)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return jsonify(result)
