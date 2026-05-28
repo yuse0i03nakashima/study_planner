@@ -8,6 +8,8 @@ DOW_JA = ["月", "火", "水", "木", "金", "土", "日"]
 MASTERY_MULTIPLIER = {1: 1.3, 2: 1.0, 3: 0.5}
 CATEGORY_GROUP  = {"Recall": 0, "Drill": 0, "Reinforce": 0, "New": 1}
 DISPLAY_ORDER   = {"Recall": 0, "Drill": 1, "Reinforce": 2, "New": 3}
+# 1日の割当時間を最大この割合まで超過して問題を割り当てる（0.10 = 10%）
+OVERFLOW_FACTOR = 0.10
 
 
 def get_adjusted_minutes(item):
@@ -37,7 +39,13 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     import math as _math
 
     remaining = {d: m for d, m in schedule.items() if m > 0}
+    original_time = dict(remaining)  # 超過判定用：割り当て前の初期値を保持
     dates_sorted = sorted(remaining.keys())
+
+    def can_fit(d, minutes):
+        """残り時間 + OVERFLOW_FACTOR分の超過余裕で問題が収まるか判定"""
+        r = remaining.get(d, 0)
+        return r >= 0 and r + original_time.get(d, 0) * OVERFLOW_FACTOR >= minutes
 
     if not dates_sorted:
         for item in plan:
@@ -65,7 +73,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
     def try_assign_balanced(item, search_dates, date_counts):
         minutes = get_adjusted_minutes(item)
-        valid = [d for d in search_dates if remaining.get(d, 0) >= minutes]
+        valid = [d for d in search_dates if can_fit(d, minutes)]
         if not valid:
             return False
         d = min(valid, key=lambda x: (date_counts[x], -remaining[x]))
@@ -145,8 +153,8 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         ratio = 0.40 + (yi / (n_yosyu - 1)) * 0.55 if n_yosyu > 1 else 0.70
         target_idx = max(0, min(int(n_search * ratio), n_search - 1))
 
-        valid_after  = [d for d in search[target_idx:] if remaining.get(d, 0) >= minutes]
-        valid_before = [d for d in search[:target_idx]  if remaining.get(d, 0) >= minutes]
+        valid_after  = [d for d in search[target_idx:] if can_fit(d, minutes)]
+        valid_before = [d for d in search[:target_idx]  if can_fit(d, minutes)]
 
         if valid_after:
             d = min(valid_after,  key=lambda x: (yosyu_date_counts.get(x, 0), x))
@@ -171,8 +179,8 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
 
     for item in fukusyu_items:
         minutes = item.get("estimated_minutes", 15)
-        first_valid  = [d for d in fuku_first_half  if remaining.get(d, 0) >= minutes]
-        second_valid = [d for d in fuku_second_half if remaining.get(d, 0) >= minutes]
+        first_valid  = [d for d in fuku_first_half  if can_fit(d, minutes)]
+        second_valid = [d for d in fuku_second_half if can_fit(d, minutes)]
 
         if first_valid:
             d = min(first_valid,  key=lambda x: (fuku_date_counts.get(x, 0), x))

@@ -162,7 +162,19 @@
         </select>
       </div>
     </form>
-    <span class="meta-text" style="margin-left:auto;">{{ assignments|length }} items</span>
+    <div>
+      <label>Subject</label>
+      <select id="filter-subject">
+        <option value="">— All —</option>
+      </select>
+    </div>
+    <div>
+      <label>Textbook</label>
+      <select id="filter-textbook" style="min-width:200px;">
+        <option value="">— All —</option>
+      </select>
+    </div>
+    <span class="meta-text" style="margin-left:auto;" id="filter-count">{{ assignments|length }} items</span>
   </div>
 
   <!-- 出題予定追加（一括） -->
@@ -289,7 +301,8 @@
     </thead>
     <tbody>
     {%- for a in assignments %}
-    <tr id="row-{{ a.assignment_id }}" class="row-{{ a.category }}">
+    <tr id="row-{{ a.assignment_id }}" class="row-{{ a.category }}"
+        data-subject="{{ a.subject }}" data-textbook="{{ a.textbook }}">
       <td><input type="checkbox" class="row-check" value="{{ a.assignment_id }}"></td>
       <td class="meta-text">{{ a.subject }}</td>
       <td class="left" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
@@ -740,6 +753,71 @@ function toggleAll(cb) {
   updateSelectedCount();
 }
 
+// ── フィルター（教科・テキスト） ──
+var _pastHidden = true;
+
+function initSubjectFilter() {
+  var subjectSet = new Set();
+  var textbookMap = new Map();
+  document.querySelectorAll('#assignments-table tbody tr[data-subject]').forEach(function(row) {
+    var s = row.dataset.subject;
+    var t = row.dataset.textbook;
+    if (s) {
+      subjectSet.add(s);
+      if (!textbookMap.has(s)) textbookMap.set(s, new Set());
+      if (t) textbookMap.get(s).add(t);
+    }
+  });
+  window._textbookMap = textbookMap;
+
+  var subSel = document.getElementById('filter-subject');
+  Array.from(subjectSet).sort().forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    subSel.appendChild(opt);
+  });
+
+  subSel.addEventListener('change', function() {
+    updateTextbookFilter(this.value);
+    applyRowVisibility();
+  });
+  document.getElementById('filter-textbook').addEventListener('change', applyRowVisibility);
+}
+
+function updateTextbookFilter(subject) {
+  var sel = document.getElementById('filter-textbook');
+  sel.innerHTML = '<option value="">— All —</option>';
+  var textbookMap = window._textbookMap || new Map();
+  var books;
+  if (subject) {
+    books = textbookMap.get(subject) || new Set();
+  } else {
+    books = new Set();
+    textbookMap.forEach(function(set) { set.forEach(function(t) { books.add(t); }); });
+  }
+  Array.from(books).sort().forEach(function(t) {
+    var opt = document.createElement('option');
+    opt.value = t; opt.textContent = t;
+    sel.appendChild(opt);
+  });
+}
+
+function applyRowVisibility() {
+  var subject  = (document.getElementById('filter-subject')  || {}).value || '';
+  var textbook = (document.getElementById('filter-textbook') || {}).value || '';
+  var count = 0;
+  document.querySelectorAll('#assignments-table tbody tr[data-subject]').forEach(function(row) {
+    var matchS = !subject  || row.dataset.subject  === subject;
+    var matchT = !textbook || row.dataset.textbook === textbook;
+    var isPast = row.classList.contains('past-row');
+    var show = matchS && matchT && !(isPast && _pastHidden);
+    row.style.display = show ? '' : 'none';
+    if (show) count++;
+  });
+  var countEl = document.getElementById('filter-count');
+  if (countEl) countEl.textContent = count + ' items';
+}
+
 // ── 過去の出題予定を折りたたむ ──
 function initPastRows() {
   var today = new Date().toISOString().slice(0, 10);
@@ -748,56 +826,43 @@ function initPastRows() {
 
   var rows = Array.from(tbody.querySelectorAll('tr[id^="row-"]'));
   var pastRows = [];
-  var futureRows = [];
+  var firstFutureRow = null;
 
   rows.forEach(function(row) {
-    // data-dateを参照（後で設定）
     var dateEl = row.querySelector('input.edit-field[data-field="scheduled_date"]');
     var dateVal = dateEl ? dateEl.value : '9999-12-31';
     if (dateVal && dateVal < today && dateVal !== '2099-12-31') {
       pastRows.push(row);
-    } else {
-      futureRows.push(row);
+      row.classList.add('past-row');
+    } else if (!firstFutureRow) {
+      firstFutureRow = row;
     }
   });
 
-  if (pastRows.length === 0) return;
+  if (pastRows.length === 0) { _pastHidden = false; return; }
 
-  // 折りたたみバーを挿入
   var toggleBar = document.createElement('tr');
-  toggleBar.innerHTML = '<td colspan="13"><div class="past-toggle-bar" onclick="togglePastRows(this)">'
+  toggleBar.id = 'past-toggle-row';
+  toggleBar.innerHTML = '<td colspan="13"><div class="past-toggle-bar" onclick="togglePastRows()">'
     + '<span id="past-arrow">▶</span>'
     + '<span>' + pastRows.length + ' past assignment' + (pastRows.length > 1 ? 's' : '') + '</span>'
     + '</div></td>';
 
-  // past rowsを非表示にしてバーの後に移動
-  pastRows.forEach(function(row) {
-    row.classList.add('past-row');
-    row.style.display = 'none';
-  });
-
-  // バーをfuture rowsの前に挿入
-  if (futureRows.length > 0) {
-    tbody.insertBefore(toggleBar, futureRows[0]);
+  if (firstFutureRow) {
+    tbody.insertBefore(toggleBar, firstFutureRow);
   } else {
-    tbody.insertBefore(toggleBar, tbody.firstChild);
+    tbody.appendChild(toggleBar);
   }
+  pastRows.forEach(function(row) { tbody.appendChild(row); });
 
-  // past rowsをバーの後に移動
-  pastRows.forEach(function(row) {
-    toggleBar.after(row);
-    toggleBar.parentNode.insertBefore(row, toggleBar.nextSibling);
-  });
+  applyRowVisibility();
 }
 
-function togglePastRows(bar) {
+function togglePastRows() {
+  _pastHidden = !_pastHidden;
   var arrow = document.getElementById('past-arrow');
-  var pastRows = document.querySelectorAll('.past-row');
-  var isHidden = pastRows.length > 0 && pastRows[0].style.display === 'none';
-  pastRows.forEach(function(row) {
-    row.style.display = isHidden ? '' : 'none';
-  });
-  arrow.textContent = isHidden ? '▼' : '▶';
+  if (arrow) arrow.textContent = _pastHidden ? '▶' : '▼';
+  applyRowVisibility();
 }
 
 function deleteAssignment(id) {
@@ -829,6 +894,7 @@ function closeConfirm() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  initSubjectFilter();
   initPastRows();
   const modal = document.getElementById('confirm-modal');
   if (modal) {
