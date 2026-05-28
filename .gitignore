@@ -14,6 +14,8 @@ plan_archives/
 
 # 環境変数・秘密情報
 .env
+*API key*.txt
+*api_key*.txt
 
 # DB（本番はRailwayボリュームで管理）
 study_planner.db
