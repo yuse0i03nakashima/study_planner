@@ -1,7 +1,11 @@
 import sqlite3
+import os
 from datetime import date, timedelta
 
-DB_PATH = "C:/Users/ynaka/study_planner/study_planner.db"
+DB_PATH = os.environ.get(
+    'DB_PATH',
+    os.path.join(os.path.dirname(__file__), 'study_planner.db')
+)
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)

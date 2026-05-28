@@ -12,5 +12,11 @@ plan_archives/
 *.xlsx
 *.pdf
 
+# 環境変数・秘密情報
+.env
+
+# DB（本番はRailwayボリュームで管理）
+study_planner.db
+
 # その他
 tree

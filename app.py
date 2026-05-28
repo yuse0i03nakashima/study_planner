@@ -29,7 +29,35 @@ def score_en_filter(v):
     except Exception:
         return str(v) if v else "—"
 
-app.secret_key = "study-planner-secret-2024"
+app.secret_key = os.environ.get('SECRET_KEY', 'study-planner-secret-dev')
+
+
+@app.before_request
+def require_login():
+    password = os.environ.get('APP_PASSWORD', '')
+    if not password:
+        return
+    if request.endpoint in ('login', 'logout', 'static'):
+        return
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if request.form.get('password') == os.environ.get('APP_PASSWORD', ''):
+            session['logged_in'] = True
+            return redirect(request.args.get('next') or '/')
+        error = 'パスワードが違います'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/login')
 
 
 @app.route("/")
@@ -2080,4 +2108,6 @@ if __name__ == "__main__":
                   f"({from_date}〜{to_date})")
     update_last_launch_date()
 
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(host='0.0.0.0', port=port, debug=debug)
