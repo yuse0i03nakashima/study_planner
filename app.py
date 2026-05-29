@@ -447,6 +447,26 @@ def record_delete(history_id):
     return redirect(request.referrer or "/record/list")
 
 
+@app.route("/record/reset_problem", methods=["POST"])
+def record_reset_problem():
+    student_id = request.form["student_id"]
+    problem_id = int(request.form["problem_id"])
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM history WHERE student_id=? AND problem_id=?",
+              (student_id, problem_id))
+    c.execute("DELETE FROM assignments WHERE student_id=? AND problem_id=?",
+              (student_id, problem_id))
+    c.execute("""
+        INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
+        VALUES (?, ?, '2099-12-31', 'New')
+    """, (student_id, problem_id))
+    conn.commit()
+    conn.close()
+    flash("問題の記録をリセットしました。出題予定は New（未定）に戻りました。", "success")
+    return redirect("/record/list")
+
+
 # ─── 生徒管理 ──────────────────────────────────────────
 
 @app.route("/students", methods=["GET", "POST"])

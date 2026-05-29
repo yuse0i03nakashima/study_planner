@@ -15,6 +15,19 @@
     button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
     button:hover { background: #2c5fa8; }
     a { color: #4472C4; }
+    .danger-zone { margin-top: 28px; padding: 16px; border: 1px solid #f5c6cb; background: #fff8f8; border-radius: 6px; }
+    .danger-zone h3 { color: #c0392b; font-size: 13px; margin: 0 0 8px 0; }
+    .danger-zone p { font-size: 13px; color: #666; margin: 0 0 12px 0; }
+    .btn-danger { background: #e74c3c; padding: 8px 20px; font-size: 14px; }
+    .btn-danger:hover { background: #c0392b; }
+    /* モーダル */
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+    .modal-overlay.show { display:flex; }
+    .modal-box { background:white; padding:28px; border-radius:8px; max-width:400px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,0.2); }
+    .modal-box h3 { color:#c0392b; margin:0 0 12px 0; }
+    .modal-box p { color:#555; font-size:14px; line-height:1.6; margin:0 0 20px 0; }
+    .modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+    .btn-cancel { background:#ccc; }
   </style>
 </head>
 <body>
@@ -34,6 +47,49 @@
       <button type="submit">更新する</button>
     </form>
   </div>
-  <p><a href="/record/list">← 授業記録一覧に戻る</a></p>
+  <!-- リセットゾーン -->
+  <div class="danger-zone">
+    <h3>⚠ この問題の記録をすべてリセット</h3>
+    <p>
+      この生徒の「{{ record.textbook }} {{ record.problem_number }}」に関する<br>
+      授業記録をすべて削除し、出題予定を <strong>New（未定）</strong> に戻します。<br>
+      誤って記録を入力した場合にご使用ください。
+    </p>
+    <button type="button" class="btn-danger" onclick="openResetModal()">記録を全削除してリセット</button>
+  </div>
+
+  <p style="margin-top:20px;"><a href="/record/list">← 授業記録一覧に戻る</a></p>
+</div>
+
+<!-- 確認モーダル -->
+<div class="modal-overlay" id="reset-modal">
+  <div class="modal-box">
+    <h3>本当にリセットしますか？</h3>
+    <p>
+      「{{ record.textbook }} {{ record.problem_number }}」の授業記録が<strong>すべて削除</strong>され、
+      習熟度・カテゴリもリセットされます。<br>この操作は元に戻せません。
+    </p>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeResetModal()">キャンセル</button>
+      <form method="POST" action="/record/reset_problem" style="margin:0;">
+        <input type="hidden" name="student_id" value="{{ record.student_id }}">
+        <input type="hidden" name="problem_id" value="{{ record.problem_id }}">
+        <button type="submit" class="btn-danger">リセットする</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openResetModal() {
+  document.getElementById('reset-modal').classList.add('show');
+}
+function closeResetModal() {
+  document.getElementById('reset-modal').classList.remove('show');
+}
+document.getElementById('reset-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeResetModal();
+});
+</script>
 </body>
 </html>
