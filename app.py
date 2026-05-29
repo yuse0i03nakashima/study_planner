@@ -397,8 +397,8 @@ def record_list():
     records = []
     if student_id:
         c.execute("""
-            SELECT h.history_id, h.date, h.correct, h.mastery, h.category,
-               h.score,
+            SELECT h.history_id, h.student_id, h.problem_id,
+                   h.date, h.correct, h.mastery, h.category, h.score,
                    p.subject, p.textbook, p.problem_number
             FROM history h
             JOIN problems p ON h.problem_id = p.problem_id

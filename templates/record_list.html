@@ -186,7 +186,7 @@
     <thead>
       <tr>
         <th>Date</th><th>Subject</th><th>Textbook</th><th>Problem</th>
-        <th>Score</th><th>Mastery</th><th>Source</th>
+        <th>Score</th><th>Mastery</th><th>Source</th><th></th>
       </tr>
     </thead>
     <tbody>
@@ -220,17 +220,74 @@
           {{ '★' * m }}
         </span>
       </td>
-      <td>
-        {{ r.category | cat_en }}
+      <td>{{ r.category | cat_en }}</td>
+      <td style="white-space:nowrap;">
+        <!-- この1件を削除 -->
+        <button class="btn btn-sm" onclick="deleteRecord({{ r.history_id }})"
+          style="background:transparent;border:1px solid var(--border-light);
+            color:var(--text-dim);padding:3px 8px;font-size:10px;margin-right:4px;"
+          title="この記録を1件削除">×</button>
+        <!-- この問題の記録を全リセット -->
+        <button class="btn btn-sm" onclick="openResetModal({{ r.problem_id }},'{{ r.textbook | replace("'","\\'")|replace('"','\\"') }} {{ r.problem_number | replace("'","\\'")|replace('"','\\"') }}')"
+          style="background:transparent;border:1px solid rgba(239,68,68,0.4);
+            color:var(--red);padding:3px 8px;font-size:10px;"
+          title="この問題の記録をすべてリセット">Reset</button>
       </td>
     </tr>
     {%- endfor %}
     </tbody>
   </table>
+
+  <!-- 確認モーダル -->
+  <div id="reset-modal" style="display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border-light);
+      border-left:3px solid var(--red);padding:28px 32px;max-width:420px;width:90%;">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
+        text-transform:uppercase;color:var(--red);margin-bottom:12px;">Confirm Reset</div>
+      <div id="reset-msg" style="font-family:'Noto Serif JP',serif;font-size:13px;
+        color:var(--text-muted);margin-bottom:20px;line-height:1.7;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeResetModal()" class="btn btn-ghost btn-sm">Cancel</button>
+        <form id="reset-form" method="POST" action="/record/reset_problem" style="margin:0;">
+          <input type="hidden" name="student_id" value="{{ selected_student }}">
+          <input type="hidden" id="reset-problem-id" name="problem_id" value="">
+          <button type="submit" class="btn btn-danger btn-sm">Reset</button>
+        </form>
+      </div>
+    </div>
+  </div>
   </div>
 <div id="toast"></div>
 
 <script>
+// ── 1件削除 ──
+async function deleteRecord(historyId) {
+  const res = await fetch('/record/delete/' + historyId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+  if (res.ok || res.redirected) {
+    document.getElementById('hrow-' + historyId)?.remove();
+    showToast('削除しました', 'success');
+  } else {
+    showToast('削除失敗', 'warn');
+  }
+}
+
+// ── 問題リセットモーダル ──
+function openResetModal(problemId, label) {
+  document.getElementById('reset-problem-id').value = problemId;
+  document.getElementById('reset-msg').textContent =
+    '「' + label + '」のすべての授業記録を削除し、出題予定を New（未定）に戻します。この操作は元に戻せません。';
+  const modal = document.getElementById('reset-modal');
+  modal.style.display = 'flex';
+  modal.addEventListener('click', function(e){ if(e.target===modal) closeResetModal(); }, { once: true });
+}
+function closeResetModal() {
+  document.getElementById('reset-modal').style.display = 'none';
+}
+
 function showToast(msg, type='success') {
   var t = document.getElementById('toast');
   if (!t) return;
