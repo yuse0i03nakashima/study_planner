@@ -8,6 +8,9 @@ import os
 
 app = Flask(__name__)
 
+# gunicornでは __main__ が実行されないため、モジュールロード時に init_db を呼ぶ
+init_db()
+
 # カテゴリ/記録種別の英語化フィルター
 CAT_EN = {
     "予習": "New", "復習": "Recall", "定着": "Drill",
