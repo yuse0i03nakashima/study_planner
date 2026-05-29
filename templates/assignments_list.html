@@ -850,10 +850,12 @@ function initPastRows() {
 
   if (firstFutureRow) {
     tbody.insertBefore(toggleBar, firstFutureRow);
+    // トグルバーの直後（未来行の前）に並べる
+    pastRows.forEach(function(row) { tbody.insertBefore(row, firstFutureRow); });
   } else {
     tbody.appendChild(toggleBar);
+    pastRows.forEach(function(row) { tbody.appendChild(row); });
   }
-  pastRows.forEach(function(row) { tbody.appendChild(row); });
 
   applyRowVisibility();
 }

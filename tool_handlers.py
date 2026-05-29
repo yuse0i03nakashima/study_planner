@@ -292,6 +292,14 @@ def handle_tool(name: str, arguments: dict):
         c.execute("SELECT name FROM textbooks WHERE textbook_id=?", (textbook_id,))
         tb_row = c.fetchone()
         textbook = tb_row["name"] if tb_row else ""
+        # 重複チェック：同テキスト内に同じ問題番号が既にあれば登録しない
+        c.execute("SELECT problem_id FROM problems WHERE textbook_id=? AND problem_number=?",
+                  (textbook_id, problem_number))
+        existing = c.fetchone()
+        if existing:
+            conn.close()
+            return {"error": f"既に登録済みです: problem_id={existing['problem_id']}, problem_number={problem_number}",
+                    "existing_problem_id": existing["problem_id"]}
         if order_in_textbook is None:
             c.execute("SELECT MAX(order_in_textbook) as m FROM problems WHERE textbook_id=?", (textbook_id,))
             r = c.fetchone()
