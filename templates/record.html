@@ -118,7 +118,7 @@
       <div class="grid-2">
         <div>
           <label>Student</label>
-          <select name="student_id" id="student-select" onchange="filterProblems()">
+          <select name="student_id" id="student-select" onchange="onStudentChange()">
             {%- for s in students %}
             <option value="{{ s.student_id }}">{{ s.name }}</option>
             {%- endfor %}
@@ -126,14 +126,34 @@
         </div>
         <div>
           <label>Date</label>
-          <input type="date" name="record_date" value="{{ today }}">
+          <input type="date" name="record_date" id="record-date" value="{{ today }}"
+                 onchange="filterProblems()">
         </div>
       </div>
 
+      <label>Textbook</label>
+      <select id="textbook-select" onchange="filterProblems()">
+        <option value="">— All Textbooks —</option>
+      </select>
+
       <label>Problem</label>
       <select name="problem_id" id="problem-select" size="1">
-        <!-- JSで動的生成 -->
       </select>
+
+      <!-- 未定問題トグル -->
+      <div id="undecided-toggle" style="display:none;margin-top:6px;">
+        <button type="button" onclick="toggleUndecided()" id="undecided-btn"
+          style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;
+            text-transform:uppercase;color:var(--text-dim);background:none;border:none;
+            cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;">
+          <span id="undecided-arrow">▶</span>
+          <span id="undecided-label"></span>
+        </button>
+      </div>
+      <div id="undecided-info" style="display:none;font-family:'DM Mono',monospace;
+        font-size:9px;color:var(--text-dim);margin-top:3px;letter-spacing:0.5px;">
+        出題日未定の問題です。記録する場合は選択してください。
+      </div>
 
       <label style="margin-top:24px;">Score</label>
       <div class="score-grid">
@@ -170,53 +190,104 @@
 </div>
 
 <script>
-// 問題データ（今期の問題と全問題に分けて管理）
-const problemData = [
-  {%- for p in problems %}
-  {
-    id: {{ p.problem_id }},
-    subject: "{{ p.subject }}",
-    textbook: "{{ p.textbook | replace('"', '\"') }}",
-    number: "{{ p.problem_number | replace('"', '\"') }}",
-    student: "{{ p.assigned_student or '' }}",
-    scheduled: "{{ p.scheduled_date or '' }}"
-  },
-  {%- endfor %}
-];
+let _allAssignments = [];
+let _showUndecided = false;
+
+async function onStudentChange() {
+  const sid = document.getElementById('student-select').value;
+  const res = await fetch('/get_assignments?student_id=' + sid);
+  _allAssignments = await res.json();
+  populateTextbooks();
+  filterProblems();
+}
+
+function populateTextbooks() {
+  const seen = new Map(); // textbook -> subject
+  _allAssignments.forEach(a => {
+    if (!seen.has(a.textbook)) seen.set(a.textbook, a.subject);
+  });
+  const sel = document.getElementById('textbook-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— All Textbooks —</option>';
+  seen.forEach((subject, textbook) => {
+    const opt = document.createElement('option');
+    opt.value = textbook;
+    opt.textContent = '[' + subject + '] ' + textbook;
+    sel.appendChild(opt);
+  });
+  // 前回選択を保持（テキストがまだあれば）
+  if (prev && [...seen.keys()].includes(prev)) sel.value = prev;
+}
 
 function filterProblems() {
-  const sid = document.getElementById('student-select').value;
-  const sel = document.getElementById('problem-select');
+  const textbook   = document.getElementById('textbook-select').value;
+  const recordDate = document.getElementById('record-date').value;
+  const sel        = document.getElementById('problem-select');
+
+  let items = _allAssignments;
+  if (textbook) items = items.filter(a => a.textbook === textbook);
+
+  // 今日以前（due）: scheduled_date <= record_date かつ '2099-12-31' でない
+  const due = items.filter(a =>
+    a.scheduled_date !== '2099-12-31' && a.scheduled_date <= recordDate
+  );
+  // 未定: scheduled_date == '2099-12-31'
+  const undecided = items.filter(a => a.scheduled_date === '2099-12-31');
+
+  // ── メインリスト（due問題）を描画 ──
   sel.innerHTML = '';
 
-  // 今期の問題（このstudentに割り当てられているもの）
-  const assigned = problemData.filter(p => p.student === sid && p.scheduled);
-  // その他の全問題
-  const others = problemData.filter(p => !assigned.find(a => a.id === p.id));
-
-  if (assigned.length > 0) {
-    const grp1 = document.createElement('optgroup');
-    grp1.label = '── This term ──';
-    assigned.forEach(p => {
+  if (due.length === 0) {
+    const ph = document.createElement('option');
+    ph.value = ''; ph.disabled = true;
+    ph.textContent = '— No due problems for this date —';
+    sel.appendChild(ph);
+  } else {
+    due.forEach(a => {
       const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = `[${p.subject}] ${p.textbook} ${p.number}`;
-      grp1.appendChild(opt);
+      opt.value = a.problem_id;
+      const label = textbook
+        ? a.problem_number                                         // テキスト選択済みなら問題番号のみ
+        : '[' + a.subject + '] ' + a.textbook + ' ' + a.problem_number;
+      opt.textContent = label + '  (' + a.scheduled_date + ')';
+      sel.appendChild(opt);
     });
-    sel.appendChild(grp1);
   }
 
-  if (others.length > 0) {
-    const grp2 = document.createElement('optgroup');
-    grp2.label = '── All problems ──';
-    others.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = `[${p.subject}] ${p.textbook} ${p.number}`;
-      grp2.appendChild(opt);
-    });
-    sel.appendChild(grp2);
+  // ── 未定トグル ──
+  const toggleDiv = document.getElementById('undecided-toggle');
+  const infoDiv   = document.getElementById('undecided-info');
+  if (undecided.length > 0) {
+    toggleDiv.style.display = 'block';
+    document.getElementById('undecided-label').textContent =
+      undecided.length + ' undecided problem' + (undecided.length > 1 ? 's' : '');
+    document.getElementById('undecided-arrow').textContent = _showUndecided ? '▼' : '▶';
+    infoDiv.style.display = _showUndecided ? 'block' : 'none';
+
+    if (_showUndecided) {
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '── Undecided ──────────────────';
+      sel.appendChild(sep);
+      undecided.forEach(a => {
+        const opt = document.createElement('option');
+        opt.value = a.problem_id;
+        const label = textbook
+          ? a.problem_number
+          : '[' + a.subject + '] ' + a.textbook + ' ' + a.problem_number;
+        opt.textContent = label + '  (未定)';
+        sel.appendChild(opt);
+      });
+    }
+  } else {
+    toggleDiv.style.display = 'none';
+    infoDiv.style.display   = 'none';
   }
+}
+
+function toggleUndecided() {
+  _showUndecided = !_showUndecided;
+  filterProblems();
 }
 
 function selectScore(score) {
@@ -227,7 +298,7 @@ function selectScore(score) {
 }
 
 // 初期化
-filterProblems();
+document.addEventListener('DOMContentLoaded', onStudentChange);
 </script>
 </body>
 </html>
