@@ -31,6 +31,32 @@ def score_en_filter(v):
 
 app.secret_key = os.environ.get('SECRET_KEY', 'study-planner-secret-dev')
 
+# gunicorn(Railway)では __main__ が実行されないため before_request で代替
+_auto_promote_done_date = None
+
+@app.before_request
+def run_auto_promote_once_per_day():
+    global _auto_promote_done_date
+    from datetime import date as _d, timedelta as _td
+    today = _d.today().isoformat()
+    if _auto_promote_done_date == today:
+        return
+    _auto_promote_done_date = today
+    try:
+        from database import (auto_promote_on_launch,
+                              get_last_launch_date, update_last_launch_date)
+        last_launch = get_last_launch_date()
+        if last_launch < today:
+            from_date = (_d.fromisoformat(last_launch) + _td(days=1)).isoformat()
+            to_date   = (_d.today() - _td(days=1)).isoformat()
+            if from_date <= to_date:
+                promoted = auto_promote_on_launch(from_date, to_date)
+                if promoted:
+                    print(f"自動昇格: {promoted}問 ({from_date}〜{to_date})")
+        update_last_launch_date()
+    except Exception as e:
+        print(f"auto_promote error: {e}")
+
 
 @app.before_request
 def require_login():

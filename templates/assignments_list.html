@@ -101,13 +101,14 @@
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
     .past-toggle-bar {
       font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
-      text-transform:uppercase; color:var(--text-dim);
-      background:var(--surface); border:1px solid var(--border);
+      text-transform:uppercase; color:var(--amber);
+      background:var(--surface); border:1px solid var(--amber-bg);
+      border-left:2px solid var(--amber);
       padding:8px 16px; margin:8px 0; cursor:pointer;
       display:flex; align-items:center; gap:8px;
       user-select:none;
     }
-    .past-toggle-bar:hover { color:var(--text-muted); border-color:var(--border-light); }
+    .past-toggle-bar:hover { color:var(--text); border-color:var(--amber); }
     .past-row { opacity:0.45; }
     .past-row:hover { opacity:0.75; }
     /* トースト通知 */
@@ -399,44 +400,62 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── 選択行に一括適用 ──
+// ── 選択行に一括適用（全フィールド更新後に1回のAPIで保存） ──
 function applyToSelected() {
   const checked = document.querySelectorAll('.row-check:checked');
-  if (checked.length === 0) {
-    showToast('Select rows first', 'warn');
-    return;
-  }
+  if (checked.length === 0) { showToast('Select rows first', 'warn'); return; }
   const cat  = document.getElementById('bulk-category').value;
   const date = document.getElementById('bulk-date').value;
-  if (!cat && !date) {
-    showToast('Set a category or date first', 'warn');
-    return;
-  }
+  if (!cat && !date) { showToast('Set a category or date first', 'warn'); return; }
+
+  const updates = [];
+  const rowIds  = [];
   checked.forEach(cb => {
     const id  = parseInt(cb.value);
     const row = document.getElementById('row-' + id);
     if (!row) return;
+    // 全フィールドを先に更新してからまとめて送信（race condition 防止）
     if (cat) {
       const sel = row.querySelector('select.edit-field[data-field="category"]');
-      if (sel) { sel.value = cat; markChanged(sel, id); }
+      if (sel) sel.value = cat;
     }
     if (date) {
       const inp = row.querySelector('input.edit-field[data-field="scheduled_date"]');
-      if (inp) { inp.value = date; markChanged(inp, id); }
+      if (inp) inp.value = date;
     }
-  });
-  checked.forEach(cb => {
-    const id  = parseInt(cb.value);
-    const row = document.getElementById('row-' + id);
-    if (row) {
-      row.classList.remove('changed-row');
-      row.classList.add('flash-row');
-      setTimeout(() => row.classList.remove('flash-row'), 700);
-    }
+    const rowData = { assignment_id: id };
+    row.querySelectorAll('.edit-field').forEach(f => { rowData[f.dataset.field] = f.value; });
+    updates.push(rowData);
+    rowIds.push(id);
     cb.checked = false;
   });
-  updateSelectedCount();
-  showToast(checked.length + ' rows updated — click Apply Changes to save', 'success');
+
+  fetch('/assignments/bulk_update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: '{{ selected_student }}', updates })
+  }).then(res => {
+    if (res.ok) {
+      rowIds.forEach(id => {
+        const row = document.getElementById('row-' + id);
+        if (!row) return;
+        if (cat) updateRowCategoryClass(row, cat);
+        row.classList.add('flash-row');
+        setTimeout(() => row.classList.remove('flash-row'), 700);
+      });
+      updateSelectedCount();
+      showToast(rowIds.length + ' rows saved', 'success');
+    } else {
+      showToast('Save failed', 'warn');
+    }
+  });
+}
+
+// row-XXX クラスだけ差し替え（past-row など他のクラスを保持）
+function updateRowCategoryClass(row, cat) {
+  const old = [...row.classList].find(c => /^row-[A-Z]/.test(c));
+  if (old) row.classList.remove(old);
+  if (cat) row.classList.add('row-' + cat);
 }
 
 // ── 生徒固有：カテゴリ・出題日を変更した瞬間に自動保存 ──
@@ -453,9 +472,7 @@ async function autoSave(el, id) {
     body: JSON.stringify({ student_id: '{{ selected_student }}', updates })
   });
   if (res.ok) {
-    // カテゴリに応じた行クラスを更新
-    const cat = data.category || '';
-    row.className = 'row-' + (data.category || '');
+    if (data.category) updateRowCategoryClass(row, data.category);
     row.classList.add('flash-row');
     setTimeout(() => row.classList.remove('flash-row'), 600);
     showToast('✓ Saved', 'success');
@@ -464,10 +481,7 @@ async function autoSave(el, id) {
   }
 }
 
-// applyToSelectedからもautoSaveを使う（markChangedの代替）
-function markChanged(el, id) {
-  autoSave(el, id);
-}
+function markChanged(el, id) { autoSave(el, id); }
 
 // ── 問題固有：数値ダブルクリック編集（Imp/Dif/RV）──
 function startNumEdit(span) {
