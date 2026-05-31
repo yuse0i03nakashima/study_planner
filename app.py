@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, send_file, jsonify, flash, url_for, get_flashed_messages, session
-from database import (init_db, get_connection, calc_new_mastery,
-                      update_assignments_after_record, get_plan, get_schedule,
+from database import (init_db, get_connection,
+                      update_assignments_after_record,
                       save_plan_history, get_plan_histories)
 from excel_export import export_excel
 from datetime import date, timedelta

@@ -19,6 +19,5 @@ plan_archives/
 
 # DB（本番はRailwayボリュームで管理）
 study_planner.db
-
-# その他
-tree
+*.db.bak*
+study_planner_backup_*.db
