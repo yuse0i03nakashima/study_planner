@@ -152,7 +152,7 @@
       </div>
       <div id="undecided-info" style="display:none;font-family:'DM Mono',monospace;
         font-size:9px;color:var(--text-dim);margin-top:3px;letter-spacing:0.5px;">
-        出題日未定の問題です。記録する場合は選択してください。
+        Problems with undecided dates. Select to record.
       </div>
 
       <label style="margin-top:24px;">Score</label>
@@ -275,7 +275,7 @@ function filterProblems() {
         const base = textbook
           ? a.problem_number
           : '[' + a.subject + '] ' + a.textbook + ' ' + a.problem_number;
-        opt.textContent = '[' + (a.category || '') + '] ' + base + '  (未定)';
+        opt.textContent = '[' + (a.category || '') + '] ' + base + '  (Undecided)';
         sel.appendChild(opt);
       });
     }

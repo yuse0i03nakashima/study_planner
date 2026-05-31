@@ -269,9 +269,9 @@ async function deleteRecord(historyId) {
   });
   if (res.ok || res.redirected) {
     document.getElementById('hrow-' + historyId)?.remove();
-    showToast('削除しました', 'success');
+    showToast('✓ Deleted', 'success');
   } else {
-    showToast('削除失敗', 'warn');
+    showToast('Delete failed', 'warn');
   }
 }
 
@@ -279,7 +279,7 @@ async function deleteRecord(historyId) {
 function openResetModal(problemId, label) {
   document.getElementById('reset-problem-id').value = problemId;
   document.getElementById('reset-msg').textContent =
-    '「' + label + '」のすべての授業記録を削除し、出題予定を New（未定）に戻します。この操作は元に戻せません。';
+    'Delete all records for "' + label + '" and reset the assignment to New (Undecided). This cannot be undone.';
   const modal = document.getElementById('reset-modal');
   modal.style.display = 'flex';
   modal.addEventListener('click', function(e){ if(e.target===modal) closeResetModal(); }, { once: true });

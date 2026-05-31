@@ -168,7 +168,7 @@ function probRowHtml(p, checked) {
     ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:2px 7px;border:1px solid ${color};color:${color};flex-shrink:0;">${cat}</span>`
     : `<span style="width:52px;flex-shrink:0;"></span>`;
   const dateStr = !p.scheduled_date ? '—'
-                : p.scheduled_date === '2099-12-31' ? '未定'
+                : p.scheduled_date === '2099-12-31' ? 'Undecided'
                 : p.scheduled_date;
   const defScore = p.difficulty <= 3 ? 5 : 4;
   const chk = checked ? 'checked' : '';
@@ -266,9 +266,9 @@ function loadBrProblems() {
         list.insertAdjacentHTML('beforeend', due.map(p => probRowHtml(p, true)).join(''));
       }
 
-      appendSection(list, 'future',    future,    '未来の出題予定', false);
-      appendSection(list, 'undecided', undecided, '出題日未定',     false);
-      appendSection(list, 'noassign',  noAssign,  'Assignment なし', false);
+      appendSection(list, 'future',    future,    'Future Assignments', false);
+      appendSection(list, 'undecided', undecided, 'Undecided',         false);
+      appendSection(list, 'noassign',  noAssign,  'No Assignment',     false);
 
       card.style.display = 'block';
     });

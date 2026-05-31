@@ -477,7 +477,7 @@ async function autoSave(el, id) {
     setTimeout(() => row.classList.remove('flash-row'), 600);
     showToast('✓ Saved', 'success');
   } else {
-    showToast('Save failed.', 'warn');
+    showToast('Save failed', 'warn');
   }
 }
 
@@ -890,8 +890,8 @@ function deleteAssignment(id) {
     });
     if (res.ok || res.redirected) {
       document.getElementById('row-' + id)?.remove();
-      showToast('Deleted.', 'success');
-    } else { showToast('Delete failed.', 'warn'); }
+      showToast('✓ Deleted', 'success');
+    } else { showToast('Delete failed', 'warn'); }
   });
 }
 

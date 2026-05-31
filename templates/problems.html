@@ -215,7 +215,7 @@
           <label>No. in Textbook</label>
           <input type="number" name="order_in_textbook" id="f-order_in_textbook"
             min="1" max="9999" placeholder="e.g. 42">
-          <p class="hint">空欄→auto-set to next No. in textbook</p>
+          <p class="hint">Blank → auto-set to next No. in textbook</p>
         </div>
       </div>
 
@@ -290,7 +290,7 @@
               letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
               margin:0;cursor:pointer;">Undecided</label>
           </div>
-          <p class="hint">空欄→auto from class schedule / Undecided→excluded from plan</p>
+          <p class="hint">Blank → auto from class schedule / Undecided → excluded from plan</p>
         </div>
       </div>
 
@@ -577,7 +577,7 @@ async function askAI() {
 ` +
       `est_minutes    : ${data.estimated_minutes} min
 ` +
-      `instruction    : ${data.instruction || '（なし）'}`;
+      `instruction    : ${data.instruction || '(none)'}`;
     document.getElementById('apply-row').style.display = 'block';
   } catch(e) {
     showToast('AI suggestion failed', 'warn');

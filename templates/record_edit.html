@@ -31,50 +31,50 @@
   </style>
 </head>
 <body>
-  <h1>授業記録編集</h1>
+  <h1>Edit Record</h1>
   <div class="form-box">
     <div class="info">
-      <strong>【{{ record.subject }}】{{ record.textbook }} {{ record.problem_number }}</strong>
+      <strong>[{{ record.subject }}] {{ record.textbook }} {{ record.problem_number }}</strong>
     </div>
     <form method="POST">
       <label>Date</label>
       <input type="date" name="date" value="{{ record.date }}" required>
-      <label>Score</label>
+      <label>Result</label>
       <select name="correct">
-        <option value="1" {% if record.correct %}selected{% endif %}>正答</option>
-        <option value="0" {% if not record.correct %}selected{% endif %}>誤答</option>
+        <option value="1" {% if record.correct %}selected{% endif %}>Correct</option>
+        <option value="0" {% if not record.correct %}selected{% endif %}>Incorrect</option>
       </select>
-      <button type="submit">更新する</button>
+      <button type="submit">Update →</button>
     </form>
   </div>
-  <!-- リセットゾーン -->
+  <!-- Reset zone -->
   <div class="danger-zone">
-    <h3>⚠ この問題の記録をすべてリセット</h3>
+    <h3>⚠ Reset All Records</h3>
     <p>
-      この生徒の「{{ record.textbook }} {{ record.problem_number }}」に関する<br>
-      授業記録をすべて削除し、出題予定を <strong>New（未定）</strong> に戻します。<br>
-      誤って記録を入力した場合にご使用ください。
+      Delete all records for <strong>{{ record.textbook }} {{ record.problem_number }}</strong><br>
+      and reset the assignment to <strong>New (Undecided)</strong>.<br>
+      Use this to undo accidental entries.
     </p>
-    <button type="button" class="btn-danger" onclick="openResetModal()">記録を全削除してリセット</button>
+    <button type="button" class="btn-danger" onclick="openResetModal()">Reset All Records</button>
   </div>
 
-  <p style="margin-top:20px;"><a href="/record/list">← 授業記録一覧に戻る</a></p>
+  <p style="margin-top:20px;"><a href="/record/list">← Back to Records</a></p>
 </div>
 
-<!-- 確認モーダル -->
+<!-- Confirm modal -->
 <div class="modal-overlay" id="reset-modal">
   <div class="modal-box">
-    <h3>本当にリセットしますか？</h3>
+    <h3>Confirm Reset</h3>
     <p>
-      「{{ record.textbook }} {{ record.problem_number }}」の授業記録が<strong>すべて削除</strong>され、
-      習熟度・カテゴリもリセットされます。<br>この操作は元に戻せません。
+      All records for <strong>{{ record.textbook }} {{ record.problem_number }}</strong> will be
+      permanently deleted and mastery / category will be reset.<br>This cannot be undone.
     </p>
     <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeResetModal()">キャンセル</button>
+      <button class="btn-cancel" onclick="closeResetModal()">Cancel</button>
       <form method="POST" action="/record/reset_problem" style="margin:0;">
         <input type="hidden" name="student_id" value="{{ record.student_id }}">
         <input type="hidden" name="problem_id" value="{{ record.problem_id }}">
-        <button type="submit" class="btn-danger">リセットする</button>
+        <button type="submit" class="btn-danger">Reset</button>
       </form>
     </div>
   </div>
