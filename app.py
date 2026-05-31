@@ -2037,18 +2037,17 @@ def api_problems_for_record():
     record_date = request.args.get("date", date.today().isoformat())
     conn = get_connection()
     c = conn.cursor()
-    # scheduled_date <= record_date の問題（未来・未定は除外）
+    # LEFT JOIN で全問題を返す（assignment がなければ NULL）
     query = """
         SELECT p.problem_id, p.problem_number, p.importance,
                p.difficulty, p.review_value, p.estimated_minutes,
                a.category, a.scheduled_date
         FROM problems p
-        JOIN assignments a ON a.problem_id = p.problem_id
-        WHERE p.textbook_id=? AND a.student_id=?
-          AND a.scheduled_date <= ?
-          AND a.scheduled_date != '2099-12-31'
+        LEFT JOIN assignments a
+          ON a.problem_id = p.problem_id AND a.student_id = ?
+        WHERE p.textbook_id = ?
     """
-    params = [textbook_id, student_id, record_date]
+    params = [student_id, textbook_id]
     if section_id:
         query += " AND p.section_id=?"
         params.append(section_id)
