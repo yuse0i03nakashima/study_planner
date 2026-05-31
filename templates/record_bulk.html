@@ -111,7 +111,7 @@
       </div>
       <div>
         <label>Date</label>
-        <input type="date" id="br-date" value="{{ today }}">
+        <input type="date" id="br-date" value="{{ today }}" onchange="loadBrProblems()">
       </div>
       <div>
         <label>Textbook</label>
@@ -203,8 +203,10 @@ function loadBrProblems() {
   const secId = document.getElementById('br-section').value;
   if (!tbId) return;
 
+  const date = document.getElementById('br-date').value;
   fetch('/api/problems_for_record?student_id=' + sid
-        + '&textbook_id=' + tbId + '&section_id=' + secId)
+        + '&textbook_id=' + tbId + '&section_id=' + secId
+        + '&date=' + date)
     .then(r => r.json())
     .then(data => {
       const card = document.getElementById('br-problems-card');
