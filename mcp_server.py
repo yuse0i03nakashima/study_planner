@@ -3,7 +3,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, "C:/Users/ynaka/study_planner")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 RAILWAY_URL     = os.environ.get('RAILWAY_URL', '').rstrip('/')
 RAILWAY_API_KEY = os.environ.get('RAILWAY_API_KEY', '')
@@ -331,20 +331,6 @@ async def list_tools():
             }
         ),
         Tool(
-            name="generate_excel_plan",
-            description="計画表をExcelファイルに出力する。plan_archivesフォルダに保存される。ブラウザUIから出力することを推奨",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "student_id":     {"type": "string", "description": "生徒ID"},
-                    "start_date":     {"type": "string", "description": "開始日YYYY-MM-DD（省略→今日）"},
-                    "end_date":       {"type": "string", "description": "終了日YYYY-MM-DD（省略→次回授業日）"},
-                    "subject_filter": {"type": "string", "description": "教科絞り込み（省略→全教科）"}
-                },
-                "required": ["student_id"]
-            }
-        ),
-        Tool(
             name="auto_record_session",
             description=(
                 "授業報告を受けた後、未報告の問題を自動登録する。"
@@ -358,20 +344,6 @@ async def list_tools():
                     "student_id":   {"type": "string", "description": "生徒ID"},
                     "record_date":  {"type": "string",
                                     "description": "基準日YYYY-MM-DD（省略→今日）。この日以前の未報告問題を処理"}
-                },
-                "required": ["student_id"]
-            }
-        ),
-        Tool(
-            name="generate_pdf_plan",
-            description="計画表をPDFファイルに出力する。plan_archivesフォルダに保存される。ブラウザUIから出力することを推奨",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "student_id":     {"type": "string", "description": "生徒ID"},
-                    "start_date":     {"type": "string", "description": "開始日YYYY-MM-DD（省略→今日）"},
-                    "end_date":       {"type": "string", "description": "終了日YYYY-MM-DD（省略→次回授業日）"},
-                    "subject_filter": {"type": "string", "description": "教科絞り込み（省略→全教科）"}
                 },
                 "required": ["student_id"]
             }
