@@ -15,11 +15,46 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
+
+    # ── 基本テーブル ─────────────────────────────────────
     c.execute("""
         CREATE TABLE IF NOT EXISTS students (
             student_id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            subjects TEXT NOT NULL
+            subjects TEXT NOT NULL,
+            plan_mode TEXT DEFAULT 'all'
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS series (
+            series_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS textbooks (
+            textbook_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            series_id INTEGER,
+            name TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            description TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS textbook_sections (
+            section_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            textbook_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            order_index INTEGER DEFAULT 0
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS student_textbooks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            textbook_id INTEGER NOT NULL,
+            UNIQUE(student_id, textbook_id)
         )
     """)
     c.execute("""
@@ -27,12 +62,16 @@ def init_db():
             problem_id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT NOT NULL,
             textbook TEXT NOT NULL,
+            textbook_id INTEGER,
+            section_id INTEGER,
             problem_number TEXT NOT NULL,
             importance INTEGER NOT NULL DEFAULT 3,
             difficulty INTEGER NOT NULL DEFAULT 3,
             review_value INTEGER NOT NULL DEFAULT 3,
             estimated_minutes INTEGER NOT NULL DEFAULT 15,
-            type TEXT NOT NULL DEFAULT "標準",
+            total_minutes INTEGER,
+            order_in_textbook INTEGER DEFAULT 1,
+            type TEXT NOT NULL DEFAULT '標準',
             instruction TEXT
         )
     """)
@@ -45,8 +84,7 @@ def init_db():
             correct INTEGER NOT NULL,
             mastery INTEGER NOT NULL,
             category TEXT NOT NULL,
-            FOREIGN KEY (student_id) REFERENCES students(student_id),
-            FOREIGN KEY (problem_id) REFERENCES problems(problem_id)
+            score INTEGER
         )
     """)
     c.execute("""
@@ -56,28 +94,21 @@ def init_db():
             problem_id INTEGER NOT NULL,
             scheduled_date TEXT NOT NULL,
             category TEXT NOT NULL,
-            FOREIGN KEY (student_id) REFERENCES students(student_id),
-            FOREIGN KEY (problem_id) REFERENCES problems(problem_id)
+            assigned_minutes INTEGER,
+            progress_before REAL DEFAULT 0.0,
+            progress_after REAL,
+            session_index INTEGER DEFAULT 1,
+            session_total INTEGER DEFAULT 1
         )
     """)
     c.execute("""
-        CREATE TABLE IF NOT EXISTS schedule_base (
-            schedule_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS suppression (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id TEXT NOT NULL,
-            dow INTEGER NOT NULL,
-            available_minutes INTEGER NOT NULL DEFAULT 0,
-            UNIQUE(student_id, dow),
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS schedule_override (
-            override_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            student_id TEXT NOT NULL,
-            date TEXT NOT NULL,
-            available_minutes INTEGER NOT NULL DEFAULT 0,
-            UNIQUE(student_id, date),
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
+            problem_id INTEGER NOT NULL,
+            suppressed_until TEXT,
+            reason TEXT,
+            created_at TEXT
         )
     """)
     c.execute("""
@@ -87,8 +118,11 @@ def init_db():
             generated_date TEXT NOT NULL,
             start_date TEXT NOT NULL,
             end_date TEXT NOT NULL,
-            excel_path TEXT NOT NULL,
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
+            excel_path TEXT NOT NULL DEFAULT '',
+            pdf_path TEXT DEFAULT '',
+            subject TEXT DEFAULT '',
+            confirmed INTEGER DEFAULT 0,
+            plan_data TEXT DEFAULT ''
         )
     """)
     c.execute("""
@@ -96,15 +130,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_id TEXT NOT NULL,
             subject TEXT NOT NULL,
-            dow INTEGER NOT NULL,
-            UNIQUE(student_id, subject, dow),
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS app_state (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
+            dow TEXT NOT NULL,
+            UNIQUE(student_id, subject, dow)
         )
     """)
     c.execute("""
@@ -113,10 +140,58 @@ def init_db():
             student_id TEXT NOT NULL,
             subject TEXT NOT NULL,
             next_class_date TEXT NOT NULL,
-            UNIQUE(student_id, subject),
-            FOREIGN KEY (student_id) REFERENCES students(student_id)
+            UNIQUE(student_id, subject)
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS schedule_base (
+            schedule_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            dow INTEGER NOT NULL,
+            available_minutes INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(student_id, dow)
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS schedule_override (
+            override_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT NOT NULL,
+            date TEXT NOT NULL,
+            available_minutes INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(student_id, date)
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS app_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+
+    # ── 既存DBへのマイグレーション（カラム追加） ──────────
+    migrations = [
+        ("students",    "plan_mode TEXT DEFAULT 'all'"),
+        ("problems",    "textbook_id INTEGER"),
+        ("problems",    "section_id INTEGER"),
+        ("problems",    "order_in_textbook INTEGER DEFAULT 1"),
+        ("problems",    "total_minutes INTEGER"),
+        ("history",     "score INTEGER"),
+        ("assignments", "assigned_minutes INTEGER"),
+        ("assignments", "progress_before REAL DEFAULT 0.0"),
+        ("assignments", "progress_after REAL"),
+        ("assignments", "session_index INTEGER DEFAULT 1"),
+        ("assignments", "session_total INTEGER DEFAULT 1"),
+        ("plan_history","pdf_path TEXT DEFAULT ''"),
+        ("plan_history","subject TEXT DEFAULT ''"),
+        ("plan_history","confirmed INTEGER DEFAULT 0"),
+        ("plan_history","plan_data TEXT DEFAULT ''"),
+    ]
+    for table, col_def in migrations:
+        try:
+            c.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
+        except Exception:
+            pass  # already exists
+
     students = [
         ("S001", "神田悠帆", "数学,古典,社会"),
         ("S002", "小山たみ", "数学"),

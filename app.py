@@ -953,11 +953,6 @@ def mastery_edit(history_id):
     return redirect(request.referrer or "/record/list")
 
 
-@app.route("/assignment/category/<int:student_id_dummy>", methods=["POST"])
-def assignment_category_edit():
-    pass
-
-
 @app.route("/assignments/list")
 def assignments_list():
     conn = get_connection()
@@ -2114,7 +2109,8 @@ def record_bulk():
 @app.route("/record/bulk_add", methods=["POST"])
 def record_bulk_add():
     """授業記録を一括登録する"""
-    from database import calc_new_mastery
+    from database import (calc_new_mastery_v2, score_to_correct,
+                          update_assignments_after_record)
     data       = request.get_json()
     student_id = data.get("student_id")
     date_str   = data.get("date")
@@ -2124,21 +2120,25 @@ def record_bulk_add():
     conn = get_connection()
     c = conn.cursor()
     added = 0
+    problem_ids = []
     for rec in records:
         pid   = rec.get("problem_id")
         score = int(rec.get("score", 5))
         if not pid:
             continue
-        correct     = 1 if score >= 4 else 0
-        new_mastery = calc_new_mastery(student_id, pid, score, date_str)
+        correct     = score_to_correct(score)
+        new_mastery = calc_new_mastery_v2(student_id, pid, score, date_str)
         c.execute("""
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category, score)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (student_id, pid, date_str, correct, new_mastery, "Record", score))
+        problem_ids.append((pid, new_mastery))
         added += 1
     conn.commit()
     conn.close()
+    for pid, new_mastery in problem_ids:
+        update_assignments_after_record(student_id, pid, date_str, new_mastery)
     return jsonify({"ok": True, "added": added})
 
 
