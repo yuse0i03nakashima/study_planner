@@ -2037,8 +2037,9 @@ def api_problems_for_record():
     conn = get_connection()
     c = conn.cursor()
     query = """
-        SELECT DISTINCT p.problem_id, p.problem_number, p.importance,
-               p.difficulty, p.review_value, p.estimated_minutes
+        SELECT p.problem_id, p.problem_number, p.importance,
+               p.difficulty, p.review_value, p.estimated_minutes,
+               a.category, a.scheduled_date
         FROM problems p
         JOIN assignments a ON a.problem_id = p.problem_id
         WHERE p.textbook_id=? AND a.student_id=?

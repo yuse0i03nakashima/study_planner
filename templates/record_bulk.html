@@ -215,14 +215,23 @@ function loadBrProblems() {
         return;
       }
       card.style.display = 'block';
+      const catColor = {New:'var(--blue)',Recall:'var(--green)',Drill:'var(--amber)',Reinforce:'var(--rose)'};
       list.innerHTML = data.map(p => {
         const defScore = p.difficulty <= 3 ? 5 : 4;
+        const cat = p.category || '';
+        const color = catColor[cat] || 'var(--text-dim)';
+        const catBadge = cat
+          ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;
+               padding:2px 7px;border:1px solid ${color};color:${color};
+               flex-shrink:0;">${cat}</span>`
+          : '';
         return `
         <div class="prob-row" id="bpr-${p.problem_id}" data-problem="${p.problem_id}"
           data-difficulty="${p.difficulty}">
           <input type="checkbox" class="br-check" checked
             style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;"
             onchange="toggleProbRow(this, ${p.problem_id})">
+          ${catBadge}
           <div class="prob-name">${p.problem_number}</div>
           <div class="prob-meta">Imp:${p.importance} Dif:${p.difficulty} ${p.estimated_minutes}min</div>
           <div class="score-btns" id="scores-${p.problem_id}">
