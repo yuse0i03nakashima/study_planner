@@ -34,6 +34,11 @@ def _call_remote(name: str, arguments: dict):
 async def list_tools():
     return [
         Tool(
+            name="check_connection",
+            description="MCPの接続先（ローカルDBかRailwayか）を確認する。問題登録前に必ず実行して接続先を確認すること。",
+            inputSchema={"type": "object", "properties": {}}
+        ),
+        Tool(
             name="get_all_students",
             description="全生徒の一覧を取得する",
             inputSchema={"type": "object", "properties": {}}
@@ -353,6 +358,20 @@ async def list_tools():
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict):
+    if name == "check_connection":
+        if RAILWAY_URL and RAILWAY_API_KEY:
+            mode = "remote"
+            target = RAILWAY_URL
+        else:
+            from tool_handlers import DB_PATH
+            mode = "local"
+            target = DB_PATH
+        return [TextContent(type="text", text=json.dumps({
+            "mode": mode,
+            "target": target,
+            "warning": None if mode == "remote" else "⚠️ ローカルDBに書き込まれます。RAILWAY_URLとRAILWAY_API_KEYが未設定です。",
+        }, ensure_ascii=False, indent=2))]
+
     if RAILWAY_URL and RAILWAY_API_KEY:
         result = _call_remote(name, arguments)
     else:

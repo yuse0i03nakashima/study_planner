@@ -333,6 +333,7 @@ def handle_tool(name: str, arguments: dict):
             "problem_id": problem_id,
             "textbook": textbook,
             "order_in_textbook": order_in_textbook,
+            "db_path": DB_PATH,
             "scheduled_dates": {
                 sid: ("2099-12-31（未定）" if undecided
                       else (scheduled_date or get_auto_next_class_date(sid, subject) or "2099-12-31"))
