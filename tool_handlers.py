@@ -231,6 +231,19 @@ def handle_tool(name: str, arguments: dict):
                 schedule[subj]["auto_next_class_date"] = get_auto_next_class_date(student_id, subj)
         return schedule
 
+    elif name == "get_sections":
+        textbook_id = arguments.get("textbook_id")
+        conn = get_connection()
+        c = conn.cursor()
+        if textbook_id:
+            c.execute("SELECT * FROM textbook_sections WHERE textbook_id=? ORDER BY order_index, section_id",
+                      (textbook_id,))
+        else:
+            c.execute("SELECT * FROM textbook_sections ORDER BY textbook_id, order_index, section_id")
+        rows = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return rows
+
     elif name == "get_suppression_list":
         student_id = arguments["student_id"]
         conn = get_connection()
@@ -286,6 +299,8 @@ def handle_tool(name: str, arguments: dict):
         undecided         = arguments.get("undecided", False)
         order_in_textbook = arguments.get("order_in_textbook")
         total_minutes     = arguments.get("total_minutes")
+        section_id        = arguments.get("section_id")
+        section_name      = arguments.get("section_name", "").strip()
 
         conn = get_connection()
         c = conn.cursor()
@@ -300,17 +315,32 @@ def handle_tool(name: str, arguments: dict):
             conn.close()
             return {"error": f"既に登録済みです: problem_id={existing['problem_id']}, problem_number={problem_number}",
                     "existing_problem_id": existing["problem_id"]}
+        # セクション処理: section_nameが指定されたら既存を探し、なければ新規作成
+        if section_name and not section_id:
+            c.execute("SELECT section_id FROM textbook_sections WHERE textbook_id=? AND name=?",
+                      (textbook_id, section_name))
+            sec_row = c.fetchone()
+            if sec_row:
+                section_id = sec_row["section_id"]
+            else:
+                c.execute("SELECT MAX(order_index) as m FROM textbook_sections WHERE textbook_id=?",
+                          (textbook_id,))
+                max_order = c.fetchone()["m"] or 0
+                c.execute("INSERT INTO textbook_sections (textbook_id, name, order_index) VALUES (?,?,?)",
+                          (textbook_id, section_name, max_order + 1))
+                conn.commit()
+                section_id = c.lastrowid
         if order_in_textbook is None:
             c.execute("SELECT MAX(order_in_textbook) as m FROM problems WHERE textbook_id=?", (textbook_id,))
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
         c.execute("""
             INSERT INTO problems
-            (subject, textbook, textbook_id, problem_number,
+            (subject, textbook, textbook_id, section_id, problem_number,
              importance, difficulty, review_value,
              estimated_minutes, instruction, type, order_in_textbook, total_minutes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (subject, textbook, textbook_id, problem_number,
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (subject, textbook, textbook_id, section_id, problem_number,
               importance, difficulty, review_value,
               estimated_minutes, instruction, "標準", order_in_textbook, total_minutes))
         conn.commit()
@@ -369,6 +399,15 @@ def handle_tool(name: str, arguments: dict):
         record_date = arguments.get("date", date.today().isoformat())
         score       = int(arguments.get("score", 5))
         correct     = score_to_correct(score)
+        conn = get_connection()
+        c = conn.cursor()
+        # 同じ問題の自動記録(Auto)が過去に存在する場合は手動記録で上書き
+        c.execute("""
+            DELETE FROM history
+            WHERE student_id=? AND problem_id=? AND category='Auto' AND date <= ?
+        """, (student_id, problem_id, record_date))
+        conn.commit()
+        conn.close()
         new_mastery = calc_new_mastery(student_id, problem_id, score, record_date)
         conn = get_connection()
         c = conn.cursor()

@@ -82,6 +82,16 @@ async def list_tools():
             inputSchema={"type": "object", "properties": {}}
         ),
         Tool(
+            name="get_sections",
+            description="テキストのセクション一覧を取得する。textbook_idを指定するとそのテキストのみ返す",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "textbook_id": {"type": "integer", "description": "テキストID（省略時は全セクション）"}
+                }
+            }
+        ),
+        Tool(
             name="get_textbooks",
             description="テキストの一覧を取得する。subject指定で絞り込み可能",
             inputSchema={
@@ -168,7 +178,9 @@ async def list_tools():
                     "category":       {"type": "string",  "description": "Category: New/Recall/Drill/Reinforce (default: New)"},
                     "scheduled_date": {"type": "string",  "description": "出題日YYYY-MM-DD（省略→授業曜日から自動計算）"},
                     "undecided":      {"type": "boolean", "description": "true=授業日未定として登録（計画表に出さない）"},
-                    "total_minutes":  {"type": "integer", "description": "総HP（省略=通常問題=1回完結）。古文精読など複数セッションに分割したい場合に設定。estimated_minutesより大きな値を設定する"}
+                    "total_minutes":  {"type": "integer", "description": "総HP（省略=通常問題=1回完結）。古文精読など複数セッションに分割したい場合に設定。estimated_minutesより大きな値を設定する"},
+                    "section_id":     {"type": "integer", "description": "セクションID（get_sectionsで確認）。section_nameと排他"},
+                    "section_name":   {"type": "string",  "description": "セクション名。指定すると既存セクションを検索し、なければ新規作成する。section_idと排他"}
                 },
                 "required": ["subject", "textbook_id", "problem_number",
                              "importance", "difficulty", "review_value", "estimated_minutes"]

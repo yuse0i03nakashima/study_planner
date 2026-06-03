@@ -2126,6 +2126,11 @@ def record_bulk_add():
         score = int(rec.get("score", 5))
         if not pid:
             continue
+        # 同じ問題の自動記録(Auto)が存在する場合は手動記録で上書き
+        c.execute("""
+            DELETE FROM history
+            WHERE student_id=? AND problem_id=? AND category='Auto' AND date <= ?
+        """, (student_id, pid, date_str))
         correct     = score_to_correct(score)
         new_mastery = calc_new_mastery_v2(student_id, pid, score, date_str)
         c.execute("""
