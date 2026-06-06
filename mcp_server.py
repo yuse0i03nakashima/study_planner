@@ -387,7 +387,10 @@ async def call_tool(name: str, arguments: dict):
     if RAILWAY_URL and RAILWAY_API_KEY:
         result = _call_remote(name, arguments)
     else:
-        result = handle_tool(name, arguments)
+        result = {
+            "error": "⚠️ Railway未接続: RAILWAY_URLとRAILWAY_API_KEYが設定されていません。Claude Desktopを再起動してください。",
+            "mode": "disconnected"
+        }
     return [TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2))]
 
 
