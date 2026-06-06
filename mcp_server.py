@@ -5,8 +5,16 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-RAILWAY_URL     = os.environ.get('RAILWAY_URL', '').rstrip('/')
-RAILWAY_API_KEY = os.environ.get('RAILWAY_API_KEY', '')
+# env vars を優先し、なければ同ディレクトリの mcp_local_config.json から読み込む
+_cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mcp_local_config.json')
+_file_cfg = {}
+if os.path.exists(_cfg_path):
+    import json as _json
+    with open(_cfg_path, encoding='utf-8') as _f:
+        _file_cfg = _json.load(_f)
+
+RAILWAY_URL     = os.environ.get('RAILWAY_URL', _file_cfg.get('RAILWAY_URL', '')).rstrip('/')
+RAILWAY_API_KEY = os.environ.get('RAILWAY_API_KEY', _file_cfg.get('RAILWAY_API_KEY', ''))
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
