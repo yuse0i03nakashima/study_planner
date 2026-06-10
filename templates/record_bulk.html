@@ -172,7 +172,7 @@ function probRowHtml(p, checked) {
                 : p.scheduled_date;
   const defScore = p.difficulty <= 3 ? 5 : 4;
   const chk = checked ? 'checked' : '';
-  return `<div class="prob-row" id="bpr-${p.problem_id}" data-problem="${p.problem_id}" data-difficulty="${p.difficulty}">
+  return `<div class="prob-row${checked ? '' : ' skipped'}" id="bpr-${p.problem_id}" data-problem="${p.problem_id}" data-difficulty="${p.difficulty}">
     <input type="checkbox" class="br-check" ${chk} style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;" onchange="toggleProbRow(this,${p.problem_id})">
     ${catBadge}
     <div class="prob-name">${p.problem_number}</div>
