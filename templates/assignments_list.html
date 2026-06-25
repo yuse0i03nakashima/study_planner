@@ -70,6 +70,8 @@
     .row-復習, .row-Recall    { border-left:2px solid var(--green); }
     .row-定着, .row-Drill     { border-left:2px solid var(--amber); }
     .row-再定着, .row-Reinforce { border-left:2px solid var(--rose); }
+    /* 授業日未定（要スケジュール）行 */
+    .undecided-row { border-left:2px dashed var(--amber) !important; }
     .changed-row td { box-shadow:inset 0 0 0 1px var(--amber); }
     @keyframes rowFlash {
       0%   { background:rgba(245,166,35,0.25); }
@@ -254,6 +256,55 @@
     </div>
   </div>
 
+  <!-- 授業日未定の一括登録 -->
+  <div id="undecided-panel" class="fade-in" style="display:none;background:var(--surface);
+    border:1px solid var(--border);border-left:2px solid var(--amber);
+    padding:16px 20px;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
+        text-transform:uppercase;color:var(--amber);">Schedule Undecided</span>
+      <span style="font-family:'Noto Serif JP',serif;font-size:11px;color:var(--text-muted);">授業日未定の一括登録</span>
+      <span id="undecided-count" class="badge" style="background:var(--amber-bg);color:var(--amber);"></span>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">
+      <div>
+        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Date</label>
+        <input type="date" id="undecided-date"
+          style="background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+      </div>
+      <div>
+        <label style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
+          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:4px;">Category</label>
+        <select id="undecided-category"
+          style="background:var(--surface2);border:1px solid var(--border-light);
+            color:var(--text);padding:7px 10px;font-size:12px;outline:none;">
+          <option value="">— Keep —</option>
+          <option value="New">New</option>
+          <option value="Recall">Recall</option>
+          <option value="Drill">Drill</option>
+          <option value="Reinforce">Reinforce</option>
+        </select>
+      </div>
+      <button type="button" class="btn btn-success btn-sm" onclick="scheduleUndecided()">→ 一括登録</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <button type="button" onclick="toggleAllUndecided(true)"
+        style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+          background:none;border:none;cursor:pointer;letter-spacing:1px;text-transform:uppercase;">✓ All</button>
+      <button type="button" onclick="toggleAllUndecided(false)"
+        style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
+          background:none;border:none;cursor:pointer;letter-spacing:1px;text-transform:uppercase;">✕ Clear</button>
+      <span id="undecided-selected" class="meta-text"></span>
+    </div>
+    <div id="undecided-list"
+      style="max-height:220px;overflow-y:auto;border:1px solid var(--border);
+        background:var(--surface2);"></div>
+  </div>
+
   <div class="bulk-bar fade-in" style="flex-wrap:wrap;gap:10px;">
     <span class="bulk-label">Bulk Edit</span>
 
@@ -302,8 +353,11 @@
     </thead>
     <tbody>
     {%- for a in assignments %}
-    <tr id="row-{{ a.assignment_id }}" class="row-{{ a.category }}"
-        data-subject="{{ a.subject }}" data-textbook="{{ a.textbook }}">
+    <tr id="row-{{ a.assignment_id }}"
+        class="row-{{ a.category }}{% if a.scheduled_date == '2099-12-31' %} undecided-row{% endif %}"
+        data-subject="{{ a.subject }}" data-textbook="{{ a.textbook }}"
+        data-date="{{ a.scheduled_date }}"
+        data-problem-label="{{ a.problem_number }}">
       <td><input type="checkbox" class="row-check" value="{{ a.assignment_id }}"></td>
       <td class="meta-text">{{ a.subject }}</td>
       <td class="left" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
@@ -456,6 +510,95 @@ function updateRowCategoryClass(row, cat) {
   const old = [...row.classList].find(c => /^row-[A-Z]/.test(c));
   if (old) row.classList.remove(old);
   if (cat) row.classList.add('row-' + cat);
+}
+
+// ── 授業日未定の一括登録 ──
+function _esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildUndecidedPanel() {
+  const panel = document.getElementById('undecided-panel');
+  const list  = document.getElementById('undecided-list');
+  if (!panel || !list) return;
+  const rows  = Array.from(document.querySelectorAll('tr.undecided-row'));
+  if (rows.length === 0) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  document.getElementById('undecided-count').textContent = rows.length + ' items';
+  list.innerHTML = rows.map(function(row) {
+    const id    = row.id.replace('row-', '');
+    const subj  = row.dataset.subject || '';
+    const tb    = row.dataset.textbook || '';
+    const label = row.dataset.problemLabel || '';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:7px 12px;'
+      + 'border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;"'
+      + ' onmouseover="this.style.background=\'var(--surface3)\'"'
+      + ' onmouseout="this.style.background=\'\'">'
+      + '<input type="checkbox" class="undecided-check" value="' + id + '" checked'
+      + ' style="accent-color:var(--amber);width:14px;height:14px;" onchange="updateUndecidedCount()">'
+      + '<span style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--text-dim);min-width:48px;">' + _esc(subj) + '</span>'
+      + '<span style="font-family:\'Noto Serif JP\',serif;">' + _esc(tb) + ' ' + _esc(label) + '</span>'
+      + '</label>';
+  }).join('');
+  updateUndecidedCount();
+}
+
+function updateUndecidedCount() {
+  const n = document.querySelectorAll('.undecided-check:checked').length;
+  document.getElementById('undecided-selected').textContent = n > 0 ? n + ' selected' : '';
+}
+
+function toggleAllUndecided(state) {
+  document.querySelectorAll('.undecided-check').forEach(function(c) { c.checked = state; });
+  updateUndecidedCount();
+}
+
+async function scheduleUndecided() {
+  const date = document.getElementById('undecided-date').value;
+  if (!date) { showToast('Pick a date first', 'warn'); return; }
+  const cat  = document.getElementById('undecided-category').value;
+  const checked = Array.from(document.querySelectorAll('.undecided-check:checked'))
+                       .map(function(c) { return parseInt(c.value); });
+  if (checked.length === 0) { showToast('Select problems first', 'warn'); return; }
+
+  const updates = [];
+  checked.forEach(function(id) {
+    const row = document.getElementById('row-' + id);
+    if (!row) return;
+    // 行内の入力値を更新してからまとめて送信
+    const dInp = row.querySelector('input.edit-field[data-field="scheduled_date"]');
+    if (dInp) dInp.value = date;
+    if (cat) {
+      const sel = row.querySelector('select.edit-field[data-field="category"]');
+      if (sel) sel.value = cat;
+    }
+    const rowData = { assignment_id: id };
+    row.querySelectorAll('.edit-field').forEach(function(f) { rowData[f.dataset.field] = f.value; });
+    updates.push(rowData);
+  });
+
+  const res = await fetch('/assignments/bulk_update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ student_id: '{{ selected_student }}', updates: updates })
+  });
+  if (res.ok) {
+    checked.forEach(function(id) {
+      const row = document.getElementById('row-' + id);
+      if (!row) return;
+      if (cat) updateRowCategoryClass(row, cat);
+      row.classList.remove('undecided-row');   // もう未定ではない
+      row.dataset.date = date;
+      row.classList.add('flash-row');
+      setTimeout(function() { row.classList.remove('flash-row'); }, 700);
+    });
+    buildUndecidedPanel();   // 残りの未定でパネルを再描画
+    showToast(checked.length + ' assignments scheduled', 'success');
+  } else {
+    showToast('Save failed', 'warn');
+  }
 }
 
 // ── 生徒固有：カテゴリ・出題日を変更した瞬間に自動保存 ──
@@ -912,6 +1055,7 @@ function closeConfirm() {
 document.addEventListener('DOMContentLoaded', function() {
   initSubjectFilter();
   initPastRows();
+  buildUndecidedPanel();
   const modal = document.getElementById('confirm-modal');
   if (modal) {
     modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(); });

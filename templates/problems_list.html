@@ -171,6 +171,46 @@
     </form>
   </div>
 
+  <!-- 一括Assignment登録 -->
+  <div class="card fade-in" id="bulk-assign-card"
+    style="border-left:2px solid var(--blue);padding:16px 20px;">
+    <div class="card-title" style="color:var(--blue);">Bulk Assign — まとめてAssignment登録</div>
+
+    <label style="margin-top:0;">Students</label>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
+      {% for s in students %}
+      <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
+        font-size:13px;font-weight:300;color:var(--text);cursor:pointer;margin:0;
+        text-transform:none;letter-spacing:0;">
+        <input type="checkbox" class="bulk-student" value="{{ s.student_id }}">
+        {{ s.name }}
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <label>Category</label>
+        <select id="bulk-category">
+          <option value="New">New</option>
+          <option value="Recall">Recall</option>
+          <option value="Drill">Drill</option>
+          <option value="Reinforce">Reinforce</option>
+        </select>
+      </div>
+      <div>
+        <label>Date <span style="color:var(--text-dim);text-transform:none;letter-spacing:0;">(任意・空欄=次回授業日/未定)</span></label>
+        <input type="date" id="bulk-date">
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-success btn-sm" onclick="submitProblemsBulkAssign()">
+        + Add Selected to Assignments</button>
+      <span id="bulk-selected-count" class="meta-text">0 problems selected</span>
+    </div>
+  </div>
+
   <div class="meta-text fade-in" style="margin-bottom:8px;">
     ※ Double-click to edit: No. / Textbook / Problem name / Imp / Dif / RV / Min / Total / Instruction
   </div>
@@ -179,6 +219,7 @@
   <table class="data-table" id="problem-table">
     <thead>
       <tr>
+        <th style="width:32px;"><input type="checkbox" id="check-all-probs" onchange="toggleAllProbs(this)"></th>
         <th>No.</th><th>Subject</th><th>Textbook</th><th>Problem</th>
         <th>Imp</th><th>Dif</th><th>RV</th><th>Min</th><th>Total</th>
         <th>Instruction</th><th></th>
@@ -187,6 +228,8 @@
     <tbody>
     {% for p in problems %}
     <tr id="prow-{{ p.problem_id }}">
+      <td><input type="checkbox" class="prob-check" value="{{ p.problem_id }}"
+        onchange="updateBulkSelectedCount()"></td>
       <td class="editable-cell" data-problem="{{ p.problem_id }}"
         data-field="order_in_textbook">
         <span class="editable" ondblclick="startNumEdit(this, 1, 9999, 1)"
@@ -594,6 +637,59 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('cancel-btn').onclick = closeConfirm;
   }
 });
+
+// ── 一括Assignment登録 ──
+function toggleAllProbs(cb) {
+  document.querySelectorAll('.prob-check').forEach(c => {
+    const tr = c.closest('tr');
+    // フィルタ等で非表示の行は対象外
+    if (!tr || tr.style.display !== 'none') c.checked = cb.checked;
+  });
+  updateBulkSelectedCount();
+}
+
+function updateBulkSelectedCount() {
+  const n = document.querySelectorAll('.prob-check:checked').length;
+  const el = document.getElementById('bulk-selected-count');
+  if (el) el.textContent = n + ' problem' + (n === 1 ? '' : 's') + ' selected';
+}
+
+async function submitProblemsBulkAssign() {
+  const problemIds = Array.from(document.querySelectorAll('.prob-check:checked'))
+                          .map(c => parseInt(c.value));
+  if (problemIds.length === 0) { showToast('Select problems first', 'warn'); return; }
+  const studentIds = Array.from(document.querySelectorAll('.bulk-student:checked'))
+                          .map(c => c.value);
+  if (studentIds.length === 0) { showToast('Select at least one student', 'warn'); return; }
+  const category = document.getElementById('bulk-category').value;
+  const date     = document.getElementById('bulk-date').value;
+
+  const res = await fetch('/assignments/bulk_add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      student_ids: studentIds,
+      problem_ids: problemIds,
+      category: category,
+      scheduled_date: date
+    })
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.ok && data.ok) {
+    if (data.added === 0) {
+      showToast('No new assignments (already assigned)', 'info');
+    } else {
+      showToast('✓ ' + data.added + ' assignments added', 'success');
+    }
+    document.querySelectorAll('.prob-check:checked').forEach(c => { c.checked = false; });
+    const checkAll = document.getElementById('check-all-probs');
+    if (checkAll) checkAll.checked = false;
+    updateBulkSelectedCount();
+  } else {
+    showToast('Error: ' + (data.message || 'failed'), 'warn');
+  }
+}
 </script>
 </body>
 </html>

@@ -2055,38 +2055,43 @@ def api_problems_for_record():
 
 @app.route("/assignments/bulk_add", methods=["POST"])
 def assignments_bulk_add():
-    """出題予定を一括登録する"""
+    """出題予定を一括登録する(複数生徒対応)"""
     from database import get_auto_next_class_date
     data        = request.get_json()
-    student_id  = data.get("student_id")
+    # student_ids(複数)優先, 後方互換でstudent_id(単数)も受け付ける
+    student_ids = data.get("student_ids")
+    if not student_ids:
+        single = data.get("student_id")
+        student_ids = [single] if single else []
     problem_ids = data.get("problem_ids", [])
     category    = data.get("category", "New")
-    sched_date  = data.get("scheduled_date", "").strip()
-    if not student_id or not problem_ids:
+    sched_date  = (data.get("scheduled_date") or "").strip()
+    if not student_ids or not problem_ids:
         return jsonify({"ok": False, "message": "missing params"}), 400
     conn = get_connection()
     c = conn.cursor()
     added = 0
-    for pid in problem_ids:
-        # 重複チェック
-        c.execute("SELECT 1 FROM assignments WHERE student_id=? AND problem_id=?",
-                  (student_id, pid))
-        if c.fetchone():
-            continue
-        # 出題日の決定
-        if sched_date:
-            effective_date = sched_date
-        else:
-            c.execute("SELECT subject FROM problems WHERE problem_id=?", (pid,))
-            row = c.fetchone()
-            subj = row["subject"] if row else ""
-            auto = get_auto_next_class_date(student_id, subj)
-            effective_date = auto if auto else "2099-12-31"
-        c.execute("""
-            INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
-            VALUES (?, ?, ?, ?)
-        """, (student_id, pid, effective_date, category))
-        added += 1
+    for student_id in student_ids:
+        for pid in problem_ids:
+            # 重複チェック
+            c.execute("SELECT 1 FROM assignments WHERE student_id=? AND problem_id=?",
+                      (student_id, pid))
+            if c.fetchone():
+                continue
+            # 出題日の決定
+            if sched_date:
+                effective_date = sched_date
+            else:
+                c.execute("SELECT subject FROM problems WHERE problem_id=?", (pid,))
+                row = c.fetchone()
+                subj = row["subject"] if row else ""
+                auto = get_auto_next_class_date(student_id, subj)
+                effective_date = auto if auto else "2099-12-31"
+            c.execute("""
+                INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
+                VALUES (?, ?, ?, ?)
+            """, (student_id, pid, effective_date, category))
+            added += 1
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "added": added})
