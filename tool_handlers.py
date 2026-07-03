@@ -91,6 +91,14 @@ def calc_new_mastery(student_id, problem_id, score, record_date):
 def handle_tool(name: str, arguments: dict):
     """ツール名と引数を受け取り、結果を plain Python オブジェクトで返す。"""
 
+    # ── 一回限りの移行(problem_id/no 再編) ──────────────────────────────
+    if name == "run_migration":
+        import migrate_renumber
+        mode = arguments.get("mode", "dry_run")
+        if mode not in ("dry_run", "apply"):
+            return {"error": "mode は 'dry_run' か 'apply'"}
+        return migrate_renumber.run(DB_PATH, mode)
+
     # ── 参照系 ──────────────────────────────────────────────────────────
     if name == "get_all_students":
         conn = get_connection()
