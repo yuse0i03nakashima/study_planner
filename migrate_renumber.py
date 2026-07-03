@@ -109,18 +109,45 @@ def apply_plan(conn, plan):
     mx = c.execute("SELECT MAX(problem_id) FROM problems").fetchone()[0]
     try: c.execute("UPDATE sqlite_sequence SET seq=? WHERE name='problems'", (mx,))
     except sqlite3.OperationalError: pass
-    orphan = 0
+    # 事前から存在した孤児FK(過去に削除された問題への参照)を掃除
+    cleaned = {}
     for tbl in ("history", "assignments", "suppression"):
-        orphan += c.execute(
+        n = c.execute(
             f"SELECT COUNT(*) FROM {tbl} WHERE problem_id NOT IN (SELECT problem_id FROM problems)").fetchone()[0]
-    if orphan:
-        raise RuntimeError(f"孤児FK {orphan}件検出 → rollback")
+        if n:
+            c.execute(f"DELETE FROM {tbl} WHERE problem_id NOT IN (SELECT problem_id FROM problems)")
+        cleaned[tbl] = n
+    remain = sum(c.execute(
+        f"SELECT COUNT(*) FROM {tbl} WHERE problem_id NOT IN (SELECT problem_id FROM problems)").fetchone()[0]
+        for tbl in ("history", "assignments", "suppression"))
+    if remain:
+        raise RuntimeError(f"掃除後も孤児FK {remain}件 → rollback")
     return {"problems_after": c.execute("SELECT COUNT(*) FROM problems").fetchone()[0],
-            "max_problem_id": mx, "orphan_fk": orphan}
+            "max_problem_id": mx, "orphans_cleaned": cleaned}
+
+
+def orphan_stats(conn):
+    """現状DBの孤児FK(削除済み問題を参照する行)をテーブル別に集計。"""
+    c = conn.cursor()
+    out, total = {}, 0
+    for tbl in ("history", "assignments", "suppression"):
+        rows = c.execute(
+            f"SELECT problem_id, COUNT(*) FROM {tbl} "
+            f"WHERE problem_id NOT IN (SELECT problem_id FROM problems) "
+            f"GROUP BY problem_id ORDER BY problem_id").fetchall()
+        out[tbl] = {int(r[0]): int(r[1]) for r in rows}
+        total += sum(int(r[1]) for r in rows)
+    out["total_rows"] = total
+    out["orphan_problem_ids"] = sorted(set(out["history"]) | set(out["assignments"]) | set(out["suppression"]))
+    return out
 
 
 def run(db_path, mode="dry_run"):
-    """tool/CLI 共通エントリ。mode: 'dry_run' | 'apply'。dict を返す。"""
+    """tool/CLI 共通エントリ。mode: 'dry_run' | 'apply' | 'diagnose_orphans'。dict を返す。"""
+    if mode == "diagnose_orphans":
+        conn = sqlite3.connect(db_path); conn.row_factory = sqlite3.Row
+        try: return {"mode": mode, "status": "ok", "orphans": orphan_stats(conn)}
+        finally: conn.close()
     backup = None
     if mode == "apply":
         backup = f"{db_path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
@@ -143,6 +170,7 @@ def run(db_path, mode="dry_run"):
                        "label": plan["meta"][pid]["problem_number"][:26]}
                       for pid in list(plan["new_id"])[:12]]
             summary["status"] = "ok_dry_run"; summary["sample"] = sample
+            summary["preexisting_orphans"] = orphan_stats(conn)
             return summary
         # apply
         result = apply_plan(conn, plan)

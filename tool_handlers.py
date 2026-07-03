@@ -95,8 +95,8 @@ def handle_tool(name: str, arguments: dict):
     if name == "run_migration":
         import migrate_renumber
         mode = arguments.get("mode", "dry_run")
-        if mode not in ("dry_run", "apply"):
-            return {"error": "mode は 'dry_run' か 'apply'"}
+        if mode not in ("dry_run", "apply", "diagnose_orphans"):
+            return {"error": "mode は 'dry_run' / 'apply' / 'diagnose_orphans'"}
         return migrate_renumber.run(DB_PATH, mode)
 
     # ── 参照系 ──────────────────────────────────────────────────────────
