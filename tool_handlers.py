@@ -342,17 +342,25 @@ def handle_tool(name: str, arguments: dict):
             c.execute("SELECT MAX(order_in_textbook) as m FROM problems WHERE textbook_id=?", (textbook_id,))
             r = c.fetchone()
             order_in_textbook = (r["m"] if r and r["m"] else 0) + 1
+        # problem_id は no から決定論的に採番する（id = textbook_id×10000 + no）。
+        # AUTOINCREMENT に任せず明示指定することで、登録直後から id 規則が保たれる。
+        problem_id = textbook_id * 10000 + order_in_textbook
+        c.execute("SELECT problem_id FROM problems WHERE problem_id=?", (problem_id,))
+        if c.fetchone():
+            conn.close()
+            return {"error": f"id衝突: problem_id={problem_id}（textbook_id={textbook_id}, no={order_in_textbook}）"
+                             f" は既に使用されています。noが重複している可能性があります。",
+                    "conflict_problem_id": problem_id}
         c.execute("""
             INSERT INTO problems
-            (subject, textbook, textbook_id, section_id, problem_number,
+            (problem_id, subject, textbook, textbook_id, section_id, problem_number,
              importance, difficulty, review_value,
              estimated_minutes, instruction, type, order_in_textbook, total_minutes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (subject, textbook, textbook_id, section_id, problem_number,
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (problem_id, subject, textbook, textbook_id, section_id, problem_number,
               importance, difficulty, review_value,
               estimated_minutes, instruction, "標準", order_in_textbook, total_minutes))
         conn.commit()
-        problem_id = c.lastrowid
         for sid in student_ids:
             if undecided:
                 effective_date = "2099-12-31"
