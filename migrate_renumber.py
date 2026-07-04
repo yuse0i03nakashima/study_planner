@@ -142,12 +142,78 @@ def orphan_stats(conn):
     return out
 
 
+def reassign_id_plan(conn):
+    """id != textbook_id*10000 + order_in_textbook の問題を検出し、修正計画を返す。"""
+    c = conn.cursor()
+    rows = [dict(r) for r in c.execute(
+        "SELECT problem_id, textbook_id, order_in_textbook, problem_number FROM problems")]
+    existing = {r["problem_id"] for r in rows}
+    fixes, collisions = [], []
+    for r in rows:
+        if r["textbook_id"] is None or r["order_in_textbook"] is None:
+            continue
+        want = r["textbook_id"] * 10000 + r["order_in_textbook"]
+        if r["problem_id"] != want:
+            if want in existing:  # 目標idが別問題に占有されている
+                collisions.append({"old_id": r["problem_id"], "want": want,
+                                   "label": r["problem_number"]})
+            else:
+                fixes.append({"old_id": r["problem_id"], "new_id": want,
+                              "no": r["order_in_textbook"], "label": r["problem_number"]})
+    return fixes, collisions
+
+
+def apply_reassign(conn, fixes):
+    c = conn.cursor()
+    for f in fixes:
+        old, new = f["old_id"], f["new_id"]
+        c.execute("UPDATE problems SET problem_id=? WHERE problem_id=?", (new, old))
+        c.execute("UPDATE history SET problem_id=? WHERE problem_id=?", (new, old))
+        c.execute("UPDATE assignments SET problem_id=? WHERE problem_id=?", (new, old))
+        c.execute("UPDATE suppression SET problem_id=? WHERE problem_id=?", (new, old))
+    mx = c.execute("SELECT MAX(problem_id) FROM problems").fetchone()[0]
+    try: c.execute("UPDATE sqlite_sequence SET seq=? WHERE name='problems'", (mx,))
+    except sqlite3.OperationalError: pass
+    orphan = sum(c.execute(
+        f"SELECT COUNT(*) FROM {tbl} WHERE problem_id NOT IN (SELECT problem_id FROM problems)").fetchone()[0]
+        for tbl in ("history", "assignments", "suppression"))
+    if orphan:
+        raise RuntimeError(f"孤児FK {orphan}件 → rollback")
+    return mx
+
+
 def run(db_path, mode="dry_run"):
-    """tool/CLI 共通エントリ。mode: 'dry_run' | 'apply' | 'diagnose_orphans'。dict を返す。"""
+    """tool/CLI 共通エントリ。mode: 'dry_run' | 'apply' | 'diagnose_orphans' |
+    'reassign_ids_dry' | 'reassign_ids'。dict を返す。"""
     if mode == "diagnose_orphans":
         conn = sqlite3.connect(db_path); conn.row_factory = sqlite3.Row
         try: return {"mode": mode, "status": "ok", "orphans": orphan_stats(conn)}
         finally: conn.close()
+    if mode in ("reassign_ids_dry", "reassign_ids"):
+        backup = None
+        if mode == "reassign_ids":
+            backup = f"{db_path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+            shutil.copy2(db_path, backup)
+        conn = sqlite3.connect(db_path); conn.row_factory = sqlite3.Row
+        try:
+            fixes, collisions = reassign_id_plan(conn)
+            res = {"mode": mode, "backup": backup, "to_fix": len(fixes),
+                   "collisions": collisions,
+                   "sample": [{k: f[k] for k in ("old_id", "new_id", "no", "label")}
+                              for f in fixes[:20]]}
+            if collisions:
+                res["status"] = "aborted"; res["reason"] = "目標idが占有されている"
+                return res
+            if mode == "reassign_ids_dry":
+                res["status"] = "ok_dry_run"; return res
+            mx = apply_reassign(conn, fixes)
+            conn.commit()
+            res["status"] = "applied"; res["max_problem_id"] = mx; res["orphan_fk"] = 0
+            return res
+        except Exception as e:
+            conn.rollback(); return {"mode": mode, "status": "error", "error": str(e), "backup": backup}
+        finally:
+            conn.close()
     backup = None
     if mode == "apply":
         backup = f"{db_path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
