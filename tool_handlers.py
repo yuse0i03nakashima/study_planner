@@ -3,20 +3,10 @@ MCP ツールハンドラの共有ロジック。
 mcp_server.py（ローカル）と app.py（/api/tool エンドポイント）の両方から使用する。
 各関数は plain な Python オブジェクト（dict/list）を返す。
 """
-import os
-import sqlite3
 from datetime import date, timedelta
 
-DB_PATH = os.environ.get(
-    'DB_PATH',
-    os.path.join(os.path.dirname(__file__), 'study_planner.db')
-)
-
-
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# DB接続は database.py に一本化(mcp_server.py が DB_PATH を参照するため再エクスポート)
+from database import DB_PATH, get_connection
 
 
 def get_auto_next_class_date(student_id, subject):
@@ -455,7 +445,23 @@ def handle_tool(name: str, arguments: dict):
         problem_id = arguments["problem_id"]
         conn = get_connection()
         c = conn.cursor()
-        for field in ["importance", "difficulty", "review_value", "estimated_minutes", "instruction"]:
+        # problem_number を変更する場合は、同一テキスト内での重複を防ぐ
+        if "problem_number" in arguments:
+            c.execute("SELECT textbook_id FROM problems WHERE problem_id=?", (problem_id,))
+            row = c.fetchone()
+            if not row:
+                conn.close()
+                return {"error": f"問題が見つかりません: problem_id={problem_id}"}
+            textbook_id = row["textbook_id"]
+            c.execute("SELECT problem_id FROM problems WHERE textbook_id=? AND problem_number=? AND problem_id<>?",
+                      (textbook_id, arguments["problem_number"], problem_id))
+            dup = c.fetchone()
+            if dup:
+                conn.close()
+                return {"error": f"同テキスト内に同名の問題が既にあります: problem_id={dup['problem_id']}, "
+                                 f"problem_number={arguments['problem_number']}",
+                        "conflict_problem_id": dup["problem_id"]}
+        for field in ["problem_number", "importance", "difficulty", "review_value", "estimated_minutes", "instruction"]:
             if field in arguments:
                 c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
                           (arguments[field], problem_id))

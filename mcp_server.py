@@ -229,11 +229,12 @@ async def list_tools():
         ),
         Tool(
             name="update_problem",
-            description="問題のパラメータ（重要度・難易度・復習価値・所要時間・学習指示）を更新する",
+            description="問題のパラメータ（問題名・重要度・難易度・復習価値・所要時間・学習指示）を更新する。problem_number を変更する場合、同テキスト内で同名が既にあればエラーになる。",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "problem_id":        {"type": "integer", "description": "問題ID"},
+                    "problem_number":    {"type": "string",  "description": "問題番号・名称（変更する場合のみ指定）"},
                     "importance":        {"type": "integer", "description": "重要度（1〜5）"},
                     "difficulty":        {"type": "integer", "description": "難易度（1〜5）"},
                     "review_value":      {"type": "integer", "description": "復習価値（1〜5）"},
