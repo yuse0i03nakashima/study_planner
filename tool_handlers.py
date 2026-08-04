@@ -254,6 +254,84 @@ def handle_tool(name: str, arguments: dict):
         conn.close()
         return rows
 
+    elif name == "get_plan_days":
+        # 計画表と同じ日別割り当てを返す（読み取り専用。DBは変更しない）
+        student_id = arguments["student_id"]
+        start_date = arguments["start_date"]
+        target_date = arguments["target_date"]
+        subject = arguments.get("subject") or None
+
+        from planner import build_plan_data
+        data = build_plan_data(student_id, start_date, target_date, subject)
+        if not data:
+            return {"error": f"student not found: {student_id}"}
+
+        rows = []
+        for row in data["rows"]:
+            for subj, items in row["subjects"].items():
+                for it in items:
+                    rows.append({
+                        "date":              row["date_str"],
+                        "subject":           subj,
+                        "problem_id":        it.get("problem_id"),
+                        "problem_number":    it.get("problem_number"),
+                        "textbook":          it.get("textbook"),
+                        "textbook_id":       it.get("textbook_id"),
+                        "category":          it.get("category"),
+                        "estimated_minutes": it.get("estimated_minutes"),
+                        "session_index":     it.get("session_index", 1),
+                        "session_total":     it.get("session_total", 1),
+                    })
+
+        unassigned = []
+        for subj, items in data["unassigned"].items():
+            for it in items:
+                unassigned.append({
+                    "subject":        subj,
+                    "problem_id":     it.get("problem_id"),
+                    "problem_number": it.get("problem_number"),
+                    "textbook":       it.get("textbook"),
+                    "category":       it.get("category"),
+                })
+
+        return {
+            "student_id":   student_id,
+            "student_name": data["student_name"],
+            "start_date":   start_date,
+            "target_date":  target_date,
+            "subject":      subject or "",
+            "days":         rows,
+            "unassigned":   unassigned,
+        }
+
+    elif name == "get_plan_history":
+        # 計画表の出力履歴（読み取り専用）。講師が計画表を出したかの確認に使う
+        student_id = arguments.get("student_id")
+        limit = int(arguments.get("limit") or 20)
+        conn = get_connection()
+        c = conn.cursor()
+        if student_id:
+            c.execute("""
+                SELECT history_id, student_id, generated_date, start_date, end_date,
+                       subject, confirmed,
+                       CASE WHEN excel_path <> '' THEN 1 ELSE 0 END AS has_excel,
+                       CASE WHEN pdf_path   <> '' THEN 1 ELSE 0 END AS has_pdf
+                FROM plan_history WHERE student_id=?
+                ORDER BY generated_date DESC, history_id DESC LIMIT ?
+            """, (student_id, limit))
+        else:
+            c.execute("""
+                SELECT history_id, student_id, generated_date, start_date, end_date,
+                       subject, confirmed,
+                       CASE WHEN excel_path <> '' THEN 1 ELSE 0 END AS has_excel,
+                       CASE WHEN pdf_path   <> '' THEN 1 ELSE 0 END AS has_pdf
+                FROM plan_history
+                ORDER BY generated_date DESC, history_id DESC LIMIT ?
+            """, (limit,))
+        rows = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return rows
+
     # ── 登録系 ──────────────────────────────────────────────────────────
     elif name == "add_series":
         conn = get_connection()

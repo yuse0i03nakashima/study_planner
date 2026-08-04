@@ -132,6 +132,31 @@ async def list_tools():
             }
         ),
         Tool(
+            name="get_plan_days",
+            description="計画表と同じ日別の割り当て（何日に何の問題をやる予定か）を取得する。読み取り専用でDBは変更しない",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id":  {"type": "string", "description": "生徒ID"},
+                    "start_date":  {"type": "string", "description": "計画開始日（YYYY-MM-DD）"},
+                    "target_date": {"type": "string", "description": "計画終了日（YYYY-MM-DD）"},
+                    "subject":     {"type": "string", "description": "教科（省略時は全教科）"}
+                },
+                "required": ["student_id", "start_date", "target_date"]
+            }
+        ),
+        Tool(
+            name="get_plan_history",
+            description="計画表の出力履歴を取得する（いつ・どの生徒/教科の計画表を出力したか）。読み取り専用",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID（省略時は全生徒）"},
+                    "limit":      {"type": "integer", "description": "取得件数（既定20）"}
+                }
+            }
+        ),
+        Tool(
             name="add_series",
             description="テキストシリーズを登録する",
             inputSchema={
