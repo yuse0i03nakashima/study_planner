@@ -2,32 +2,37 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from database import get_connection
 from planner import build_plan_data
+from export_theme import get_palette, normalize_theme
 
 
 def _write_excel_sheet(ws, subjects, rows, unassigned,
-                       student_name, start_date, end_date):
-    """全教科を1シートに出力するダークテーマExcel"""
+                       student_name, start_date, end_date, theme="dark"):
+    """全教科を1シートに出力する（theme: "dark" / "light"）"""
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
     from datetime import date as date_cls
 
     # ── カラーパレット ──
-    BG_MAIN     = "0C0D11"
-    BG_SURFACE  = "13151E"
-    BG_SURFACE2 = "1B1E2B"
-    BG_SURFACE3 = "222536"
-    BG_DAY_A    = "13151E"   # 日付ブロックA（濃）
-    BG_DAY_B    = "1B1E2B"   # 日付ブロックB（やや薄）
-    C_TEXT      = "DDE1EC"
-    C_MUTED     = "9AA3B8"
-    C_DIM       = "555D7A"
-    C_BLUE      = "5B8FF9"
-    C_GREEN     = "3ECF8E"
-    C_AMBER     = "F5A623"
-    C_ROSE      = "F06292"
-    C_RED       = "EF4444"
-    C_BORDER    = "252838"
-    C_BORDER_L  = "2F3347"
+    _p = get_palette(theme)
+    BG_MAIN     = _p["bg_main"]
+    BG_SURFACE  = _p["bg_surface"]
+    BG_SURFACE2 = _p["bg_surface2"]
+    BG_SURFACE3 = _p["bg_header"]
+    BG_TITLE    = _p["bg_title"]
+    BG_DAY_A    = _p["bg_day_a"]   # 日付ブロックA
+    BG_DAY_B    = _p["bg_day_b"]   # 日付ブロックB
+    C_TEXT      = _p["text"]
+    C_MUTED     = _p["muted"]
+    C_DIM       = _p["dim"]
+    C_BLUE      = _p["blue"]
+    C_GREEN     = _p["green"]
+    C_AMBER     = _p["amber"]
+    C_ROSE      = _p["rose"]
+    C_RED       = _p["red"]
+    C_BORDER    = _p["border"]
+    C_BORDER_L  = _p["border_light"]
+    BG_UNASSIGNED     = _p["unassigned_bg"]
+    C_UNASSIGNED_BDR  = _p["unassigned_border"]
 
     CAT_COLORS = {
         "予習": C_BLUE, "復習": C_GREEN,
@@ -68,7 +73,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     N_COLS = len(COLS)
 
     # ── 全セルにデフォルト背景色を設定 ──
-    # I列より右（J〜Z列）にもダークテーマを適用
+    # I列より右（J〜Z列）にもテーマ背景を適用
     for r in range(1, 501):
         for c in range(1, 40):  # A〜AN列まで
             ws.cell(row=r, column=c).fill = fill(BG_MAIN)
@@ -81,13 +86,13 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     ws.merge_cells(f"A1:{get_column_letter(N_COLS)}1")
     c1 = ws["A1"]
     c1.value = f"[SP]  {student_name}   {start_date} → {end_date}"
-    c1.fill = fill("0F1119")   # タイトル専用（最も濃い）
+    c1.fill = fill(BG_TITLE)   # タイトル専用
     c1.font = Font(color=C_BLUE, bold=True, size=12, name="Consolas")
     c1.alignment = aln("left", "center")
     ws.row_dimensions[1].height = 30
 
     # ── ヘッダ行 ──
-    BG_HEADER_ROW = "222536"   # ヘッダ専用色（BG_SURFACE3相当）
+    BG_HEADER_ROW = BG_SURFACE3   # ヘッダ専用色
     for i, (h, _) in enumerate(COLS, 1):
         cell = ws.cell(row=2, column=i)
         cell.value = h.upper()
@@ -233,7 +238,7 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
         ws.merge_cells(f"A{cur}:{get_column_letter(N_COLS)}{cur}")
         sep = ws.cell(row=cur, column=1)
         sep.value = "── UNASSIGNED ──"
-        sep.fill = fill("1A0A0A")
+        sep.fill = fill(BG_UNASSIGNED)
         sep.font = Font(color=C_RED, size=8, name="Consolas")
         sep.alignment = aln("left", "center")
         ws.row_dimensions[cur].height = 14
@@ -251,9 +256,9 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
             for col_i, val in enumerate(vals, 1):
                 cell = ws.cell(row=cur, column=col_i)
                 cell.value = val
-                cell.fill = fill("1A0A0A")
+                cell.fill = fill(BG_UNASSIGNED)
                 cell.font = font(C_DIM, size=9)
-                cell.border = bdr("3A1010")
+                cell.border = bdr(C_UNASSIGNED_BDR)
                 cell.alignment = aln("center" if col_i in (1,2,7,8) else "left",
                                      "center")
             ws.row_dimensions[cur].height = 18
@@ -263,11 +268,17 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
     ws.auto_filter.ref = f"A2:{get_column_letter(N_COLS)}{cur - 1}"
 
 
-def export_excel(student_id, start_date_str, end_date_str, subject_filter=None, section_ids=None):
-    """計画表をExcelファイルに出力して保存パスを返す"""
+def export_excel(student_id, start_date_str, end_date_str, subject_filter=None,
+                 section_ids=None, theme="dark"):
+    """計画表をExcelファイルに出力して保存パスを返す
+
+    theme: "dark"（既定）または "light"
+    """
     import openpyxl
     import os
     from datetime import datetime
+
+    theme = normalize_theme(theme)
 
     plan_data = build_plan_data(
         student_id, start_date_str, end_date_str, subject_filter)
@@ -285,12 +296,15 @@ def export_excel(student_id, start_date_str, end_date_str, subject_filter=None, 
     # 全教科を1シートに出力
     ws = wb.create_sheet(title="Plan")
     _write_excel_sheet(ws, subjects, rows, unassigned,
-                       student_name, start_date_str, end_date_str)
+                       student_name, start_date_str, end_date_str,
+                       theme=theme)
 
     # 保存
     archive_dir = os.path.join(os.path.dirname(__file__), "plan_archives")
     os.makedirs(archive_dir, exist_ok=True)
-    base_name = f"{student_name}_{start_date_str}_{end_date_str}"
+    theme_suffix = "" if theme == "dark" else f"_{theme}"
+    base_name = (f"{student_name}_{start_date_str}_{end_date_str}"
+                 f"{theme_suffix}")
     filename  = f"{base_name}.xlsx"
     filepath  = os.path.join(archive_dir, filename)
     # 同名ファイルが開かれている場合はタイムスタンプを付加

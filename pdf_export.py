@@ -8,37 +8,54 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from planner import build_plan_data
+from export_theme import get_palette, normalize_theme
 import os
 
 pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
 FONT = "HeiseiKakuGo-W5"
 
-# ── カラーパレット（アプリのCSSに準拠） ──
-BG_MAIN     = colors.HexColor("#0C0D11")
-BG_SURFACE  = colors.HexColor("#13151E")
-BG_SURFACE2 = colors.HexColor("#1B1E2B")
-BG_DAY_A    = colors.HexColor("#13151E")
-BG_DAY_B    = colors.HexColor("#1B1E2B")
-C_TEXT      = colors.HexColor("#DDE1EC")
-C_MUTED     = colors.HexColor("#9AA3B8")
-C_DIM       = colors.HexColor("#555D7A")
-C_BLUE      = colors.HexColor("#5B8FF9")
-C_GREEN     = colors.HexColor("#3ECF8E")
-C_AMBER     = colors.HexColor("#F5A623")
-C_ROSE      = colors.HexColor("#F06292")
-C_RED       = colors.HexColor("#EF4444")
-C_BORDER    = colors.HexColor("#252838")
-C_BORDER_L  = colors.HexColor("#2F3347")
-
-CAT_COLORS = {
-    "New": C_BLUE, "Recall": C_GREEN, "Drill": C_AMBER, "Reinforce": C_ROSE,
-    "予習":  C_BLUE,
-    "復習":  C_GREEN,
-    "定着":  C_AMBER,
-    "再定着": C_ROSE,
-}
-MASTERY_COLORS = {1: C_ROSE, 2: C_AMBER, 3: C_GREEN}
 DOW_JA = ["月", "火", "水", "木", "金", "土", "日"]
+
+
+class _Palette:
+    """テーマ名からreportlab用のカラー一式を作る"""
+
+    def __init__(self, theme=None):
+        p = get_palette(theme)
+        def c(key): return colors.HexColor("#" + p[key])
+
+        self.BG_MAIN     = c("bg_main")
+        self.BG_SURFACE  = c("bg_surface")
+        self.BG_SURFACE2 = c("bg_surface2")
+        self.BG_HEADER   = c("bg_header")
+        self.BG_DAY_A    = c("bg_day_a")
+        self.BG_DAY_B    = c("bg_day_b")
+        self.TEXT        = c("text")
+        self.MUTED       = c("muted")
+        self.DIM         = c("dim")
+        self.BLUE        = c("blue")
+        self.GREEN       = c("green")
+        self.AMBER       = c("amber")
+        self.ROSE        = c("rose")
+        self.RED         = c("red")
+        self.BORDER      = c("border")
+        self.BORDER_L    = c("border_light")
+        self.UNASSIGNED  = c("unassigned_bg")
+
+        self.CAT_COLORS = {
+            "New": self.BLUE, "Recall": self.GREEN,
+            "Drill": self.AMBER, "Reinforce": self.ROSE,
+            "予習":   self.BLUE,
+            "復習":   self.GREEN,
+            "定着":   self.AMBER,
+            "再定着": self.ROSE,
+        }
+        self.MASTERY_COLORS = {1: self.ROSE, 2: self.AMBER, 3: self.GREEN}
+
+
+# 既定（ダーク）パレット — モジュール外からの参照互換用
+_DEFAULT_PAL = _Palette("dark")
+C_TEXT = _DEFAULT_PAL.TEXT
 
 
 
@@ -71,9 +88,16 @@ def _para(text, color=None, size=8, bold=False, align="LEFT"):
 
 
 def export_pdf(student_id, start_date_str, end_date_str,
-               subject_filter=None, output_path=None, section_ids=None):
-    """計画表をPDFファイルに出力して保存パスを返す"""
+               subject_filter=None, output_path=None, section_ids=None,
+               theme="dark"):
+    """計画表をPDFファイルに出力して保存パスを返す
+
+    theme: "dark"（既定）または "light"
+    """
     from datetime import date as date_cls
+
+    theme = normalize_theme(theme)
+    pal = _Palette(theme)
 
     plan_data = build_plan_data(
         student_id, start_date_str, end_date_str, subject_filter,
@@ -86,7 +110,9 @@ def export_pdf(student_id, start_date_str, end_date_str,
         archive_dir = os.path.join(os.path.dirname(__file__), "plan_archives")
         os.makedirs(archive_dir, exist_ok=True)
         student_name = plan_data["student_name"]
-        base_name = f"{student_name}_{start_date_str}_{end_date_str}"
+        theme_suffix = "" if theme == "dark" else f"_{theme}"
+        base_name = (f"{student_name}_{start_date_str}_{end_date_str}"
+                     f"{theme_suffix}")
         output_path = os.path.join(archive_dir, f"{base_name}.pdf")
         # ロック対策
         if os.path.exists(output_path):
@@ -124,7 +150,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
     # ── タイトル ──
     title_style = ParagraphStyle(
         "title", fontName=FONT, fontSize=13, leading=18,
-        textColor=C_BLUE,
+        textColor=pal.BLUE,
         spaceAfter=2*mm,
     )
     story.append(Paragraph(
@@ -133,14 +159,14 @@ def export_pdf(student_id, start_date_str, end_date_str,
     ))
     story.append(HRFlowable(
         width="100%", thickness=0.5,
-        color=C_BORDER_L, spaceAfter=3*mm
+        color=pal.BORDER_L, spaceAfter=3*mm
     ))
 
     # ── ヘッダ行 ──
     headers = ["Date", "Day", "Subject", "Cat",
                "Textbook", "Problem", "Mastery", "Min", "Instruction"]
     header_row = [
-        _para(h, color=C_MUTED, size=8, align="CENTER")
+        _para(h, color=pal.MUTED, size=8, align="CENTER")
         for h in headers
     ]
 
@@ -164,7 +190,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
         if not day_items:
             continue
 
-        day_bg = BG_DAY_A if day_toggle else BG_DAY_B
+        day_bg = pal.BG_DAY_A if day_toggle else pal.BG_DAY_B
         day_toggle = not day_toggle
 
         try:
@@ -177,24 +203,24 @@ def export_pdf(student_id, start_date_str, end_date_str,
             date_disp = date_str_raw
             is_weekend = False
 
-        dow_color = C_ROSE if is_weekend else C_MUTED
+        dow_color = pal.ROSE if is_weekend else pal.MUTED
 
         for i, (subj, item) in enumerate(day_items):
             cat = item.get("category", "")
-            cat_color = CAT_COLORS.get(cat, C_DIM)
+            cat_color = pal.CAT_COLORS.get(cat, pal.DIM)
             mastery_int = item.get("mastery_int", 1)
-            mastery_color = MASTERY_COLORS.get(mastery_int, C_TEXT)
+            mastery_color = pal.MASTERY_COLORS.get(mastery_int, pal.TEXT)
 
             row = [
-                _para(date_disp if i == 0 else "", C_MUTED, 8, align="CENTER"),
+                _para(date_disp if i == 0 else "", pal.MUTED, 8, align="CENTER"),
                 _para(dow if i == 0 else "", dow_color, 8, align="CENTER"),
-                _para(subj, C_MUTED, 8, align="CENTER"),
+                _para(subj, pal.MUTED, 8, align="CENTER"),
                 _para(cat, cat_color, 8, align="CENTER"),
-                _para(item.get("textbook", ""), C_MUTED, 8),
-                _para(_pdf_prob_text(item), C_TEXT, 9),
+                _para(item.get("textbook", ""), pal.MUTED, 8),
+                _para(_pdf_prob_text(item), pal.TEXT, 9),
                 _para(item.get("mastery", "★"), mastery_color, 9, align="CENTER"),
-                _para(str(item.get("estimated_minutes", "")), C_DIM, 8, align="CENTER"),
-                _para(item.get("instruction", ""), C_MUTED, 8),
+                _para(str(item.get("estimated_minutes", "")), pal.DIM, 8, align="CENTER"),
+                _para(item.get("instruction", ""), pal.MUTED, 8),
             ]
             table_data.append(row)
 
@@ -210,38 +236,38 @@ def export_pdf(student_id, start_date_str, end_date_str,
 
     if all_unassigned:
         # 区切り行
-        sep_row = [_para("── UNASSIGNED ──", C_RED, 7)] + [""] * 8
+        sep_row = [_para("── UNASSIGNED ──", pal.RED, 7)] + [""] * 8
         table_data.append(sep_row)
-        row_styles.append((row_index, colors.HexColor("#1A0A0A"), False))
+        row_styles.append((row_index, pal.UNASSIGNED, False))
         row_index += 1
 
         for subj, item in all_unassigned:
             cat = item.get("category", "")
-            cat_color = CAT_COLORS.get(cat, C_DIM)
+            cat_color = pal.CAT_COLORS.get(cat, pal.DIM)
             row = [
-                _para("—", C_DIM, 7, align="CENTER"),
-                _para("—", C_DIM, 7, align="CENTER"),
-                _para(subj, C_DIM, 7, align="CENTER"),
-                _para(cat, CAT_COLORS.get(cat, C_DIM), 7, align="CENTER"),
-                _para(item.get("textbook", ""), C_DIM, 7),
-                _para(item.get("problem_number", ""), C_DIM, 8),
-                _para("—", C_DIM, 7, align="CENTER"),
-                _para(str(item.get("estimated_minutes", "")), C_DIM, 7),
-                _para(item.get("instruction", ""), C_DIM, 7),
+                _para("—", pal.DIM, 7, align="CENTER"),
+                _para("—", pal.DIM, 7, align="CENTER"),
+                _para(subj, pal.DIM, 7, align="CENTER"),
+                _para(cat, cat_color, 7, align="CENTER"),
+                _para(item.get("textbook", ""), pal.DIM, 7),
+                _para(item.get("problem_number", ""), pal.DIM, 8),
+                _para("—", pal.DIM, 7, align="CENTER"),
+                _para(str(item.get("estimated_minutes", "")), pal.DIM, 7),
+                _para(item.get("instruction", ""), pal.DIM, 7),
             ]
             table_data.append(row)
-            row_styles.append((row_index, colors.HexColor("#1A0A0A"), True))
+            row_styles.append((row_index, pal.UNASSIGNED, True))
             row_index += 1
 
     # ── テーブルスタイル ──
     ts = TableStyle([
         # 全体
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#222536")),   # ヘッダ
-        ("TEXTCOLOR",  (0, 0), (-1, 0), C_MUTED),
+        ("BACKGROUND", (0, 0), (-1, 0), pal.BG_HEADER),   # ヘッダ
+        ("TEXTCOLOR",  (0, 0), (-1, 0), pal.MUTED),
         ("FONTNAME",   (0, 0), (-1, -1), FONT),
         ("FONTSIZE",   (0, 0), (-1, 0), 7),
-        ("ROWBACKGROUND", (0, 0), (-1, 0), BG_SURFACE2),
-        ("GRID",       (0, 0), (-1, -1), 0.3, C_BORDER),
+        ("ROWBACKGROUND", (0, 0), (-1, 0), pal.BG_SURFACE2),
+        ("GRID",       (0, 0), (-1, -1), 0.3, pal.BORDER),
         ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 2),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
@@ -253,16 +279,16 @@ def export_pdf(student_id, start_date_str, end_date_str,
     for ri, bg, is_last in row_styles:
         ts.add("BACKGROUND", (0, ri), (-1, ri), bg)
         if is_last:
-            ts.add("LINEBELOW", (0, ri), (-1, ri), 0.8, C_BORDER_L)
+            ts.add("LINEBELOW", (0, ri), (-1, ri), 0.8, pal.BORDER_L)
 
     tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
     tbl.setStyle(ts)
     story.append(tbl)
 
-    # ── ページ背景色を黒に ──
+    # ── ページ背景色（テーマに追従） ──
     def draw_bg(canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(BG_MAIN)
+        canvas.setFillColor(pal.BG_MAIN)
         canvas.rect(0, 0, landscape(A4)[0], landscape(A4)[1],
                     fill=True, stroke=False)
         canvas.restoreState()

@@ -53,6 +53,22 @@
     .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
       margin-top:5px; letter-spacing:0.5px; }
     .action-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; align-items:center; }
+    .theme-toggle { display:flex; gap:8px; flex-wrap:wrap; }
+    .theme-opt { display:inline-flex; margin:0; cursor:pointer; }
+    .theme-opt input { position:absolute; opacity:0; width:0; height:0; }
+    .theme-opt span { display:inline-flex; align-items:center; gap:8px;
+      padding:9px 18px; border:1px solid var(--border-light);
+      background:var(--surface2); color:var(--text-dim);
+      font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
+      text-transform:uppercase; transition:all 0.15s; }
+    .theme-opt:hover span { color:var(--text-muted); }
+    .theme-opt input:checked + span { border-color:var(--blue);
+      color:var(--blue); background:var(--blue-bg); }
+    .theme-opt input:focus-visible + span { outline:1px solid var(--blue); outline-offset:2px; }
+    .sw { width:11px; height:11px; display:inline-block;
+      border:1px solid var(--border-light); }
+    .sw-dark  { background:#13151e; }
+    .sw-light { background:#f4f6fa; }
     .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
       text-transform:uppercase; padding:11px 24px; border:none; cursor:pointer;
       transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
@@ -193,6 +209,23 @@
         <input type="hidden" name="mode" value="per_subject">
       </div>
 
+
+      <div style="margin-top:18px;">
+        <label style="margin-top:0;">Output Theme</label>
+        <div class="theme-toggle">
+          <label class="theme-opt">
+            <input type="radio" name="export_theme" value="dark"
+              {% if selected_theme != 'light' %}checked{% endif %}>
+            <span><i class="sw sw-dark"></i>Dark</span>
+          </label>
+          <label class="theme-opt">
+            <input type="radio" name="export_theme" value="light"
+              {% if selected_theme == 'light' %}checked{% endif %}>
+            <span><i class="sw sw-light"></i>Light</span>
+          </label>
+        </div>
+        <p class="hint">Excel / PDF の配色。Light は印刷向け（白背景）。</p>
+      </div>
 
       <div class="action-row">
         <button type="submit" class="btn btn-preview">

@@ -594,12 +594,17 @@ def preview():
             end_date = next_cls if next_cls else (
                 date.fromisoformat(start_date) + timedelta(days=7)).isoformat()
 
+        export_theme = request.form.get("export_theme", "dark").strip().lower()
+        if export_theme not in ("dark", "light"):
+            export_theme = "dark"
+
         selected = {
             "student_id":     student_id,
             "mode":           "per_subject" if subject_filter else "all",
             "subject_filter": subject_filter,
             "start_date":     start_date,
             "end_date":       end_date,
+            "export_theme":   export_theme,
         }
 
         from planner import build_plan_data
@@ -611,7 +616,8 @@ def preview():
             from excel_export import export_excel
             path = export_excel(student_id, start_date, end_date,
                                 subject_filter if subject_filter else None,
-                                section_ids=section_ids if section_ids else None)
+                                section_ids=section_ids if section_ids else None,
+                                theme=export_theme)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path=path, pdf_path="",
@@ -623,7 +629,8 @@ def preview():
             from pdf_export import export_pdf
             path = export_pdf(student_id, start_date, end_date,
                               subject_filter if subject_filter else None,
-                              section_ids=section_ids if section_ids else None)
+                              section_ids=section_ids if section_ids else None,
+                              theme=export_theme)
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path="", pdf_path=path,
@@ -645,6 +652,7 @@ def preview():
     selected_subject     = selected.get("subject_filter", "")
     start_date           = selected.get("start_date", date.today().isoformat())
     end_date             = selected.get("end_date", "")
+    selected_theme       = selected.get("export_theme", "dark")
     selected_student_name = ""
     subjects = []
     for s in students:
@@ -685,6 +693,7 @@ def preview():
                            selected_subject=selected_subject,
                            start_date=start_date,
                            end_date=end_date,
+                           selected_theme=selected_theme,
                            subjects=subjects,
                            selected_sections=_selected_sections,
                            selected_section_ids=_sec_filters,
