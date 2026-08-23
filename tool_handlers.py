@@ -78,8 +78,83 @@ def calc_new_mastery(student_id, problem_id, score, record_date):
     return new_mastery
 
 
+def _calc_new_mastery_c(c, student_id, problem_id, score, record_date):
+    """calc_new_mastery と同一ロジックのカーソル版。
+    add_records のように1トランザクション内で複数件を処理する際、
+    同一接続内の未コミット行を参照できるようにするために使う。"""
+    c.execute("SELECT mastery FROM history WHERE student_id=? AND problem_id=? ORDER BY date DESC LIMIT 1",
+              (student_id, problem_id))
+    row = c.fetchone()
+    current_mastery = row["mastery"] if row else 1
+    if score == 3:
+        return current_mastery
+    correct = score_to_correct(score)
+    if correct == 0:
+        return max(1, current_mastery - 1)
+    if current_mastery >= 3:
+        return 3
+    if current_mastery == 1:
+        c.execute("SELECT COUNT(*) as cnt FROM history WHERE student_id=? AND problem_id=? AND correct=1 AND date < ?",
+                  (student_id, problem_id, record_date))
+        cnt = c.fetchone()["cnt"]
+        return 2 if cnt >= 1 else 1
+    if current_mastery == 2:
+        c.execute("SELECT date FROM history WHERE student_id=? AND problem_id=? AND correct=1 ORDER BY date DESC LIMIT 3",
+                  (student_id, problem_id))
+        dates = [r["date"] for r in c.fetchall()]
+        if len(dates) >= 2:
+            from datetime import datetime
+            d1 = datetime.fromisoformat(dates[-1])
+            d2 = datetime.fromisoformat(record_date)
+            weeks_diff = (d2 - d1).days // 7
+            return 3 if (len(dates) >= 3 and weeks_diff >= 1) else 2
+        return 2
+    return current_mastery
+
+
+def _update_assignments_after_record_c(c, student_id, problem_id, record_date, new_mastery):
+    """database.update_assignments_after_record と同一ロジックのカーソル版。
+    次回出題日を返す（problems に該当がなければ None）。"""
+    from database import get_next_date
+    c.execute("DELETE FROM assignments WHERE student_id=? AND problem_id=?",
+              (student_id, problem_id))
+    c.execute("SELECT review_value FROM problems WHERE problem_id=?", (problem_id,))
+    row = c.fetchone()
+    if not row:
+        return None
+    next_date = get_next_date(row["review_value"], new_mastery, record_date)
+    category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
+    c.execute("""
+        INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
+        VALUES (?, ?, ?, ?)
+    """, (student_id, problem_id, next_date.isoformat(), category))
+    return next_date.isoformat()
+
+
+SCORE_LABELS = {5: "Perfect", 4: "Good", 3: "Review", 2: "Retry", 1: "Failed"}
+
+# handle_tool が処理できるツール名の一覧（get_server_info が返す。デプロイ確認用）
+SUPPORTED_TOOLS = [
+    "get_all_students", "get_student_summary", "get_problems", "get_assignments",
+    "get_series", "get_textbooks", "get_class_schedule", "get_sections",
+    "get_suppression_list", "get_plan_days", "get_plan_history", "get_history",
+    "add_series", "add_textbook", "add_problem", "add_assignment",
+    "add_record", "add_records",
+    "update_problem", "update_assignment_date", "update_assignment_category",
+    "update_mastery", "update_review_value",
+    "delete_assignment", "delete_problem", "delete_record",
+    "set_class_schedule", "set_next_class_date", "clear_suppression",
+    "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
+]
+
+SERVER_VERSION = "2026-08-23-records-v1"
+
+
 def handle_tool(name: str, arguments: dict):
     """ツール名と引数を受け取り、結果を plain Python オブジェクトで返す。"""
+
+    if name == "get_server_info":
+        return {"version": SERVER_VERSION, "tools": sorted(SUPPORTED_TOOLS)}
 
     # ── 一回限りの移行(problem_id/no 再編) ──────────────────────────────
     if name == "run_migration":
@@ -332,6 +407,38 @@ def handle_tool(name: str, arguments: dict):
         conn.close()
         return rows
 
+    elif name == "get_history":
+        # history を生徒×問題×日付範囲で絞って閲覧する軽量ツール
+        student_id = arguments["student_id"]
+        problem_id = arguments.get("problem_id")
+        date_from  = arguments.get("date_from")
+        date_to    = arguments.get("date_to")
+        limit      = int(arguments.get("limit") or 100)
+        conn = get_connection()
+        c = conn.cursor()
+        query = """
+            SELECT h.history_id, h.problem_id, h.date, h.score, h.correct,
+                   h.mastery, h.category, p.problem_number, p.textbook
+            FROM history h LEFT JOIN problems p ON h.problem_id = p.problem_id
+            WHERE h.student_id=?
+        """
+        params = [student_id]
+        if problem_id:
+            query += " AND h.problem_id=?"
+            params.append(int(problem_id))
+        if date_from:
+            query += " AND h.date >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND h.date <= ?"
+            params.append(date_to)
+        query += " ORDER BY h.date DESC, h.history_id DESC LIMIT ?"
+        params.append(limit)
+        c.execute(query, params)
+        rows = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return {"student_id": student_id, "count": len(rows), "history": rows}
+
     # ── 登録系 ──────────────────────────────────────────────────────────
     elif name == "add_series":
         conn = get_connection()
@@ -482,6 +589,7 @@ def handle_tool(name: str, arguments: dict):
         problem_id  = arguments["problem_id"]
         record_date = arguments.get("date", date.today().isoformat())
         score       = int(arguments.get("score", 5))
+        auto_sweep  = bool(arguments.get("auto_sweep", True))  # 省略時は従来どおり掃き込みあり
         correct     = score_to_correct(score)
         conn = get_connection()
         c = conn.cursor()
@@ -503,18 +611,87 @@ def handle_tool(name: str, arguments: dict):
         conn.close()
         from database import update_assignments_after_record
         update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
-        try:
-            from database import auto_record_unreported
-            auto_results = auto_record_unreported(student_id, record_date)
-        except Exception:
-            auto_results = []
-        score_labels = {5: "Perfect", 4: "Good", 3: "Review", 2: "Retry", 1: "Failed"}
+        auto_results = []
+        if auto_sweep:
+            try:
+                from database import auto_record_unreported
+                auto_results = auto_record_unreported(student_id, record_date)
+            except Exception:
+                auto_results = []
         return {
             "new_mastery": new_mastery,
             "mastery_stars": "★" * new_mastery,
             "score": score,
-            "score_label": score_labels.get(score, str(score)),
+            "score_label": SCORE_LABELS.get(score, str(score)),
             "correct": correct,
+            "auto_sweep": auto_sweep,
+            "auto_recorded": auto_results,
+        }
+
+    elif name == "add_records":
+        # 授業で実際に扱った複数問を、明示スコアで一括記録する。
+        # sweep（未報告分の自動掃き込み）は既定でオフ。行うなら最後に高々1回。
+        student_id  = arguments["student_id"]
+        record_date = arguments.get("date", date.today().isoformat())
+        auto_sweep  = bool(arguments.get("auto_sweep", False))
+        records     = arguments.get("records") or []
+        if not records:
+            return {"error": "records が空です。[{problem_id, score}, ...] を指定してください"}
+        for r in records:
+            if "problem_id" not in r:
+                return {"error": f"problem_id がない要素があります: {r}"}
+        conn = get_connection()
+        c = conn.cursor()
+        results = []
+        try:
+            for r in records:
+                problem_id = int(r["problem_id"])
+                score = int(r.get("score", 5))
+                c.execute("SELECT problem_number, textbook FROM problems WHERE problem_id=?", (problem_id,))
+                p = c.fetchone()
+                if not p:
+                    raise ValueError(f"問題が見つかりません: problem_id={problem_id}（全件ロールバックしました）")
+                # add_record と同様、過去のAuto記録は手動記録で上書き
+                c.execute("""
+                    DELETE FROM history
+                    WHERE student_id=? AND problem_id=? AND category='Auto' AND date <= ?
+                """, (student_id, problem_id, record_date))
+                new_mastery = _calc_new_mastery_c(c, student_id, problem_id, score, record_date)
+                correct = score_to_correct(score)
+                c.execute("""
+                    INSERT INTO history (student_id, problem_id, date, correct, mastery, category, score)
+                    VALUES (?,?,?,?,?,?,?)
+                """, (student_id, problem_id, record_date, correct, new_mastery, "Record", score))
+                next_date = _update_assignments_after_record_c(
+                    c, student_id, problem_id, record_date, new_mastery)
+                results.append({
+                    "problem_id": problem_id,
+                    "problem_number": p["problem_number"],
+                    "score": score,
+                    "score_label": SCORE_LABELS.get(score, str(score)),
+                    "correct": correct,
+                    "new_mastery": new_mastery,
+                    "mastery_stars": "★" * new_mastery,
+                    "next_scheduled_date": next_date,
+                })
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            return {"error": str(e)}
+        conn.close()
+        auto_results = []
+        if auto_sweep:
+            try:
+                from database import auto_record_unreported
+                auto_results = auto_record_unreported(student_id, record_date)
+            except Exception:
+                auto_results = []
+        return {
+            "recorded_count": len(results),
+            "date": record_date,
+            "records": results,
+            "auto_sweep": auto_sweep,
             "auto_recorded": auto_results,
         }
 
@@ -579,6 +756,101 @@ def handle_tool(name: str, arguments: dict):
         conn.commit()
         conn.close()
         return {"status": "ok", "deleted_problem_id": problem_id}
+
+    elif name == "delete_record":
+        # 誤記録の取り消し。confirm=true を付けない限り削除は実行せず対象のプレビューを返す。
+        history_id = arguments.get("history_id")
+        student_id = arguments.get("student_id")
+        problem_id = arguments.get("problem_id")
+        rec_date   = arguments.get("date")
+        confirm    = bool(arguments.get("confirm", False))
+        conn = get_connection()
+        c = conn.cursor()
+        if history_id:
+            c.execute("""
+                SELECT h.history_id, h.student_id, h.problem_id, h.date, h.score,
+                       h.correct, h.mastery, h.category, p.problem_number, p.textbook
+                FROM history h LEFT JOIN problems p ON h.problem_id=p.problem_id
+                WHERE h.history_id=?
+            """, (int(history_id),))
+        elif student_id and problem_id and rec_date:
+            c.execute("""
+                SELECT h.history_id, h.student_id, h.problem_id, h.date, h.score,
+                       h.correct, h.mastery, h.category, p.problem_number, p.textbook
+                FROM history h LEFT JOIN problems p ON h.problem_id=p.problem_id
+                WHERE h.student_id=? AND h.problem_id=? AND h.date=?
+            """, (student_id, int(problem_id), rec_date))
+        else:
+            conn.close()
+            return {"error": "history_id か、student_id+problem_id+date のどちらかを指定してください"}
+        targets = [dict(r) for r in c.fetchall()]
+        if not targets:
+            conn.close()
+            return {"error": "該当する記録が見つかりません"}
+        if not confirm:
+            conn.close()
+            return {
+                "requires_confirm": True,
+                "message": "以下の記録を削除します。実行するには confirm=true を付けて再度呼んでください。",
+                "targets": targets,
+            }
+        del_student = targets[0]["student_id"]
+        del_problem = targets[0]["problem_id"]
+        del_date    = min(t["date"] for t in targets)
+        c.execute(f"DELETE FROM history WHERE history_id IN ({','.join('?'*len(targets))})",
+                  [t["history_id"] for t in targets])
+        conn.commit()
+        conn.close()
+        # 残った履歴から mastery を再計算して整合させる。
+        # 削除行より前の履歴は保存値を正とし書き換えない（削除の影響範囲だけを再計算）
+        from database import recalc_mastery_from_history, update_assignments_after_record
+        recalc = recalc_mastery_from_history(del_student, del_problem, since_date=del_date)
+        # 出題予定の復元:
+        #  - 履歴が残っていれば、最新の残存記録の日付＋再計算後mastery で次回出題日を引き直す
+        #  - 履歴が空になったら「未学習」に戻ったとみなし、削除した記録の日付で
+        #    category='New' の出題予定を復元する（元カテゴリは復元不能のため要確認）
+        conn = get_connection()
+        c = conn.cursor()
+        restored = None
+        if recalc["latest_mastery"] is not None:
+            c.execute("SELECT date FROM history WHERE student_id=? AND problem_id=? ORDER BY date DESC, history_id DESC LIMIT 1",
+                      (del_student, del_problem))
+            latest_date = c.fetchone()["date"]
+            conn.close()
+            update_assignments_after_record(del_student, del_problem, latest_date, recalc["latest_mastery"])
+            conn = get_connection()
+            c = conn.cursor()
+            c.execute("SELECT scheduled_date, category FROM assignments WHERE student_id=? AND problem_id=? ORDER BY assignment_id DESC LIMIT 1",
+                      (del_student, del_problem))
+            row = c.fetchone()
+            restored = dict(row) if row else None
+            conn.close()
+        else:
+            c.execute("DELETE FROM assignments WHERE student_id=? AND problem_id=?",
+                      (del_student, del_problem))
+            c.execute("INSERT INTO assignments (student_id, problem_id, scheduled_date, category) VALUES (?,?,?,?)",
+                      (del_student, del_problem, del_date, "New"))
+            conn.commit()
+            conn.close()
+            restored = {"scheduled_date": del_date, "category": "New",
+                        "note": "履歴が空になったため未学習として復元。元カテゴリがNew以外なら update_assignment_category で修正してください"}
+        return {
+            "status": "ok",
+            "deleted": targets,
+            "mastery_recalc": recalc,
+            "restored_assignment": restored,
+        }
+
+    elif name == "recalc_mastery":
+        # history から mastery を再計算して整合させる（delete_record が内部で行う処理の単体版）
+        student_id = arguments["student_id"]
+        problem_id = int(arguments["problem_id"])
+        from database import recalc_mastery_from_history
+        result = recalc_mastery_from_history(student_id, problem_id)
+        if result["rows"] == 0:
+            return {"status": "ok", "message": "履歴がありません", **result}
+        return {"status": "ok", "student_id": student_id, "problem_id": problem_id, **result,
+                "mastery_stars": "★" * (result["latest_mastery"] or 0)}
 
     elif name == "update_assignment_date":
         assignment_id  = arguments["assignment_id"]

@@ -940,6 +940,91 @@ def get_auto_next_class_date(student_id, subject):
     return None
 
 
+def replay_mastery(rows, since_date=None):
+    """
+    history の行リスト（date ASC, history_id ASC 順）を先頭から再生し、
+    各行のあるべき mastery を計算して返す。
+    登録時の calc_new_mastery / calc_new_mastery_v2 と同じ状態遷移を
+    純粋関数として再現しており、行の削除・修正後の再計算に使う。
+    since_date を指定すると、それより前の行は保存済み mastery を正として
+    状態だけ引き継ぎ、since_date 以降の行のみ再計算する
+    （古いロジックで記録された過去行を書き換えないための最小侵襲モード）。
+    rows: [{"history_id", "date", "correct", "mastery", "category", "score"}, ...]
+    戻り値: [(history_id, new_mastery), ...]（rows と同順）
+    """
+    result = []
+    m = 1
+    prior_correct_dates = []  # correct=1 だった行の日付（再生順）
+    for row in rows:
+        cat = row["category"]
+        row_date = date.fromisoformat(row["date"])
+        if since_date is not None and row["date"] < since_date:
+            # 再計算対象外: 保存値を状態として引き継ぐ
+            new_m = int(row["mastery"])
+            if row["correct"]:
+                prior_correct_dates.append(row_date)
+            m = new_m
+            result.append((row["history_id"], new_m))
+            continue
+        if cat == "Manual":
+            # 手動設定はその値を正とする
+            new_m = max(1, min(3, int(row["mastery"])))
+        elif cat in ("AutoPromotion", "LinkedPromotion"):
+            new_m = min(m + 1, 3) if row["correct"] else max(m - 1, 1)
+        else:
+            score = row["score"] if row["score"] is not None else (4 if row["correct"] else 2)
+            if score == 3:
+                new_m = m
+            elif score <= 2:
+                new_m = max(1, m - 1)
+            elif m >= 3:
+                new_m = 3
+            elif m == 1:
+                has_prior = any(d < row_date for d in prior_correct_dates)
+                new_m = 2 if has_prior else 1
+            else:  # m == 2
+                last3 = sorted(prior_correct_dates, reverse=True)[:3]
+                if len(last3) >= 2:
+                    weeks_diff = (row_date - last3[-1]).days // 7
+                    new_m = 3 if (len(last3) >= 3 and weeks_diff >= 1) else 2
+                else:
+                    new_m = 2
+        if row["correct"]:
+            prior_correct_dates.append(row_date)
+        m = new_m
+        result.append((row["history_id"], new_m))
+    return result
+
+
+def recalc_mastery_from_history(student_id, problem_id, since_date=None):
+    """
+    指定問題の history を日付順に再生して mastery カラムを整合させる。
+    削除・修正で「最新行の mastery」が壊れた場合の復旧に使う。
+    since_date 指定時はそれより前の行を書き換えない（delete_record 用の最小侵襲モード）。
+    戻り値: {"rows": 総行数, "changed": 更新行数, "latest_mastery": 最新行のmastery(履歴なしならNone)}
+    """
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT history_id, date, correct, mastery, category, score
+        FROM history WHERE student_id=? AND problem_id=?
+        ORDER BY date, history_id
+    """, (student_id, problem_id))
+    rows = [dict(r) for r in c.fetchall()]
+    if not rows:
+        conn.close()
+        return {"rows": 0, "changed": 0, "latest_mastery": None}
+    replayed = replay_mastery(rows, since_date=since_date)
+    changed = 0
+    for row, (hid, new_m) in zip(rows, replayed):
+        if row["mastery"] != new_m:
+            c.execute("UPDATE history SET mastery=? WHERE history_id=?", (new_m, hid))
+            changed += 1
+    conn.commit()
+    conn.close()
+    return {"rows": len(rows), "changed": changed, "latest_mastery": replayed[-1][1]}
+
+
 def auto_record_unreported(student_id, record_date):
     """
     出題予定のうち授業記録がない問題を自動登録する。

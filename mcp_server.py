@@ -236,10 +236,12 @@ async def list_tools():
         Tool(
             name="add_record",
             description=(
-                "授業記録を登録し習熟度を自動更新する。"
+                "授業記録を1問登録し習熟度を自動更新する。"
                 "score: 5=Perfect(正答), 4=Good(正答), 3=Review(変化なし), "
                 "2=Retry(誤答), 1=Failed(誤答)。"
-                "報告がない問題はscore=5として扱う。"
+                "auto_sweep=true（省略時）の場合、記録後にその日以前の未報告問題を"
+                "まとめて自動記録（掃き込み）する。扱った問題だけを記録したい場合は"
+                "auto_sweep=false を指定するか、add_records を使うこと。"
             ),
             inputSchema={
                 "type": "object",
@@ -247,7 +249,90 @@ async def list_tools():
                     "student_id": {"type": "string",  "description": "生徒ID"},
                     "problem_id": {"type": "integer", "description": "問題ID"},
                     "date":       {"type": "string",  "description": "授業日YYYY-MM-DD（省略時は今日）"},
-                    "score":      {"type": "integer", "description": "評価スコア1〜5（省略時は5=Perfect）"}
+                    "score":      {"type": "integer", "description": "評価スコア1〜5（省略時は5=Perfect)"},
+                    "auto_sweep": {"type": "boolean", "description": "false=未報告問題の自動掃き込みを行わない（省略時true=従来どおり）"}
+                },
+                "required": ["student_id", "problem_id"]
+            }
+        ),
+        Tool(
+            name="add_records",
+            description=(
+                "授業で実際に扱った複数の問題を、問題ごとの明示スコアで一括記録する（1トランザクション）。"
+                "授業報告の処理にはadd_recordよりこちらを推奨。"
+                "auto_sweep は省略時 false（掃き込みなし）。true にした場合のみ、"
+                "全件記録後に最後に1回だけ未報告問題の自動記録を行う。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID"},
+                    "date":       {"type": "string", "description": "授業日YYYY-MM-DD（省略時は今日）"},
+                    "auto_sweep": {"type": "boolean", "description": "true=全件記録後に未報告問題を自動掃き込み（省略時false）"},
+                    "records": {
+                        "type": "array",
+                        "description": "記録する問題のリスト",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "problem_id": {"type": "integer", "description": "問題ID"},
+                                "score":      {"type": "integer", "description": "評価スコア1〜5（省略時5）"}
+                            },
+                            "required": ["problem_id"]
+                        }
+                    }
+                },
+                "required": ["student_id", "records"]
+            }
+        ),
+        Tool(
+            name="get_history",
+            description=(
+                "授業記録(history)を閲覧する。problem_id・日付範囲で絞り込み可能。"
+                "delete_recordの対象となるhistory_idの確認にも使う。読み取り専用"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string",  "description": "生徒ID"},
+                    "problem_id": {"type": "integer", "description": "問題ID（省略時は全問題）"},
+                    "date_from":  {"type": "string",  "description": "この日以降YYYY-MM-DD（任意）"},
+                    "date_to":    {"type": "string",  "description": "この日以前YYYY-MM-DD（任意）"},
+                    "limit":      {"type": "integer", "description": "取得件数（既定100）"}
+                },
+                "required": ["student_id"]
+            }
+        ),
+        Tool(
+            name="delete_record",
+            description=(
+                "誤った授業記録を取り消す。history_id、または student_id+problem_id+date で指定。"
+                "confirm=true を付けない限り削除は実行せず、対象のプレビューだけを返す（安全確認）。"
+                "削除後は履歴からmasteryを再計算し、出題予定も復元する"
+                "（履歴が空になった場合は削除した記録の日付・category=Newで復元）。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "history_id": {"type": "integer", "description": "履歴ID（get_historyで確認。指定時は他の絞り込みは不要）"},
+                    "student_id": {"type": "string",  "description": "生徒ID（history_id未指定時に使用）"},
+                    "problem_id": {"type": "integer", "description": "問題ID（history_id未指定時に使用）"},
+                    "date":       {"type": "string",  "description": "記録日YYYY-MM-DD（history_id未指定時に使用。同日の全記録が対象）"},
+                    "confirm":    {"type": "boolean", "description": "true=削除を実行。省略時はプレビューのみ"}
+                }
+            }
+        ),
+        Tool(
+            name="recalc_mastery",
+            description=(
+                "指定問題のhistoryを日付順に再生してmasteryカラムを再計算・整合させる。"
+                "履歴の削除・修正後に習熟度がおかしい場合の復旧用"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string",  "description": "生徒ID"},
+                    "problem_id": {"type": "integer", "description": "問題ID"}
                 },
                 "required": ["student_id", "problem_id"]
             }
@@ -408,13 +493,20 @@ async def call_tool(name: str, arguments: dict):
         if RAILWAY_URL and RAILWAY_API_KEY:
             mode = "remote"
             target = RAILWAY_URL
+            # リモート側のバージョン・対応ツール一覧を取得（デプロイ確認用）
+            try:
+                server_info = _call_remote("get_server_info", {})
+            except Exception as e:
+                server_info = {"error": f"get_server_info失敗: {e}"}
         else:
-            from tool_handlers import DB_PATH
+            from tool_handlers import DB_PATH, SERVER_VERSION, SUPPORTED_TOOLS
             mode = "local"
             target = DB_PATH
+            server_info = {"version": SERVER_VERSION, "tools": sorted(SUPPORTED_TOOLS)}
         return [TextContent(type="text", text=json.dumps({
             "mode": mode,
             "target": target,
+            "server_info": server_info,
             "warning": None if mode == "remote" else "⚠️ ローカルDBに書き込まれます。RAILWAY_URLとRAILWAY_API_KEYが未設定です。",
         }, ensure_ascii=False, indent=2))]
 
