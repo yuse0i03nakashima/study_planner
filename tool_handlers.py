@@ -148,7 +148,7 @@ SUPPORTED_TOOLS = [
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
 ]
 
-SERVER_VERSION = "2026-09-20-day-assign-v3"
+SERVER_VERSION = "2026-09-20-day-assign-v4"
 
 
 def handle_tool(name: str, arguments: dict):

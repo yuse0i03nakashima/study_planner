@@ -196,13 +196,15 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     """
     割り当てロジック（2026-09 再設計）：
     復習：scheduled_dateが対象教科の授業日ならその前日まで、
-          そうでなければscheduled_dateまでに、件数バランスをとって前半寄りに配置（仕様保証）
+          そうでなければscheduled_dateまでに配置（仕様保証）。
+          候補日の中では余裕時間（残りキャパ）が最大の日を選び、日別の余裕を均す
+          （大キャパ日に多く・小キャパ日に軽く。同率なら前半寄り）
     予習：締切(scheduled_date)ごとにまとめ、番号順（テキスト間インターリーブ）を保ったまま
           「後半寄り重み×曜日別キャパ」の水充填クォータで日別配分。
           後半キャパに収まらない分は番号の小さい側から前半の残キャパへ流れ、
           全体を通した番号順と曜日別キャパ比例が保たれる
-    定着・再定着：残り時間に均等分散、代表問題優先、抑制中はスキップ
-                  （割当が1問もない日を優先して埋める）
+    定着・再定着：代表問題優先、抑制中はスキップ。割当が1問もない日を最優先で埋め、
+          その後は余裕時間が最大の日から埋める（日別の余裕を均す）
     戻り値：(assigned, unassigned, context)
     context は coverage_pass（空き日解消）用の状態
     """
@@ -242,32 +244,30 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     assigned   = []
     unassigned = []
 
-    def try_assign_balanced(item, search_dates, date_counts):
+    def try_assign_balanced(item, search_dates):
         minutes = get_adjusted_minutes(item)
         valid = [d for d in search_dates if can_fit(d, minutes)]
         if not valid:
             return False
-        # 全カテゴリ通して1問もない日を最優先に埋める（空き日の解消）
+        # 全カテゴリ通して1問もない日を最優先に埋め（空き日の解消）、
+        # その後は余裕時間（残りキャパ）が最大の日から埋める（余裕の均し）
         d = min(valid, key=lambda x: (1 if day_item_counts[x] > 0 else 0,
-                                      date_counts[x], -remaining[x]))
+                                      -remaining[x], x))
         remaining[d] -= minutes
         item["assigned_date"] = d
         item["_cov"] = ("any", None)
         item["_charged_minutes"] = minutes
-        date_counts[d] += 1
         day_item_counts[d] += 1
         assigned.append(item)
         return True
 
-    date_counts = defaultdict(int)
     day_item_counts = defaultdict(int)  # 全カテゴリ合算の日別問題数
 
     def day_before(date_str):
         return (date.fromisoformat(date_str) - timedelta(days=1)).isoformat()
 
-    # ── 復習：授業前日まで（授業日出題の場合）／締切までに前半寄り配置 ──
+    # ── 復習：授業前日まで（授業日出題の場合）／締切までに余裕均し配置 ──
     fukusyu_items = [p for p in plan if p["category"] == "Recall"]
-    fuku_date_counts = {}
 
     for item in fukusyu_items:
         minutes = item.get("estimated_minutes", 15) or 15
@@ -287,12 +287,12 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         for cand in candidate_windows:
             valid = [d for d in cand if can_fit(d, minutes)]
             if valid:
-                d = min(valid, key=lambda x: (fuku_date_counts.get(x, 0), x))
+                # 余裕時間（残りキャパ）が最大の日を選ぶ。同率なら前半寄り
+                d = min(valid, key=lambda x: (-remaining[x], x))
                 remaining[d] -= minutes
                 item["assigned_date"] = d
                 item["_cov"] = ("until", limit)   # 移動は limit までに制限
                 item["_charged_minutes"] = minutes
-                fuku_date_counts[d] = fuku_date_counts.get(d, 0) + 1
                 day_item_counts[d] += 1
                 assigned.append(item)
                 placed = True
@@ -440,12 +440,12 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         key=priority_score)
 
     for item in rep_items:
-        if not try_assign_balanced(item, dates_sorted, date_counts):
+        if not try_assign_balanced(item, dates_sorted):
             item["assigned_date"] = None
             unassigned.append(item)
 
     for item in normal_items:
-        if not try_assign_balanced(item, dates_sorted, date_counts):
+        if not try_assign_balanced(item, dates_sorted):
             item["assigned_date"] = None
             unassigned.append(item)
 
