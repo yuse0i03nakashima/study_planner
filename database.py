@@ -273,18 +273,31 @@ def update_assignments_after_record(student_id, problem_id, today_str, new_maste
 
 # ─── 授業スケジュール取得 ──────────────────────────────
 
+DOW_STR_TO_INT = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+
+def decode_dows(rows):
+    """class_schedule_base.dow は文字列(mon〜sun)保存。整数も許容してweekday()値に揃える"""
+    result = set()
+    for v in rows:
+        if isinstance(v, int):
+            if 0 <= v <= 6:
+                result.add(v)
+        elif v in DOW_STR_TO_INT:
+            result.add(DOW_STR_TO_INT[v])
+    return result
+
 def get_next_class_date(student_id, subject, start_date_str):
-    """教科ごとの次回授業日を取得する（上書き優先）"""
+    """教科ごとの次回授業日を取得する（上書き優先。過去日の上書きは失効）"""
     conn = get_connection()
     c = conn.cursor()
 
-    # 上書き（都度指定）を優先
+    # 上書き（都度指定）を優先。ただしstart_date_strより過去の設定は失効扱い
     c.execute("""
         SELECT next_class_date FROM class_schedule_override
         WHERE student_id=? AND subject=?
     """, (student_id, subject))
     row = c.fetchone()
-    if row:
+    if row and row["next_class_date"] and row["next_class_date"] >= start_date_str:
         conn.close()
         return row["next_class_date"]
 
@@ -294,7 +307,7 @@ def get_next_class_date(student_id, subject, start_date_str):
         WHERE student_id=? AND subject=?
         ORDER BY dow
     """, (student_id, subject))
-    dows = [r["dow"] for r in c.fetchall()]
+    dows = decode_dows([r["dow"] for r in c.fetchall()])
     conn.close()
 
     if not dows:
@@ -316,7 +329,7 @@ def get_class_dates_in_range(student_id, subject, start_date_str, end_date_str):
         SELECT dow FROM class_schedule_base
         WHERE student_id=? AND subject=?
     """, (student_id, subject))
-    dows = [r["dow"] for r in c.fetchall()]
+    dows = decode_dows([r["dow"] for r in c.fetchall()])
     conn.close()
 
     if not dows:
@@ -387,6 +400,7 @@ def get_plan_v2(student_id, start_date_str, end_date_str, subject_filter=None):
             "problem_id": r["problem_id"],
             "textbook_id": r["textbook_id"],
             "order_in_textbook": r["order_in_textbook"] or r["problem_id"],
+            "scheduled_date": r["scheduled_date"],
         })
     return plan
 
@@ -901,19 +915,21 @@ def score_to_correct(score):
 def get_auto_next_class_date(student_id, subject):
     """
     class_schedule_overrideがあればそれを返す。
-    なければclass_schedule_baseの曜日から
+    ただし過去日の手動設定は自動失効し、class_schedule_baseの曜日から
     「今日以降の最初の授業日」を自動計算して返す。
     """
     conn = get_connection()
     c = conn.cursor()
 
-    # overrideを確認
+    today = date.today()
+
+    # overrideを確認（今日以降のもののみ有効。経過した手動設定は失効）
     c.execute("""
         SELECT next_class_date FROM class_schedule_override
         WHERE student_id=? AND subject=?
     """, (student_id, subject))
     row = c.fetchone()
-    if row and row["next_class_date"]:
+    if row and row["next_class_date"] and row["next_class_date"] >= today.isoformat():
         conn.close()
         return row["next_class_date"]
 
@@ -928,10 +944,8 @@ def get_auto_next_class_date(student_id, subject):
     if not rows:
         return None
 
-    dow_map = {"mon":0,"tue":1,"wed":2,"thu":3,"fri":4,"sat":5,"sun":6}
-    class_dows = set(dow_map[r["dow"]] for r in rows if r["dow"] in dow_map)
+    class_dows = decode_dows([r["dow"] for r in rows])
 
-    today = date.today()
     for delta in range(1, 14):
         d = today + timedelta(days=delta)
         if d.weekday() in class_dows:

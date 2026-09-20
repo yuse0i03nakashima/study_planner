@@ -104,6 +104,42 @@ confirm()・alert()を使用している箇所があり、ブラウザ言語に�
 - check_connection はリモートの get_server_info（version・tools一覧）を返すようになった。
   デプロイ後の新ツール反映確認に使う。tool_handlers.py の SERVER_VERSION を更新すること。
 
+## 日別配置ロジック v2（2026-09-20 再設計）
+planner.py assign_days_v2 を再設計した。設計思想：予復習が大半・週前半=復習系・後半=予習系。
+
+- **復習(Recall)を最初に配置**。scheduled_date が対象教科の授業日なら「授業前日まで」、
+  そうでなければ「scheduled_dateまで」を候補窓とする（仕様保証）。窓内に収まらない場合のみ
+  scheduled_dateまで→全日の順でフォールバック。
+- **予習(New)は締切(scheduled_date)ごとにグループ化**し、番号順（テキスト間インターリーブ）を
+  保ったまま「後半寄り重み(0.35→1.0)×曜日別キャパ」の水充填(water_fill)で日別クォータを決め、
+  日ポインタを単調に進めて割り当てる。→ 同一締切内の番号順は構造的に崩れない。
+  予習が大半の週は前半の大キャパ日へ番号の小さい側から自然に溢れ、小キャパ日は比例配分で
+  上限に張り付かない。締切が異なる問題間では締切遵守が番号順に優先される（正常動作）。
+  予習型/演習型のモード分けは不要（scheduled_date が窓を決めるため両運用に対応）。
+- 定着・再定着は従来どおり残り時間に均等分散。ただし全カテゴリ通して1問もない日を
+  最優先で埋める（空き日の解消）。
+- **空き日カバレッジ（coverage_pass）**: 配置後、キャパがあるのに割当0問の日へ、
+  制約（番号順・授業前日・締切・キャパ）を守れる問題を1問移す。
+  直接移動（2問以上の日から。新たな空き日を作らない）→ カスケード左詰め
+  （空き日以降の問題を番号順を保ったまま1日ずつ詰める）の順で試す。
+  課題数が日数より少ない週は埋められないが、**前倒しは行わない**
+  （前倒しが必要な場合は講師が問題登録を修正する運用）。埋まらなかった日は
+  build_plan_data の戻り値 `empty_days` で明示され、get_plan_days・スナップショットにも含まれる。
+- scheduled_date が計画期間より過去（期限超過）の課題は週全体を配置窓として扱う。
+- バグ修正: class_schedule_base.dow は文字列(mon〜sun)保存だが、database.py の
+  get_class_dates_in_range / get_next_class_date が整数比較しており常に空を返していた
+  （decode_dows で両対応に修正。復習の授業前日保証はこの修正で機能する）。
+- バグ修正: set_next_class_date の手動設定日は経過後に自動失効し、授業曜日からの未来日へ
+  フォールバックする（tool_handlers.py / database.py の get_auto_next_class_date。
+  get_class_schedule は失効した設定を expired_override として返す）。
+
+## 計画スナップショット（2026-09-20 追加）
+- ブラウザUIから Excel/PDF を出力すると、出力時点の日別配置が plan_history.plan_data に
+  days_v1 形式で保存される（app.py /preview → planner.plan_days_snapshot）。
+- `get_plan_days` に source パラメータを追加: "snapshot" で保存済み配置（=生徒の手元の計画表）を
+  参照。該当スナップショットが無ければ再計算し source="live"・snapshot_found=false を返す。
+  homework_watch の取り組み確認は source="snapshot" を推奨。
+
 ## 開発方針
 - DBへの直接操作は必ずバックアップ後に行う
 - カテゴリ値はDBに英語で保存（New/Recall/Drill/Reinforce）

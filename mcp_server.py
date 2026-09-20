@@ -133,14 +133,15 @@ async def list_tools():
         ),
         Tool(
             name="get_plan_days",
-            description="計画表と同じ日別の割り当て（何日に何の問題をやる予定か）を取得する。読み取り専用でDBは変更しない",
+            description="計画表と同じ日別の割り当て（何日に何の問題をやる予定か）を取得する。読み取り専用でDBは変更しない。source=snapshotで出力時に保存した日別配置（生徒の手元の計画表と一致）を参照できる。empty_days（キャパはあるが課題不足で割当のない日）も返す",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "student_id":  {"type": "string", "description": "生徒ID"},
                     "start_date":  {"type": "string", "description": "計画開始日（YYYY-MM-DD）"},
                     "target_date": {"type": "string", "description": "計画終了日（YYYY-MM-DD）"},
-                    "subject":     {"type": "string", "description": "教科（省略時は全教科）"}
+                    "subject":     {"type": "string", "description": "教科（省略時は全教科）"},
+                    "source":      {"type": "string", "description": "live（既定・再計算）/ snapshot（出力時に保存した配置。無ければ再計算にフォールバックし source=live を返す）"}
                 },
                 "required": ["student_id", "start_date", "target_date"]
             }

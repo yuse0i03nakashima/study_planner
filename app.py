@@ -607,11 +607,23 @@ def preview():
             "export_theme":   export_theme,
         }
 
-        from planner import build_plan_data
+        from planner import build_plan_data, plan_days_snapshot
         action = request.form.get("action", "preview")
 
         section_filters = request.form.getlist("section_filter")
         section_ids = [int(s) for s in section_filters if s.strip()]
+
+        def _make_snapshot():
+            # 出力時点の日別配置を保存し、get_plan_daysから参照できるようにする
+            try:
+                snap_src = build_plan_data(
+                    student_id, start_date, end_date,
+                    subject_filter if subject_filter else None,
+                    section_ids=section_ids if section_ids else None)
+                return plan_days_snapshot(snap_src)
+            except Exception:
+                return None
+
         if action == "excel":
             from excel_export import export_excel
             path = export_excel(student_id, start_date, end_date,
@@ -621,7 +633,8 @@ def preview():
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path=path, pdf_path="",
-                                  subject=subject_filter)
+                                  subject=subject_filter,
+                                  plan_data=_make_snapshot())
                 return send_file(path, as_attachment=True)
             return redirect("/preview")
 
@@ -634,7 +647,8 @@ def preview():
             if path:
                 save_plan_history(student_id, start_date, end_date,
                                   excel_path="", pdf_path=path,
-                                  subject=subject_filter)
+                                  subject=subject_filter,
+                                  plan_data=_make_snapshot())
                 return send_file(path, as_attachment=True)
             return redirect("/preview")
 

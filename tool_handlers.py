@@ -10,12 +10,13 @@ from database import DB_PATH, get_connection
 
 
 def get_auto_next_class_date(student_id, subject):
+    """次回授業日（手動設定優先。過去日の手動設定は自動失効し曜日ベースの未来日へフォールバック）"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("SELECT next_class_date FROM class_schedule_override WHERE student_id=? AND subject=?",
               (student_id, subject))
     row = c.fetchone()
-    if row and row["next_class_date"]:
+    if row and row["next_class_date"] and row["next_class_date"] >= date.today().isoformat():
         conn.close()
         return row["next_class_date"]
     c.execute("SELECT dow FROM class_schedule_base WHERE student_id=? AND subject=?",
@@ -147,7 +148,7 @@ SUPPORTED_TOOLS = [
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
 ]
 
-SERVER_VERSION = "2026-08-23-records-v1"
+SERVER_VERSION = "2026-09-20-day-assign-v3"
 
 
 def handle_tool(name: str, arguments: dict):
@@ -294,11 +295,16 @@ def handle_tool(name: str, arguments: dict):
             if subj not in schedule:
                 schedule[subj] = {"dows": [], "next_class_date": None, "auto_next_class_date": None}
             schedule[subj]["dows"].append(r["dow"])
+        today_str = date.today().isoformat()
         for r in override_rows:
             subj = r["subject"]
             if subj not in schedule:
                 schedule[subj] = {"dows": [], "next_class_date": None, "auto_next_class_date": None}
-            schedule[subj]["next_class_date"] = r["next_class_date"]
+            if r["next_class_date"] and r["next_class_date"] < today_str:
+                # 経過した手動設定は失効扱い（自動計算日を使う）
+                schedule[subj]["expired_override"] = r["next_class_date"]
+            else:
+                schedule[subj]["next_class_date"] = r["next_class_date"]
         for subj in schedule:
             if not schedule[subj]["next_class_date"]:
                 schedule[subj]["auto_next_class_date"] = get_auto_next_class_date(student_id, subj)
@@ -331,10 +337,55 @@ def handle_tool(name: str, arguments: dict):
 
     elif name == "get_plan_days":
         # 計画表と同じ日別割り当てを返す（読み取り専用。DBは変更しない）
+        # source="snapshot" で出力時に保存した日別配置を参照する
+        # （生徒に渡した計画表と再計算結果のずれを避ける。homework_watch向け）
         student_id = arguments["student_id"]
         start_date = arguments["start_date"]
         target_date = arguments["target_date"]
         subject = arguments.get("subject") or None
+        source = (arguments.get("source") or "live").strip().lower()
+
+        if source == "snapshot":
+            import json as _json
+            conn = get_connection()
+            c = conn.cursor()
+            c.execute("""
+                SELECT history_id, generated_date, subject, plan_data
+                FROM plan_history
+                WHERE student_id=? AND start_date=? AND end_date=?
+                  AND plan_data <> ''
+                ORDER BY history_id DESC
+            """, (student_id, start_date, target_date))
+            snap_rows = c.fetchall()
+            conn.close()
+            for r in snap_rows:
+                # subject指定時は同一教科（または全教科出力）のスナップショットを使う
+                if subject and r["subject"] and r["subject"] != subject:
+                    continue
+                try:
+                    payload = _json.loads(r["plan_data"])
+                except Exception:
+                    continue
+                if not (isinstance(payload, dict) and payload.get("format") == "days_v1"):
+                    continue  # 旧形式（日別配置なし）はスキップ
+                days = payload.get("days", [])
+                unassigned = payload.get("unassigned", [])
+                if subject:
+                    days = [d for d in days if d.get("subject") == subject]
+                    unassigned = [u for u in unassigned if u.get("subject") == subject]
+                return {
+                    "student_id":     student_id,
+                    "start_date":     start_date,
+                    "target_date":    target_date,
+                    "subject":        subject or "",
+                    "source":         "snapshot",
+                    "generated_date": r["generated_date"],
+                    "history_id":     r["history_id"],
+                    "days":           days,
+                    "unassigned":     unassigned,
+                    "empty_days":     payload.get("empty_days", []),
+                }
+            # スナップショットが無ければ再計算（sourceで明示して返す）
 
         from planner import build_plan_data
         data = build_plan_data(student_id, start_date, target_date, subject)
@@ -375,8 +426,11 @@ def handle_tool(name: str, arguments: dict):
             "start_date":   start_date,
             "target_date":  target_date,
             "subject":      subject or "",
+            "source":       "live",
+            "snapshot_found": False if source == "snapshot" else None,
             "days":         rows,
             "unassigned":   unassigned,
+            "empty_days":   data.get("empty_days", []),
         }
 
     elif name == "get_plan_history":
