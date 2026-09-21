@@ -66,7 +66,8 @@ def require_login():
     password = os.environ.get('APP_PASSWORD', '')
     if not password:
         return
-    if request.endpoint in ('login', 'logout', 'static', 'api_tool'):
+    if request.endpoint in ('login', 'logout', 'static', 'api_tool',
+                            'api_export_plan'):
         return
     if not session.get('logged_in'):
         return redirect(url_for('login'))
@@ -2191,6 +2192,105 @@ def sections_bulk_assign():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "updated": len(problem_ids)})
+
+@app.route('/api/export_plan', methods=['POST'])
+def api_export_plan():
+    """計画表(Excel/PDF)をAPI経由で出力する。
+
+    /preview の action=excel / action=pdf と同じ経路を使い、
+    スナップショット付きで plan_history に保存する。
+    認証は /api/tool と同じ X-API-Key 方式。
+    """
+    api_key = os.environ.get('RAILWAY_API_KEY', '')
+    if not api_key or request.headers.get('X-API-Key') != api_key:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        return jsonify({'error': 'invalid JSON body'}), 400
+    if not isinstance(data, dict):
+        return jsonify({'error': 'invalid JSON body'}), 400
+
+    student_id = str(data.get('student_id') or '').strip()
+    start_date = str(data.get('start_date') or '').strip()
+    end_date   = str(data.get('end_date') or '').strip()
+    if not student_id:
+        return jsonify({'error': 'student_id is required'}), 400
+    for label, value in (('start_date', start_date), ('end_date', end_date)):
+        if not value:
+            return jsonify({'error': f'{label} is required'}), 400
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            return jsonify(
+                {'error': f'{label} must be YYYY-MM-DD'}), 400
+    if start_date > end_date:
+        return jsonify(
+            {'error': 'start_date must be on or before end_date'}), 400
+
+    subject_filter = str(data.get('subject') or '').strip()
+
+    raw_sections = data.get('section_ids') or []
+    if not isinstance(raw_sections, (list, tuple)):
+        return jsonify({'error': 'section_ids must be a list of int'}), 400
+    try:
+        section_ids = [int(s) for s in raw_sections
+                       if str(s).strip() != '']
+    except (TypeError, ValueError):
+        return jsonify({'error': 'section_ids must be a list of int'}), 400
+
+    fmt = str(data.get('format') or 'excel').strip().lower()
+    if fmt not in ('excel', 'pdf'):
+        return jsonify({'error': 'format must be "excel" or "pdf"'}), 400
+
+    export_theme = str(data.get('theme') or 'dark').strip().lower()
+    if export_theme not in ('dark', 'light'):
+        return jsonify({'error': 'theme must be "dark" or "light"'}), 400
+
+    from planner import build_plan_data, plan_days_snapshot
+
+    def _make_snapshot():
+        # 出力時点の日別配置を保存し、get_plan_daysから参照できるようにする
+        try:
+            snap_src = build_plan_data(
+                student_id, start_date, end_date,
+                subject_filter if subject_filter else None,
+                section_ids=section_ids if section_ids else None)
+            return plan_days_snapshot(snap_src)
+        except Exception:
+            return None
+
+    try:
+        if fmt == 'excel':
+            from excel_export import export_excel
+            path = export_excel(student_id, start_date, end_date,
+                                subject_filter if subject_filter else None,
+                                section_ids=section_ids if section_ids else None,
+                                theme=export_theme)
+            if not path:
+                return jsonify({'error': 'no plan data'}), 404
+            save_plan_history(student_id, start_date, end_date,
+                              excel_path=path, pdf_path="",
+                              subject=subject_filter,
+                              plan_data=_make_snapshot())
+        else:
+            from pdf_export import export_pdf
+            path = export_pdf(student_id, start_date, end_date,
+                              subject_filter if subject_filter else None,
+                              section_ids=section_ids if section_ids else None,
+                              theme=export_theme)
+            if not path:
+                return jsonify({'error': 'no plan data'}), 404
+            save_plan_history(student_id, start_date, end_date,
+                              excel_path="", pdf_path=path,
+                              subject=subject_filter,
+                              plan_data=_make_snapshot())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    return send_file(path, as_attachment=True)
+
 
 if __name__ == "__main__":
     init_db()

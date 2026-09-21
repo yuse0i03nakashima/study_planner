@@ -141,10 +141,22 @@ planner.py assign_days_v2 を再設計した。設計思想：予復習が大半
 - `get_plan_days` に source パラメータを追加: "snapshot" で保存済み配置（=生徒の手元の計画表）を
   参照。該当スナップショットが無ければ再計算し source="live"・snapshot_found=false を返す。
   homework_watch の取り組み確認は source="snapshot" を推奨。
+- `/api/export_plan`（2026-09-21 追加）からの出力でも同じスナップショットが plan_history.plan_data に
+  保存される（/preview と同一経路・同一の `_make_snapshot()` 相当処理）。
+  homework_watch が参照するため、この保存は省略しないこと。
+
+## 計画表出力API `/api/export_plan`（2026-09-21 追加）
+- `POST /api/export_plan`、認証は `/api/tool` と同じ `X-API-Key`（環境変数 `RAILWAY_API_KEY`）。
+- JSONボディ: `student_id`(必須) / `start_date`(必須 YYYY-MM-DD) / `end_date`(必須 YYYY-MM-DD) /
+  `subject`(任意・空=全教科) / `section_ids`(任意 intリスト) / `format`("excel"既定|"pdf") /
+  `theme`("dark"既定|"light")。
+- 成功時はファイル本体を attachment で返し、plan_history にスナップショット付きで記録する。
+  必須欠落・不正値=400、認証失敗=401、計画データなし=404（`{"error": "no plan data"}`）。
 
 ## 開発方針
 - DBへの直接操作は必ずバックアップ後に行う
 - カテゴリ値はDBに英語で保存（New/Recall/Drill/Reinforce）
 - scheduled_date='2099-12-31'は「授業日未定」を意味する
-- 計画表の出力はブラウザUIから手動で行う（MCPからは実行しない）
+- 計画表の出力はブラウザUIまたは `/api/export_plan`（X-API-Key認証）から行う。
+  Claude Codeからの出力は講師のプレビュー承認後のみ実行する（tutor側 `/plan-export` スキル参照）
 - 削除操作は必ず確認を取ってから実行する
