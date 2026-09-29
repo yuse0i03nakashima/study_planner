@@ -129,6 +129,7 @@ def export_pdf(student_id, start_date_str, end_date_str,
     subjects     = plan_data["subjects"]
     rows         = plan_data["rows"]
     unassigned   = plan_data.get("unassigned", {})
+    carried      = plan_data.get("carried_over", {})
 
     # 横向きA4
     doc = SimpleDocTemplate(
@@ -228,15 +229,18 @@ def export_pdf(student_id, start_date_str, end_date_str,
             row_styles.append((row_index, day_bg, is_last))
             row_index += 1
 
-    # ── 未割当 ──
-    all_unassigned = []
-    for subj in subjects:
-        for item in unassigned.get(subj, []):
-            all_unassigned.append((subj, item))
+    # ── 未割当／繰り越し（定着系の週上限で翌週へ回した問題） ──
+    for label, group in (("── UNASSIGNED ──", unassigned),
+                         ("── CARRY OVER（翌週へ繰り越し）──", carried)):
+        all_unassigned = []
+        for subj in subjects:
+            for item in group.get(subj, []):
+                all_unassigned.append((subj, item))
+        if not all_unassigned:
+            continue
 
-    if all_unassigned:
         # 区切り行
-        sep_row = [_para("── UNASSIGNED ──", pal.RED, 7)] + [""] * 8
+        sep_row = [_para(label, pal.RED, 7)] + [""] * 8
         table_data.append(sep_row)
         row_styles.append((row_index, pal.UNASSIGNED, False))
         row_index += 1

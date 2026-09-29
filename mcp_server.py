@@ -64,7 +64,7 @@ async def list_tools():
         ),
         Tool(
             name="get_problems",
-            description="問題マスタの一覧を取得する。student_idで生徒に紐づく問題のみに絞り込み可能",
+            description="問題マスタの一覧を取得する（section_id・section_name・representative_of を含む）。student_idで生徒に紐づく問題のみに絞り込み可能",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -214,7 +214,8 @@ async def list_tools():
                     "undecided":      {"type": "boolean", "description": "true=授業日未定として登録（計画表に出さない）"},
                     "total_minutes":  {"type": "integer", "description": "総HP（省略=通常問題=1回完結）。古文精読など複数セッションに分割したい場合に設定。estimated_minutesより大きな値を設定する"},
                     "section_id":     {"type": "integer", "description": "セクションID（get_sectionsで確認）。section_nameと排他"},
-                    "section_name":   {"type": "string",  "description": "セクション名。指定すると既存セクションを検索し、なければ新規作成する。section_idと排他"}
+                    "section_name":   {"type": "string",  "description": "セクション名（教科書の節名で統一）。指定すると既存セクションを検索し、なければ新規作成する。section_idと排他"},
+                    "representative_of": {"type": "integer", "description": "この問題を周辺問題として紐づける代表問題のID（任意。後から update_problem で指定・解除可）"}
                 },
                 "required": ["subject", "textbook_id", "problem_number",
                              "importance", "difficulty", "review_value", "estimated_minutes"]
@@ -340,7 +341,12 @@ async def list_tools():
         ),
         Tool(
             name="update_problem",
-            description="問題のパラメータ（問題名・重要度・難易度・復習価値・所要時間・学習指示）を更新する。problem_number を変更する場合、同テキスト内で同名が既にあればエラーになる。",
+            description=(
+                "問題のパラメータ（問題名・重要度・難易度・復習価値・所要時間・学習指示）を更新する。"
+                "problem_number を変更する場合、同テキスト内で同名が既にあればエラーになる。"
+                "事後修正: section_name（検索→無ければ作成）または section_id でセクションを付け替え、"
+                "representative_of で代表問題（復習価値4以上）への紐づけを指定・解除（null）できる。"
+            ),
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -350,9 +356,54 @@ async def list_tools():
                     "difficulty":        {"type": "integer", "description": "難易度（1〜5）"},
                     "review_value":      {"type": "integer", "description": "復習価値（1〜5）"},
                     "estimated_minutes": {"type": "integer", "description": "所要時間（分）"},
-                    "instruction":       {"type": "string",  "description": "学習指示"}
+                    "instruction":       {"type": "string",  "description": "学習指示"},
+                    "section_id":        {"type": ["integer", "null"], "description": "セクションID（同テキストのもの。null で解除）。section_name と排他"},
+                    "section_name":      {"type": "string",  "description": "セクション名（教科書の節名。既存を検索し無ければ作成）"},
+                    "representative_of": {"type": ["integer", "null"], "description": "この問題を周辺問題として紐づける代表問題のID。null で解除"}
                 },
                 "required": ["problem_id"]
+            }
+        ),
+        Tool(
+            name="get_linked_problems",
+            description=(
+                "代表問題（復習価値4以上）に連動する周辺問題の一覧を返す（DBは変更しない）。"
+                "紐づけの事後修正後の確認用。優先順: representative_of の明示指定 → 同セクションで復習価値がより低い問題 → "
+                "（セクション無し）同テキストで初回授業日が同じ問題（12問を超えるグループは連動しない）。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string",  "description": "生徒ID"},
+                    "problem_id": {"type": "integer", "description": "代表問題のID"}
+                },
+                "required": ["student_id", "problem_id"]
+            }
+        ),
+        Tool(
+            name="set_problem_sections",
+            description=(
+                "既存問題にセクションを一括で付ける（バックフィル用）。confirm を付けない場合はプレビューのみ。"
+                "confirm=true で DB を .bak_日時 にコピーしてから適用する。セクション名は同テキスト内で検索し、無ければ作成する。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entries": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "problem_id":   {"type": "integer"},
+                                "section_name": {"type": "string", "description": "教科書の節名（例: 38 不定積分）"}
+                            },
+                            "required": ["problem_id", "section_name"]
+                        },
+                        "description": "[{problem_id, section_name}, ...]"
+                    },
+                    "confirm": {"type": "boolean", "description": "true で適用。省略時はプレビューのみ"}
+                },
+                "required": ["entries"]
             }
         ),
         Tool(

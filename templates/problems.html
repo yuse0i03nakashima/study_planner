@@ -1,168 +1,128 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Add Problem — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-      --purple:#a78bfa; --purple-bg:rgba(167,139,250,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1000px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; color:#f87171; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border);
-      padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:18px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    textarea { resize:vertical; min-height:72px; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-purple { background:var(--purple-bg); color:var(--purple);
-      border:1px solid rgba(167,139,250,0.3); }
-    .btn-purple:hover { background:rgba(167,139,250,0.2); }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-danger { background:var(--red); color:white; }
-    .btn-danger:hover { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted);
-      border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      margin-top:5px; letter-spacing:0.5px; }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted);
-      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
-      text-transform:uppercase; padding:10px 12px; text-align:center;
-      border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:8px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-dim); letter-spacing:1px; }
-    /* AI提案ボックス */
-    .ai-box { background:var(--purple-bg); border:1px solid rgba(167,139,250,0.25);
-      padding:20px 24px; margin-bottom:20px; }
-    .ai-box-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--purple); margin-bottom:14px;
-      padding-bottom:10px; border-bottom:1px solid rgba(167,139,250,0.2); }
-    .ai-result { margin-top:14px; background:var(--surface2);
-      border:1px solid var(--border-light); padding:14px 16px;
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.5px;
-      white-space:pre-wrap; display:none; color:var(--text-muted); }
-    .loading { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim);
-      letter-spacing:1px; display:none; }
-    /* チェックボックス */
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    .student-checks { display:flex; gap:20px; flex-wrap:wrap; margin-top:8px; }
-    .student-checks label { font-weight:normal; display:flex; align-items:center;
-      gap:8px; margin:0; text-transform:none; letter-spacing:0; font-size:13px;
-      color:var(--text); font-family:'Noto Serif JP',serif; }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue); color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    a { color:var(--blue); text-decoration:none; }
-    .editable { cursor:pointer; padding:2px 6px; border-radius:2px;
-      border:1px dashed transparent; transition:border-color 0.12s, background 0.12s;
-      display:inline-block; }
-    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
-    .editable.editing { display:none; }
-    .inline-input { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
-    .inline-textarea { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:4px 8px; font-size:11px; outline:none;
-      width:200px; min-height:52px; resize:both; }
-    #confirm-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.75); z-index:2000;
-      align-items:center; justify-content:center; }
-    #confirm-modal.show { display:flex; }
-    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
-      border-left:3px solid var(--red); padding:24px 28px;
-      min-width:320px; max-width:460px; width:90%; }
-    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
-    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
-      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
-    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set container_w = "1000px" %}
+{% set page_label = "01 / Master" %}
+{% set page_title = "Add Problem" %}
+{% set page_title_ja = "問題登録" %}
+{% set title_color = "var(--red)" %}
+{% set back_href = "/problems/list" %}
+{% set back_label = "PROBLEM LIST" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">01 / Master Data</div>
-      <div class="page-title">Add Problem</div>
-      <div class="page-title-ja">Add New Problem</div>
-    </div>
-    <a class="page-header-back" href="/problems/list">Problem List</a>
-  </div>
+{% block title %}Add Problem — Study Planner{% endblock %}
 
+{% block style %}
+<style>
+  /* ── フォームのフィールド（label + control + hint で高さを揃える） ── */
+  .field { display:flex; flex-direction:column; }
+  .field > label { margin-top:0; }
+  .field > .hint { min-height:30px; margin-top:6px; margin-bottom:0; }
+  .field-row { margin-bottom:4px; }
+  .hint a { color:var(--red); }
+  .hp { color:var(--green); margin-left:6px; }
+
+  /* hint の中に置くチェックボックス */
+  .inline-check {
+    display:inline-flex; align-items:center; gap:6px;
+    margin:0 10px 0 0; font-size:10px; cursor:pointer;
+    color:var(--text-muted);
+  }
+
+  /* ── AI提案ボックス ── */
+  .ai-box {
+    background:var(--purple-bg); border:1px solid rgba(167,139,250,0.25);
+    padding:20px 24px; margin-bottom:20px;
+  }
+  .ai-box-title {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--purple); margin-bottom:10px;
+    padding-bottom:10px; border-bottom:1px solid rgba(167,139,250,0.2);
+  }
+  .ai-box-desc { font-size:12px; color:var(--text-muted); margin-bottom:10px; }
+  .ai-actions { display:flex; gap:12px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  .ai-result {
+    margin-top:14px; background:var(--surface2);
+    border:1px solid var(--border-light); padding:14px 16px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:0.5px;
+    white-space:pre-wrap; display:none; color:var(--text-muted);
+  }
+  .loading {
+    font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+    letter-spacing:1px; display:none;
+  }
+
+  /* ── 生徒チェックボックス ── */
+  .student-checks { display:flex; gap:20px; flex-wrap:wrap; margin-top:8px; }
+  .student-checks label {
+    font-weight:normal; display:flex; align-items:center;
+    gap:8px; margin:0; text-transform:none; letter-spacing:0; font-size:13px;
+    color:var(--text); font-family:var(--font-ja); cursor:pointer;
+  }
+
+  /* ── 送信行 ── */
+  .submit-row { margin-top:24px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .submit-note { font-size:12px; color:var(--text-muted); }
+
+  /* ── インライン編集 ── */
+  .editable {
+    cursor:pointer; padding:2px 6px; border-radius:2px;
+    border:1px dashed transparent; display:inline-block;
+    transition:border-color 0.12s, background 0.12s;
+  }
+  .editable:hover { border-color:var(--border-light); background:var(--surface3); }
+  .editable.editing { display:none; }
+  .inline-input {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:3px 6px; font-size:12px; width:auto;
+  }
+  .inline-textarea {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:4px 8px; font-size:11px;
+    width:200px; min-height:52px; resize:both;
+  }
+  .cell-num { font-family:var(--font-mono); font-size:11px; }
+  .cell-clip {
+    font-size:11px; display:block; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap;
+  }
+  .col-textbook { max-width:130px; }
+  .col-problem  { max-width:150px; }
+  .col-instr    { max-width:140px; }
+
+  /* ── 出題予定追加モーダル ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.7); z-index:1000;
+    align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal-box {
+    background:var(--surface); border:1px solid var(--border-light);
+    padding:28px 32px; min-width:320px; max-width:500px; width:100%;
+  }
+  .modal-title {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--border);
+  }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
   <!-- AI提案ボックス -->
   <div class="ai-box fade-in">
-    <div class="ai-box-title">AI Suggest — 4パラメータ自動提案</div>
+    <div class="ai-box-title">AI Suggest</div>
+    <p class="ai-box-desc">
+      問題の内容・特徴を書くと、重要度・難易度・復習価値・所要時間の4パラメータを提案します。
+    </p>
     <textarea id="ai-input"
-      placeholder="問題の内容・特徴を入力してください&#10;例：体系数学2 代数 大問5 因数分解の応用。難しめ。"></textarea>
-    <div style="display:flex;gap:12px;align-items:center;margin-top:12px;">
-      <button class="btn btn-purple btn-sm" onclick="askAI()">✦ AI に提案してもらう</button>
+      placeholder="例：体系数学2 代数 大問5 因数分解の応用。難しめ。"></textarea>
+    <div class="ai-actions">
+      <button type="button" class="btn btn-purple btn-sm" onclick="askAI()">✦ Suggest</button>
       <span class="loading" id="ai-loading">analysing...</span>
     </div>
     <div class="ai-result" id="ai-result"></div>
     <div style="margin-top:12px;display:none;" id="apply-row">
-      <button class="btn btn-success btn-sm" onclick="applyAI()">↓ Apply to Form</button>
+      <button type="button" class="btn btn-success btn-sm" onclick="applyAI()">↓ Apply to Form</button>
     </div>
   </div>
 
@@ -171,57 +131,54 @@
     <div class="card-title">Problem Entry</div>
     <form method="POST" id="problem-form">
 
-      <div class="grid-3">
-        <div>
-          <label>Subject</label>
-          <select name="subject" id="f-subject" onchange="filterTextbooks()">
+      <div class="grid-3 field-row">
+        <div class="field">
+          <label for="f-subject">Subject</label>
+          <select name="subject" id="f-subject">
             {% for subj in all_subjects %}
             <option value="{{ subj }}">{{ subj }}</option>
             {% endfor %}
           </select>
+          <p class="hint">教科でテキストを絞り込みます</p>
         </div>
-        <div>
-          <label>Textbook</label>
-          <select name="textbook_id" id="f-textbook_id"
-            onchange="updateOrderHint(); loadProblemSections();">
+        <div class="field">
+          <label for="f-textbook_id">Textbook</label>
+          <select name="textbook_id" id="f-textbook_id">
             {% for t in textbooks %}
             <option value="{{ t.textbook_id }}" data-subject="{{ t.subject }}">
               {% if t.series_name %}[{{ t.series_name }}] {% endif %}{{ t.name }}
             </option>
             {% endfor %}
           </select>
-          <p class="hint">
-            <a href="/textbooks" style="color:#f87171;">+ New Textbook</a>
-          </p>
+          <p class="hint"><a href="/textbooks">+ New Textbook</a></p>
         </div>
-        <div>
-          <label>Section <span style="color:var(--text-dim);font-size:9px;">blank = same as previous</span></label>
-          <select name="section_id" id="f-section_id"
-            style="width:100%;padding:8px 12px;background:var(--surface2);
-              border:1px solid var(--border-light);color:var(--text);
-              font-size:13px;outline:none;">
+        <div class="field">
+          <label for="f-section_id">Section</label>
+          <select name="section_id" id="f-section_id">
             <option value="">— Same as previous —</option>
           </select>
+          <p class="hint">Blank → 直前と同じセクション</p>
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:0;">
-        <div>
-          <label>Problem Number / Name</label>
+      <div class="grid-2 field-row">
+        <div class="field">
+          <label for="f-problem_number">Problem Number / Name</label>
           <input type="text" name="problem_number" id="f-problem_number"
             placeholder="e.g. Problem 5 (Factorization)" required>
+          <p class="hint">計画表に表示される問題名</p>
         </div>
-        <div>
-          <label>No. in Textbook</label>
+        <div class="field">
+          <label for="f-order_in_textbook">No. in Textbook</label>
           <input type="number" name="order_in_textbook" id="f-order_in_textbook"
             min="1" max="9999" placeholder="e.g. 42">
-          <p class="hint">Blank → auto-set to next No. in textbook</p>
+          <p class="hint">Blank → テキスト内の次の No. を自動採番</p>
         </div>
       </div>
 
-      <div class="grid-4" style="margin-top:0;">
-        <div>
-          <label>Importance</label>
+      <div class="grid-3 field-row">
+        <div class="field">
+          <label for="f-importance">Importance</label>
           <select name="importance" id="f-importance">
             <option value="5">5 — 最重要</option>
             <option value="4">4 — 重要</option>
@@ -229,9 +186,10 @@
             <option value="2">2 — やや低</option>
             <option value="1">1 — 低</option>
           </select>
+          <p class="hint">出題の優先度</p>
         </div>
-        <div>
-          <label>Difficulty</label>
+        <div class="field">
+          <label for="f-difficulty">Difficulty</label>
           <select name="difficulty" id="f-difficulty">
             <option value="5">5 — 最難</option>
             <option value="4">4 — 難</option>
@@ -239,9 +197,10 @@
             <option value="2">2 — 易</option>
             <option value="1">1 — 基礎</option>
           </select>
+          <p class="hint">自動記録のスコアに影響</p>
         </div>
-        <div>
-          <label>Recall Value</label>
+        <div class="field">
+          <label for="f-review_value">Recall Value</label>
           <select name="review_value" id="f-review_value">
             <option value="5">5 — 最高</option>
             <option value="4">4 — 高</option>
@@ -249,54 +208,57 @@
             <option value="2">2 — 低</option>
             <option value="1">1 — 最低</option>
           </select>
+          <p class="hint">復習で再出題する価値</p>
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:0;">
-        <div>
-          <label>Min. / Session</label>
+      <div class="grid-2 field-row">
+        <div class="field">
+          <label for="f-estimated_minutes">Min. / Session</label>
           <select name="estimated_minutes" id="f-estimated_minutes">
             {% for m in range(5, 125, 5) %}
             <option value="{{ m }}" {% if m == 15 %}selected{% endif %}>{{ m }} min</option>
             {% endfor %}
           </select>
+          <p class="hint">1回あたりの想定時間</p>
         </div>
-        <div>
-          <label>Total Min. <span style="color:var(--text-dim);font-size:9px;">blank = single session</span></label>
+        <div class="field">
+          <label for="f-total_minutes">Total Min.</label>
           <input type="number" name="total_minutes" id="f-total_minutes"
             min="5" max="999" step="5" placeholder="e.g. 180">
-          <div class="hint" id="hp-hint" style="margin-top:4px;color:var(--green);"></div>
+          <p class="hint">Blank → 1回で完結<span class="hp" id="hp-hint"></span></p>
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:0;">
-        <div>
-          <label>Category</label>
+      <div class="grid-2 field-row">
+        <div class="field">
+          <label for="f-category">Category</label>
           <select name="category" id="f-category">
             <option value="New" selected>New</option>
             <option value="Recall">Recall</option>
             <option value="Drill">Drill</option>
             <option value="Reinforce">Reinforce</option>
           </select>
+          <p class="hint">New=予習 / Recall=復習 / Drill=定着 / Reinforce=再定着</p>
         </div>
-        <div>
-          <label>Scheduled Date</label>
+        <div class="field">
+          <label for="f-scheduled_date">Scheduled Date</label>
           <input type="date" name="scheduled_date" id="f-scheduled_date">
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
-            <input type="checkbox" name="undecided" value="1" id="f-undecided"
-              style="accent-color:var(--blue);width:14px;height:14px;"
-              onchange="toggleDate(this)">
-            <label for="f-undecided" style="font-family:'DM Mono',monospace;font-size:10px;
-              letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);
-              margin:0;cursor:pointer;">Undecided</label>
-          </div>
-          <p class="hint">Blank → auto from class schedule / Undecided → excluded from plan</p>
+          <p class="hint">
+            <label class="inline-check" for="f-undecided">
+              <input type="checkbox" name="undecided" value="1" id="f-undecided"
+                onchange="toggleDate(this)">Undecided
+            </label>
+            Blank → 授業予定から自動 / Undecided → 計画から除外
+          </p>
         </div>
       </div>
 
-      <label>Instruction</label>
-      <textarea name="instruction" id="f-instruction"
-        placeholder="e.g. Focus on the factorization procedure."></textarea>
+      <div class="field" style="margin-top:12px;">
+        <label for="f-instruction">Instruction</label>
+        <textarea name="instruction" id="f-instruction"
+          placeholder="e.g. Focus on the factorization procedure."></textarea>
+      </div>
 
       <label>Students</label>
       <div class="student-checks">
@@ -308,9 +270,10 @@
         {% endfor %}
       </div>
 
-      <div style="margin-top:24px;display:flex;gap:12px;">
+      <div class="submit-row">
         <button type="submit" class="btn btn-primary">Register →</button>
         <a href="/problems/list" class="btn btn-ghost">Problem List</a>
+        <span class="submit-note">この内容で問題マスタに登録します</span>
       </div>
 
     </form>
@@ -319,7 +282,8 @@
   <!-- 直近50件 -->
   <div class="card fade-in">
     <div class="card-title">Recent Problems — Last 50</div>
-    <div style="overflow-x:auto;">
+    {% if problems %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
@@ -330,18 +294,13 @@
       <tbody>
       {% for p in problems %}
       <tr id="row-{{ p.problem_id }}">
-        <td class="meta-text" style="font-family:'DM Mono',monospace;font-size:11px;">
-          {{ p.order_in_textbook or '—' }}
-        </td>
+        <td class="meta-text cell-num">{{ p.order_in_textbook or '—' }}</td>
         <td class="meta-text">{{ p.subject }}</td>
-        <td class="left" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">
-          {{ p.textbook }}
-        </td>
+        <td class="left col-textbook"><span class="cell-clip">{{ p.textbook }}</span></td>
         <!-- 問題番号：テキスト編集 -->
-        <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="problem_number"
-          style="max-width:150px;">
-          <span class="editable" ondblclick="startTextLineEdit(this)"
-            style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">
+        <td class="editable-cell left col-problem" data-problem="{{ p.problem_id }}"
+          data-field="problem_number">
+          <span class="editable cell-clip" ondblclick="startTextLineEdit(this)">
             {{ p.problem_number }}
           </span>
         </td>
@@ -359,22 +318,23 @@
         <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="estimated_minutes">
           <span class="editable" ondblclick="startNumEdit(this, 5, 120, 5)">{{ p.estimated_minutes }}</span>
         </td>
-        <!-- 総HP：数値編集 -->
-        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="total_minutes"><span class="editable" ondblclick="startNumEdit(this, 5, 999, 5)" style="color:var(--text-dim);">{{ p.total_minutes if p.total_minutes else '—' }}</span></td>
-        <!-- 総HP：数値編集 -->
+        <!-- 総所要時間：数値編集 -->
+        <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="total_minutes">
+          <span class="editable" ondblclick="startNumEdit(this, 5, 999, 5)"
+            style="color:var(--text-dim);">{{ p.total_minutes if p.total_minutes else '—' }}</span>
+        </td>
         <!-- 学習指示：テキストエリア編集 -->
-        <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="instruction"
-          style="max-width:140px;">
-          <span class="editable" ondblclick="startTextAreaEdit(this)"
-            style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
+        <td class="editable-cell left col-instr" data-problem="{{ p.problem_id }}"
+          data-field="instruction">
+          <span class="editable cell-clip" ondblclick="startTextAreaEdit(this)">
             {{ p.instruction or '—' }}
           </span>
         </td>
         <td>
-          <button class="btn btn-ghost btn-sm"
+          <button type="button" class="btn btn-ghost btn-sm"
             onclick="showAddAssignment({{ p.problem_id }})"
             title="Add to assignments">+</button>
-          <button class="btn btn-danger btn-sm"
+          <button type="button" class="btn btn-danger btn-sm"
             onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
         </td>
       </tr>
@@ -382,154 +342,127 @@
       </tbody>
     </table>
     </div>
-  </div>
-
-  <div id="toast"></div>
-
-<!-- 削除確認モーダル -->
-<div id="confirm-modal">
-  <div class="confirm-box">
-    <div class="confirm-title">Confirm Delete</div>
-    <div class="confirm-message" id="confirm-message"></div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
-      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-title">No Problems</div>
+      問題がまだ登録されていません。上のフォームから登録してください。
     </div>
+    {% endif %}
   </div>
-</div>
+{% endblock %}
 
+{% block after_container %}
 <!-- 出題予定追加モーダル -->
-<div id="assign-modal" style="display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border:1px solid var(--border-light);
-    padding:28px 32px;min-width:360px;max-width:500px;width:90%;">
-    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
-      text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;
-      padding-bottom:10px;border-bottom:1px solid var(--border);">
-      Add Assignment
-    </div>
+<div id="assign-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Add Assignment</div>
     <form id="assign-form" method="POST" action="/assignments/add">
       <input type="hidden" name="problem_id" id="modal-problem-id">
       <input type="hidden" name="redirect_to" value="/problems">
       <div style="margin-bottom:14px;">
-        <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-          Students
-        </label>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <label>Students</label>
+        <div class="student-checks">
           {% for s in students %}
-          <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
-            font-size:13px;font-weight:300;color:var(--text);cursor:pointer;">
-            <input type="checkbox" name="student_ids" value="{{ s.student_id }}"
-              style="accent-color:var(--blue);width:14px;height:14px;">
+          <label>
+            <input type="checkbox" name="student_ids" value="{{ s.student_id }}">
             {{ s.name }}
           </label>
           {% endfor %}
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
-        <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-            Category
-          </label>
-          <select name="category"
-            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
-              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+      <div class="grid-2" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Category</label>
+          <select name="category">
             <option value="New">New</option>
             <option value="Recall">Recall</option>
             <option value="Drill">Drill</option>
             <option value="Reinforce">Reinforce</option>
           </select>
         </div>
-        <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-            Date
-          </label>
-          <input type="date" name="scheduled_date"
-            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
-              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" name="scheduled_date">
         </div>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost btn-sm"
-          onclick="closeModal()">Cancel</button>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm">Add →</button>
       </div>
     </form>
   </div>
 </div>
+{% endblock %}
 
-</div>
+{% block script %}
 <script>
 let aiData = null;
 
 function showAddAssignment(problemId) {
   document.getElementById('modal-problem-id').value = problemId;
-  const modal = document.getElementById('assign-modal');
-  modal.style.display = 'flex';
+  document.getElementById('assign-modal').classList.add('show');
 }
 
 function closeModal() {
-  document.getElementById('assign-modal').style.display = 'none';
+  document.getElementById('assign-modal').classList.remove('show');
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const assignModal = document.getElementById('assign-modal');
-  if (assignModal) assignModal.addEventListener('click', e => {
-    if (e.target === assignModal) closeModal();
-  });
+// ── Textbook → Section 読み込み（既知課題#4）─────────────
+// 呼び出し経路を1本化し、遅れて届いた古いレスポンスは破棄する。
+let sectionReqSeq = 0;
 
-  const confirmModal = document.getElementById('confirm-modal');
-  if (confirmModal) {
-    confirmModal.addEventListener('click', e => {
-      if (e.target === confirmModal) closeConfirm();
-    });
-    document.getElementById('cancel-btn').onclick = closeConfirm;
-  }
-});
-
-// Textbook変更時にSectionを読み込む
-function loadProblemSections() {
-  var tbEl  = document.getElementById('f-textbook_id');
-  var secSel = document.getElementById('f-section_id');
+function loadProblemSections(preselect) {
+  const tbEl   = document.getElementById('f-textbook_id');
+  const secSel = document.getElementById('f-section_id');
   if (!secSel) return;
-  // まず選択肢をクリア
+
+  const myReq = ++sectionReqSeq;
   secSel.innerHTML = '<option value="">— Same as previous —</option>';
   if (!tbEl || !tbEl.value) return;
-  var tbId = tbEl.value;
-  fetch('/api/sections_by_textbook?textbook_id=' + encodeURIComponent(tbId))
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      // 再度クリア（fetch中に変更された可能性）
+
+  fetch('/api/sections_by_textbook?textbook_id=' + encodeURIComponent(tbEl.value))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (myReq !== sectionReqSeq) return;   // 新しい選択が走っている＝この応答は捨てる
       secSel.innerHTML = '<option value="">— Same as previous —</option>';
-      data.forEach(function(s) {
-        var opt = document.createElement('option');
+      (data || []).forEach(function (s) {
+        const opt = document.createElement('option');
         opt.value = s.section_id;
         opt.textContent = s.name;
         secSel.appendChild(opt);
       });
+      if (preselect) {
+        secSel.value = preselect;            // 無ければ空欄のまま
+      }
     })
-    .catch(function(e) { console.log('section load error:', e); });
+    .catch(function (e) { console.log('section load error:', e); });
 }
 
-// HPヒント表示（Est.MinutesとTotal Minutesから分割数を計算）
-function updateOrderHint() {
-  fetchNextOrder();
-}
-
-// 教科でテキストを絞り込む
-function filterTextbooks() {
+// ── 教科でテキストを絞り込む ───────────────────────────
+// opts.preferTextbook / opts.preferSection を渡すと、その選択を維持する。
+function filterTextbooks(opts) {
+  opts = opts || {};
   const subject = document.getElementById('f-subject').value;
-  const select = document.getElementById('f-textbook_id');
-  let first = true;
+  const select  = document.getElementById('f-textbook_id');
+  let firstVisible = null;
+  let preferred    = null;
+
   for (const opt of select.options) {
     opt.hidden = opt.dataset.subject !== subject;
-    if (!opt.hidden && first) { opt.selected = true; first = false; }
+    if (opt.hidden) continue;
+    if (!firstVisible) firstVisible = opt;
+    if (opts.preferTextbook && opt.value === String(opts.preferTextbook)) preferred = opt;
   }
+
+  const target = preferred || firstVisible;
+  if (target) {
+    target.selected = true;
+  } else {
+    select.selectedIndex = -1;   // その教科のテキストが無いときは空にする
+  }
+
   fetchNextOrder();
-  loadProblemSections();
+  loadProblemSections(opts.preferSection || '');
 }
 
 async function fetchNextOrder() {
@@ -540,21 +473,13 @@ async function fetchNextOrder() {
     const res = await fetch('/api/next_order?textbook_id=' + tbId);
     const data = await res.json();
     orderInput.placeholder = 'No.: ' + data.next_order;
-  } catch(e) {}
+  } catch (e) { /* noop */ }
 }
 
-// テキスト変更時もorderを更新
-document.addEventListener('DOMContentLoaded', () => {
-  const tbSel = document.getElementById('f-textbook_id');
-  if (tbSel) tbSel.addEventListener('change', fetchNextOrder);
-  filterTextbooks();  // filterTextbooks内でloadProblemSections()も呼ぶ
-  fetchNextOrder();
-});
-
-// AI提案
+// ── AI提案 ─────────────────────────────────────────────
 async function askAI() {
   const input = document.getElementById('ai-input').value.trim();
-  if (!input) { showToast('Please enter a problem description', 'warn'); return; }
+  if (!input) { showToast('問題の説明を入力してください', 'warn'); return; }
   document.getElementById('ai-loading').style.display = 'inline';
   document.getElementById('ai-result').style.display = 'none';
   document.getElementById('apply-row').style.display = 'none';
@@ -569,18 +494,14 @@ async function askAI() {
     const r = document.getElementById('ai-result');
     r.style.display = 'block';
     r.textContent =
-      `importance     : ${data.importance}
-` +
-      `difficulty     : ${data.difficulty}
-` +
-      `review_value   : ${data.review_value}
-` +
-      `est_minutes    : ${data.estimated_minutes} min
-` +
-      `instruction    : ${data.instruction || '(none)'}`;
+      'importance     : ' + data.importance + '\n' +
+      'difficulty     : ' + data.difficulty + '\n' +
+      'review_value   : ' + data.review_value + '\n' +
+      'est_minutes    : ' + data.estimated_minutes + ' min\n' +
+      'instruction    : ' + (data.instruction || '(none)');
     document.getElementById('apply-row').style.display = 'block';
-  } catch(e) {
-    showToast('AI suggestion failed', 'warn');
+  } catch (e) {
+    showToast('AI提案に失敗しました', 'warn');
   } finally {
     document.getElementById('ai-loading').style.display = 'none';
   }
@@ -588,16 +509,16 @@ async function askAI() {
 
 function applyAI() {
   if (!aiData) return;
-  document.getElementById('f-importance').value      = aiData.importance;
-  document.getElementById('f-difficulty').value      = aiData.difficulty;
-  document.getElementById('f-review_value').value    = aiData.review_value;
+  document.getElementById('f-importance').value        = aiData.importance;
+  document.getElementById('f-difficulty').value        = aiData.difficulty;
+  document.getElementById('f-review_value').value      = aiData.review_value;
   document.getElementById('f-estimated_minutes').value = aiData.estimated_minutes;
-  document.getElementById('f-instruction').value     = aiData.instruction || '';
+  document.getElementById('f-instruction').value       = aiData.instruction || '';
   showToast('↓ Applied to form', 'success');
 }
 
 // ── インライン編集：数値 ──
-function startNumEdit(span, min=1, max=5, step=1) {
+function startNumEdit(span, min = 1, max = 5, step = 1) {
   const cell = span.closest('.editable-cell');
   const field = cell.dataset.field;
   const problemId = cell.dataset.problem;
@@ -707,37 +628,25 @@ function toggleDate(cb) {
   if (cb.checked) dateInput.value = '';
 }
 
-function deleteProblem(id) {
-  openConfirm('Delete Problem ' + id + '?', async () => {
-    const res = await fetch('/problems/delete/' + id, { method: 'POST' });
-    if (res.ok) {
-      document.getElementById('row-' + id)?.remove();
-      showToast('Deleted.', 'success');
-    } else { showToast('Delete failed.', 'warn'); }
+async function deleteProblem(id) {
+  const ok = await showConfirm({
+    title: 'Confirm Delete',
+    message: '問題 ID ' + id + ' を削除しますか？\nこの操作は取り消せません。',
+    okLabel: 'Delete',
+    danger: true
   });
+  if (!ok) return;
+  const res = await fetch('/problems/delete/' + id, { method: 'POST' });
+  if (res.ok) {
+    const row = document.getElementById('row-' + id);
+    if (row) row.remove();
+    showToast('Deleted.', 'success');
+  } else {
+    showToast('Delete failed.', 'warn');
+  }
 }
 
-function openConfirm(message, onOk) {
-  const modal = document.getElementById('confirm-modal');
-  document.getElementById('confirm-message').textContent = message;
-  modal.classList.add('show');
-  const okBtn = document.getElementById('confirm-ok');
-  const newOk = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOk, okBtn);
-  newOk.onclick = () => { closeConfirm(); onOk(); };
-}
-
-function closeConfirm() {
-  document.getElementById('confirm-modal').classList.remove('show');
-}
-
-function showToast(msg, type='success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-
-// HP計算のリアルタイム表示
+// ── 所要時間ヒント（分割数の目安）──
 function updateHpHint() {
   var est  = parseInt(document.getElementById('f-estimated_minutes').value) || 0;
   var tot  = parseInt(document.getElementById('f-total_minutes').value)     || 0;
@@ -753,7 +662,28 @@ function updateHpHint() {
   var nMax = Math.ceil(tot / minM);
   hint.textContent = '→ approx. ' + nMin + '–' + nMax + ' sessions';
 }
-document.addEventListener('DOMContentLoaded', function() {
+
+document.addEventListener('DOMContentLoaded', function () {
+  // 出題予定追加モーダル：背景クリックで閉じる
+  const assignModal = document.getElementById('assign-modal');
+  if (assignModal) {
+    assignModal.addEventListener('click', function (e) {
+      if (e.target === assignModal) closeModal();
+    });
+  }
+
+  // Subject / Textbook の change はここで1本化して登録する（インラインonchangeは廃止）
+  const subSel = document.getElementById('f-subject');
+  if (subSel) subSel.addEventListener('change', function () { filterTextbooks(); });
+
+  const tbSel = document.getElementById('f-textbook_id');
+  if (tbSel) tbSel.addEventListener('change', function () {
+    fetchNextOrder();
+    loadProblemSections();
+  });
+
+  filterTextbooks();   // 初期表示（内部で fetchNextOrder / loadProblemSections を呼ぶ）
+
   const estEl = document.getElementById('f-estimated_minutes');
   const totEl = document.getElementById('f-total_minutes');
   if (estEl) estEl.addEventListener('input', updateHpHint);
@@ -773,33 +703,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const d = await res.json();
     if (!d.ok) { showToast('Registration failed.', 'warn'); return; }
     showToast('✓ Registered: ' + d.problem_number, 'success');
+
+    // form.reset() は Subject / Textbook / Section も既定値に戻してしまうので、
+    // 連続登録できるよう選択を退避して復元する（既知課題#4）
+    const keepSubject  = document.getElementById('f-subject').value;
+    const keepTextbook = document.getElementById('f-textbook_id').value;
+    const keepSection  = document.getElementById('f-section_id').value;
     form.reset();
-    filterTextbooks();
+    document.getElementById('f-subject').value = keepSubject;
+    filterTextbooks({ preferTextbook: keepTextbook, preferSection: keepSection });
+    updateHpHint();
+
     const tbody = document.querySelector('.data-table tbody');
     if (tbody) {
       const tr = document.createElement('tr');
       tr.id = 'row-' + d.problem_id;
       tr.innerHTML =
-        '<td class="meta-text" style="font-family:\'DM Mono\',monospace;font-size:11px;">' + (d.order_in_textbook || '—') + '</td>' +
+        '<td class="meta-text cell-num">' + (d.order_in_textbook || '—') + '</td>' +
         '<td class="meta-text">' + d.subject + '</td>' +
-        '<td class="left" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;">' + d.textbook + '</td>' +
-        '<td class="left" style="max-width:150px;">' +
-          '<span class="editable" style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;">' + d.problem_number + '</span>' +
-        '</td>' +
+        '<td class="left col-textbook"><span class="cell-clip">' + d.textbook + '</span></td>' +
+        '<td class="left col-problem"><span class="cell-clip">' + d.problem_number + '</span></td>' +
         '<td class="meta-text">' + d.importance + '</td>' +
         '<td class="meta-text">' + d.difficulty + '</td>' +
         '<td class="meta-text">' + d.review_value + '</td>' +
         '<td class="meta-text">' + d.estimated_minutes + '</td>' +
         '<td class="meta-text" style="color:var(--text-dim);">' + (d.total_minutes || '—') + '</td>' +
-        '<td class="left" style="max-width:140px;">' +
-          '<span class="editable" style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">' + (d.instruction || '—') + '</span>' +
-        '</td>' +
+        '<td class="left col-instr"><span class="cell-clip">' + (d.instruction || '—') + '</span></td>' +
         '<td>' +
-          '<button class="btn btn-ghost btn-sm" onclick="showAddAssignment(' + d.problem_id + ')" title="Add to assignments">+</button> ' +
-          '<button class="btn btn-danger btn-sm" onclick="deleteProblem(' + d.problem_id + ')">×</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" onclick="showAddAssignment(' + d.problem_id + ')" title="Add to assignments">+</button> ' +
+          '<button type="button" class="btn btn-danger btn-sm" onclick="deleteProblem(' + d.problem_id + ')">×</button>' +
         '</td>';
       tbody.prepend(tr);
       if (tbody.rows.length > 50) tbody.deleteRow(tbody.rows.length - 1);
+    } else {
+      // 0件表示（empty-state）だった場合はテーブルが無いので描き直す
+      location.reload();
     }
   });
 
@@ -820,5 +758,4 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
-</body>
-</html>
+{% endblock %}

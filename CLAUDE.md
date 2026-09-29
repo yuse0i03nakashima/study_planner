@@ -30,7 +30,10 @@ history.categoryの種別：Record / Auto / Manual / AutoPromotion / LinkedPromo
 | pdf_export.py | PDF出力（build_plan_dataをplanner.pyからimport） |
 | tool_handlers.py | MCPツール実装（mcp_server.pyとapp.pyの/api/toolで共用） |
 | mcp_server.py | Claude Desktop向けMCPサーバー |
-| templates/ | Jinja2テンプレート群 |
+| templates/ | Jinja2テンプレート群（全ページ base.html 継承。雛形は templates/_MIGRATION.md） |
+| templates/base.html | 共通レイアウト（head・グローバルナビ・ページヘッダー・Flash→トースト・確認モーダル） |
+| static/css/app.css | 共通CSS（デザイントークン・部品・@media）。ページ固有CSSは各テンプレートの {% block style %} |
+| static/js/ui.js | showToast() / showConfirm() / form[data-confirm] の共通ハンドラ |
 
 ## DBスキーマ（主要テーブル）
 - students: student_id, name, subjects
@@ -65,22 +68,30 @@ DBコピー上での機能テストで仕様どおり動作を確認(難易度3�
 985c4fa(bulk記録の習熟度計算)。calc_new_mastery は現在 tool_handlers.py:41 と database.py:222 にある。
 再発した場合はこの2箇所と add_record 処理(tool_handlers.py:417周辺)を確認。
 
-## 既知のUI上の問題（優先度中）
+## UI共通化（2026-09-29 実施）
+templates を base.html + static/css/app.css + static/js/ui.js に集約した。旧「既知のUI上の問題」4〜6は解消済み。
+- **4. Section選択の不安定**: 原因は onchange の3経路混在・古いfetch応答の上書き・プログラム選択で change 非発火・
+  登録後 form.reset()。problems.html で change リスナー一本化・リクエスト連番・選択復元で修正。
+- **5. ネイティブ confirm()/alert()**: 全廃。削除は `<form data-confirm="...">` か `showConfirm({danger:true})` 経由。
+- **6. POST後の先頭復帰**: schedule 系は sessionStorage でスクロール位置を復元。他は fetch 化済み。
+- ナビ体系: 01 Master(赤)=/problems,/textbooks / 02 Students(青)=/students,/schedule*,/class_schedule /
+  03 Plan(緑)=/preview,/history / 04 Records(橙)=/record*,/assignments。base.html が request.path で現在地を判定。
+- 旧ライトテーマの export.html は削除（`/export`→`/preview` リダイレクト、`/export_pdf` は削除。
+  旧経路は export 関数の旧シグネチャを呼んでおり常時500だった）。
+- `:root { color-scheme: dark }` でネイティブ部品もダーク描画。`--text-dim` は #7b84a3（AA準拠）。
 
-### 4. problems.html: Section選択が不安定
-Textbook変更時にloadProblemSections()が確実に呼ばれない。
-`/api/sections_by_textbook?textbook_id=`のレスポンスは正常。
-**確認箇所:** problems.html内のTextbook selectのonchange属性と
-loadProblemSections()関数の定義位置。
-
-### 5. 削除確認など一部のダイアログがブラウザネイティブ
-confirm()・alert()を使用している箇所があり、ブラウザ言語に依存する。
-**対応方針:** 既存のカスタムモーダル（#confirm-modal）を全ページに展開する。
-
-### 6. 操作後にページトップに戻る
-フォームのPOST送信後にリダイレクトされてページ先頭に戻る。
-**対応方針:** fetch APIによる非同期送信に切り替え、
-成功時はDOM更新のみ行いスクロール位置を維持する。
+## セキュリティ・運用設定（2026-09-29 実施）
+- **本番（環境変数 RAILWAY_ENVIRONMENT あり）では SECRET_KEY と APP_PASSWORD が未設定だと起動時に RuntimeError**。
+  Railway の Variables に両方入っていることをデプロイ前に確認する。ローカルは従来どおり未設定でも動く。
+- 秘密情報の比較は app.py `_secret_equal()`（hmac.compare_digest）。login の next は `_safe_next()` で相対パスのみ許可。
+- Cookie: HttpOnly / SameSite=Lax / 本番のみ Secure。MAX_CONTENT_LENGTH=64MB。
+- `/admin/db-restore` は SQLite ヘッダと integrity_check を検証し、既存DBを `.bak_日時` に退避してから差し替える。
+- `run_migration` の apply / reassign_ids は confirm=true 必須。実行前に DB を `.bak_日時` にコピーする。
+- `/api/tool` の定義を `if __name__` ブロックより前に移動（従来 `python app.py` 起動では404だった）。
+- database.py: get_connection に busy_timeout/foreign_keys、init_db で history/assignments/problems に索引作成、WAL 有効化。
+  実在生徒のシードデータは削除した（本番DBには影響なし）。
+- history.category の書き込みは英語（Record / Manual）に統一（旧 "記録"/"手動修正"。実DBは既に全件英語）。
+- ログは logging（print 廃止）。LOG_LEVEL 環境変数で制御。
 
 ## 授業報告の記録フロー（2026-08-23 追加）
 2026-08-18 の事故（add_record 1回で auto_record_unreported が30件を一括done、
@@ -152,6 +163,37 @@ planner.py assign_days_v2 を再設計した。設計思想：予復習が大半
   `theme`("dark"既定|"light")。
 - 成功時はファイル本体を attachment で返し、plan_history にスナップショット付きで記録する。
   必須欠落・不正値=400、認証失敗=401、計画データなし=404（`{"error": "no plan data"}`）。
+
+## SRS改修 v2（2026-09-30 実装）
+設計と経緯は `SRS_IMPROVEMENT_PLAN.md`（第2版）と `SRS_IMPROVEMENT_PLAN_tutor回答.md` を参照。
+
+- **間隔伸長（卒業なし）**: 習熟度3で正答を重ねるごとに `基準週 × 1.5^(連続正答-1)`、上限36週で必ず再出題。
+  基準週は復習価値別（5:6 / 4:8 / 3:12 / 2:18 / 1:24）。連続正答は Record/Auto/Manual の score≥4 行のみ
+  数え、score 3 は据え置き（数えず中断もしない）、score≤2 で習熟度2に落ちてリセット。
+  AutoPromotion / LinkedPromotion は数えない。database.py `get_correct_streak_c` / `interval_weeks` / `get_next_date(…, streak)`。
+- **代表問題の連動（再稼働）**: 復習価値4以上の問題を add_record / add_records / Web記録で記録すると
+  `apply_linked_after_record` が周辺問題の **assignments の日付だけ** を動かす（習熟度・history は触らない）。
+  正答(score≥4): 周辺の次回日を「自身の次回日と代表の次回日の遅い方」へ送る。誤答(score≤2): 代表と同じ次回日に
+  Recall で戻す。score 3 は何もしない。同じ日に明示記録した問題は動かさない。戻り値 `linked` に内容が出る。
+  auto_record_unreported（掃き込み）からは発火しない。旧 process_representative_* / suppression 登録は廃止
+  （suppression テーブルと get_suppression_list / clear_suppression は手動用に残置）。
+- **周辺問題の定義**（`get_linked_problems_c`、優先順）: ① problems.representative_of がその代表を指す問題（明示）
+  ② 代表に section_id があれば同テキスト・同セクションで復習価値がより低い問題（同値どうしは干渉しない）
+  ③ セクション無しなら同テキスト・セクション未設定で初回授業日（history の最初の日、無ければ scheduled_date）が
+  同じで復習価値がより低い問題。ただしグループが LINK_FALLBACK_MAX=12 問を超える場合は連動しない
+  （本番検証で一括登録日の問題を最大31問拾ったため）。別の代表を明示している問題は②③から外れる。
+  scheduled_date は家庭学習の予定日なのでグループ化に使わない。
+- **事後修正ツール**: `update_problem` に section_id / section_name（検索→無ければ作成）/ representative_of（null で解除）
+  を追加。`get_linked_problems`（student_id, problem_id）で連動対象を確認。`set_problem_sections`（entries, confirm）で
+  セクションを一括バックフィル（confirm 無しはプレビュー、適用前に DB を .bak_日時 にコピー）。
+  `get_problems` は section_id / section_name / representative_of を返す。textbook_sections(textbook_id, name) に一意索引。
+- **起動時自動昇格は既定で停止**（app.py `AUTO_PROMOTE_ON_LAUNCH`、環境変数 AUTO_PROMOTE_ON_LAUNCH=1 で従来動作）。
+  未報告は期限超過のまま残り、記録は add_records か明示的な auto_record_session で行う。
+- **定着系の週上限**（planner.py `TEICHAKU_CAP_RATIO=0.40`）: Drill/Reinforce に使う時間を週キャパ（教科別スケジュール
+  使用時は教科ごと）の40%まで。選抜順は `teichaku_priority`（復習価値高→期限超過が長い→習熟度低）。溢れた分は
+  build_plan_data の `carried_over`（翌週へ繰り越し）として未割当と区別され、Excel/PDF の「CARRY OVER」ブロック、
+  スナップショット、get_plan_days の `carried_over` に出る。assignments は残るので翌週に再候補になる。
+- SERVER_VERSION = 2026-09-30-srs-linked-v2。
 
 ## 開発方針
 - DBへの直接操作は必ずバックアップ後に行う

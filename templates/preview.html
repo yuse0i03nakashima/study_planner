@@ -1,123 +1,107 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>New & Export — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292;
-      --blue-bg:rgba(91,143,249,0.10); --amber-bg:rgba(245,166,35,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; color:#3ecf8e; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:16px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="date"], select {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus, select:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      margin-top:5px; letter-spacing:0.5px; }
-    .action-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; align-items:center; }
-    .theme-toggle { display:flex; gap:8px; flex-wrap:wrap; }
-    .theme-opt { display:inline-flex; margin:0; cursor:pointer; }
-    .theme-opt input { position:absolute; opacity:0; width:0; height:0; }
-    .theme-opt span { display:inline-flex; align-items:center; gap:8px;
-      padding:9px 18px; border:1px solid var(--border-light);
-      background:var(--surface2); color:var(--text-dim);
-      font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; transition:all 0.15s; }
-    .theme-opt:hover span { color:var(--text-muted); }
-    .theme-opt input:checked + span { border-color:var(--blue);
-      color:var(--blue); background:var(--blue-bg); }
-    .theme-opt input:focus-visible + span { outline:1px solid var(--blue); outline-offset:2px; }
-    .sw { width:11px; height:11px; display:inline-block;
-      border:1px solid var(--border-light); }
-    .sw-dark  { background:#13151e; }
-    .sw-light { background:#f4f6fa; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:11px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-preview { background:var(--blue-bg); color:var(--blue);
-      border:1px solid rgba(91,143,249,0.35); }
-    .btn-preview:hover { background:rgba(91,143,249,0.2); }
-    .btn-excel  { background:var(--green); color:#0c0d11; }
-    .btn-excel:hover { background:#5eddaa; }
-    .btn-pdf    { background:var(--amber-bg); color:var(--amber);
-      border:1px solid rgba(245,166,35,0.35); }
-    .btn-pdf:hover { background:rgba(245,166,35,0.2); }
-    .action-sep { width:1px; height:24px; background:var(--border-light); margin:0 4px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .preview-section { margin-top:24px; }
-    .preview-section h2 { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; }
-    table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
-      font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
-      padding:10px 12px; text-align:center; border-bottom:1px solid var(--border-light);
-      white-space:nowrap; }
-    td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top;
-      font-family:'Noto Serif JP',serif; }
-    td.date-col { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-muted); white-space:nowrap; }
-    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
-      padding:2px 8px; display:inline-block; }
-    .badge-予習, .badge-New      { background:rgba(91,143,249,0.10);  color:#5b8ff9;  border:1px solid rgba(91,143,249,0.3); }
-    .badge-復習, .badge-Recall   { background:rgba(62,207,142,0.10);  color:#3ecf8e;  border:1px solid rgba(62,207,142,0.3); }
-    .badge-定着, .badge-Drill    { background:rgba(245,166,35,0.10);  color:#f5a623;  border:1px solid rgba(245,166,35,0.3); }
-    .badge-再定着, .badge-Reinforce { background:rgba(240,98,146,0.10); color:#f06292;  border:1px solid rgba(240,98,146,0.3); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set container_w = "1100px" %}
+{% set page_label = "03 / Plan" %}
+{% set page_title = "Preview & Export" %}
+{% set page_title_ja = "計画プレビュー・出力" %}
+{% set title_color = "var(--green)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">03 / Plan</div>
-      <div class="page-title">Preview &amp; Export</div>
-      <div class="page-title-ja">Preview &amp; Export</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+{% block title %}Preview &amp; Export — Study Planner{% endblock %}
 
+{% block style %}
+<style>
+  /* ── 出力アクション ── */
+  .action-row { display:flex; gap:10px; flex-wrap:wrap; margin-top:20px; align-items:center; }
+  .action-sep { width:1px; height:24px; background:var(--border-light); margin:0 4px; }
+  .btn-preview { background:var(--blue-bg); color:var(--blue);
+    border:1px solid rgba(91,143,249,0.35); }
+  .btn-preview:hover { background:rgba(91,143,249,0.2); }
+  /* Excel ボタンは app.css の .btn-success をそのまま使う */
+  .btn-pdf   { background:var(--amber-bg); color:var(--amber);
+    border:1px solid rgba(245,166,35,0.35); }
+  .btn-pdf:hover { background:rgba(245,166,35,0.2); }
+
+  /* ── テーマ選択 ── */
+  .theme-toggle { display:flex; gap:8px; flex-wrap:wrap; }
+  .theme-opt { display:inline-flex; margin:0; cursor:pointer; }
+  .theme-opt input { position:absolute; opacity:0; width:0; height:0; }
+  .theme-opt span { display:inline-flex; align-items:center; gap:8px;
+    padding:9px 18px; border:1px solid var(--border-light);
+    background:var(--surface2); color:var(--text-muted);
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; transition:all 0.15s; }
+  .theme-opt:hover span { color:var(--text); }
+  .theme-opt input:checked + span { border-color:var(--blue);
+    color:var(--blue); background:var(--blue-bg); }
+  .sw { width:11px; height:11px; display:inline-block;
+    border:1px solid var(--border-light); }
+  .sw-dark  { background:#13151e; }
+  .sw-light { background:#f4f6fa; }
+
+  /* ── Section 折りたたみ ── */
+  .sec-toggle-btn {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-muted); background:none; border:none;
+    cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:6px;
+  }
+  .sec-toggle-btn:hover { color:var(--text); }
+  .sec-toggle-btn .sel-count { color:var(--blue); }
+  #sec-toggle-arrow { display:inline-block; transition:transform 0.2s; }
+  #section-filter { max-width:400px; min-height:80px; max-height:160px;
+    padding:4px 8px; font-size:12px; }
+  .sec-mini-btn {
+    font-family:var(--font-mono); font-size:10px; color:var(--text-muted);
+    background:none; border:none; cursor:pointer;
+    letter-spacing:1px; text-transform:uppercase; padding:2px 0;
+  }
+  .sec-mini-btn:hover { color:var(--text); }
+  .sec-mini-row { margin-top:6px; display:flex; gap:12px; align-items:center; }
+
+  /* ── プレビュー表 ── */
+  .preview-section { margin-top:24px; }
+  .preview-section h2 { font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:12px; }
+  .preview-section h2 .h2-range { font-size:10px; color:var(--text-muted);
+    margin-left:12px; font-style:normal; }
+  .subject-block { margin-bottom:28px; }
+  .subject-head { font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;
+    padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .preview-section table { width:100%; border-collapse:collapse;
+    background:var(--surface); font-size:12px; }
+  .preview-section th { background:var(--surface2); color:var(--text-muted);
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; padding:10px 12px; text-align:center;
+    border-bottom:1px solid var(--border-light); white-space:nowrap; }
+  .preview-section td { padding:8px 12px; border-bottom:1px solid var(--border);
+    vertical-align:top; font-family:var(--font-ja); }
+  .preview-section td.date-col { font-family:var(--font-mono); font-size:10px;
+    color:var(--text-muted); white-space:nowrap; }
+  .cell-clip { font-size:11px; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; font-family:var(--font-ja); }
+  .cell-tb   { max-width:130px; }
+  .cell-prob { max-width:160px; }
+  .cell-inst { max-width:200px; color:var(--text-muted); }
+  .progress-tag { font-family:var(--font-mono); font-size:10px; color:var(--green);
+    margin-left:8px; letter-spacing:0; }
+  .m-1 { color:var(--rose); }
+  .m-2 { color:var(--amber); }
+  .m-3 { color:var(--green); }
+
+  .badge-予習, .badge-New         { background:var(--blue-bg);  color:var(--blue);  border:1px solid rgba(91,143,249,0.3); }
+  .badge-復習, .badge-Recall      { background:var(--green-bg); color:var(--green); border:1px solid rgba(62,207,142,0.3); }
+  .badge-定着, .badge-Drill       { background:var(--amber-bg); color:var(--amber); border:1px solid rgba(245,166,35,0.3); }
+  .badge-再定着, .badge-Reinforce { background:var(--rose-bg);  color:var(--rose);  border:1px solid rgba(240,98,146,0.3); }
+
+  .unassigned-note { margin-top:8px; font-family:var(--font-mono); font-size:10px;
+    color:var(--rose); letter-spacing:1px; padding:8px 12px;
+    background:rgba(240,98,146,0.05); border-left:2px solid var(--rose); }
+  .unassigned-note span { margin-left:6px; color:var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
   <div class="card fade-in">
     <div class="card-title">Export Settings</div>
     <form method="POST" action="/preview" id="preview-form">
@@ -149,7 +133,7 @@
         </div>
       </div>
 
-      <div class="grid-2" style="margin-top:0;">
+      <div class="grid-2" style="margin-top:16px;">
         <div>
           <label>Start Date</label>
           <input type="date" name="start_date" value="{{ start_date }}">
@@ -164,28 +148,19 @@
 
       <!-- Section for exam prep（折りたたみ） -->
       <div style="margin-top:12px;">
-        <button type="button" onclick="toggleSectionPanel()"
-          id="sec-toggle-btn"
-          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-            text-transform:uppercase;color:var(--text-dim);background:none;border:none;
-            cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;">
-          <span id="sec-toggle-arrow" style="display:inline-block;transition:transform 0.2s;">
+        <button type="button" class="sec-toggle-btn"
+          onclick="toggleSectionPanel()" id="sec-toggle-btn">
+          <span id="sec-toggle-arrow">
             {%- if selected_section_ids %}▼{%- else %}▶{%- endif %}
           </span>
           Section for exam prep
           {%- if selected_section_ids %}
-          <span style="color:var(--blue);font-size:9px;">({{ selected_section_ids|length }} selected)</span>
+          <span class="sel-count">({{ selected_section_ids|length }} selected)</span>
           {%- endif %}
         </button>
         <div id="sec-panel" style="display:{%- if selected_section_ids %}block{%- else %}none{%- endif %};margin-top:6px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
-            margin-bottom:4px;">Click to toggle selection</div>
-          <select name="section_filter" id="section-filter"
-            multiple size="5"
-            style="padding:4px 8px;background:var(--surface2);
-              border:1px solid var(--border-light);color:var(--text);
-              font-family:'Noto Serif JP',serif;font-size:12px;
-              width:100%;max-width:400px;min-height:80px;max-height:160px;">
+          <div class="hint" style="margin-bottom:4px;">Click to toggle selection</div>
+          <select name="section_filter" id="section-filter" multiple size="5">
             {% if selected_sections %}
             {% for sec in selected_sections %}
             <option value="{{ sec.section_id }}"
@@ -195,20 +170,13 @@
             {% endfor %}
             {% endif %}
           </select>
-          <div style="margin-top:4px;display:flex;gap:8px;align-items:center;">
-            <button type="button" onclick="selectAllSections()"
-              style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
-                background:none;border:none;cursor:pointer;
-                letter-spacing:1px;text-transform:uppercase;">✓ All</button>
-            <button type="button" onclick="clearSections()"
-              style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);
-                background:none;border:none;cursor:pointer;
-                letter-spacing:1px;text-transform:uppercase;">✕ Clear</button>
+          <div class="sec-mini-row">
+            <button type="button" class="sec-mini-btn" onclick="selectAllSections()">✓ All</button>
+            <button type="button" class="sec-mini-btn" onclick="clearSections()">✕ Clear</button>
           </div>
         </div>
         <input type="hidden" name="mode" value="per_subject">
       </div>
-
 
       <div style="margin-top:18px;">
         <label style="margin-top:0;">Output Theme</label>
@@ -232,7 +200,7 @@
           <span>👁</span> Preview
         </button>
         <div class="action-sep"></div>
-        <button type="submit" name="action" value="excel" class="btn btn-excel">
+        <button type="submit" name="action" value="excel" class="btn btn-success">
           <span>↓</span> Excel
         </button>
         <button type="submit" name="action" value="pdf" class="btn btn-pdf">
@@ -242,12 +210,10 @@
     </form>
   </div>
 
-    {% if preview_data %}
+  {% if preview_data %}
   <div class="preview-section fade-in">
     <h2>Preview — {{ preview_data.student_name }}
-      <span style="font-size:10px;color:var(--text-dim);margin-left:12px;font-style:normal;">
-        {{ start_date }} → {{ end_date }}
-      </span>
+      <span class="h2-range">{{ start_date }} → {{ end_date }}</span>
     </h2>
 
     {# rows は [{date, date_str, subjects:{教科:[問題,...]}}] の形 #}
@@ -261,13 +227,9 @@
     {% endfor %}
 
     {% for subject in all_subjects %}
-    <div style="margin-bottom:28px;">
-      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
-        text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;
-        padding-bottom:8px;border-bottom:1px solid var(--border);">
-        {{ subject }}
-      </div>
-      <div style="overflow-x:auto;">
+    <div class="subject-block">
+      <div class="subject-head">{{ subject }}</div>
+      <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -279,35 +241,24 @@
         {% for day in preview_data.rows %}
           {% for prob in day.subjects.get(subject, []) %}
           <tr>
-            <td class="date-col" style="white-space:nowrap;">{{ day.date }}</td>
+            <td class="date-col">{{ day.date }}</td>
             <td>
               <span class="badge badge-{{ prob.category }}">{{ prob.category | cat_en }}</span>
             </td>
-            <td style="font-size:11px;max-width:130px;overflow:hidden;
-              text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
-              {{ prob.textbook }}
-            </td>
-            <td style="font-size:11px;max-width:160px;overflow:hidden;
-              text-overflow:ellipsis;white-space:nowrap;font-family:'Noto Serif JP',serif;">
+            <td class="cell-clip cell-tb">{{ prob.textbook }}</td>
+            <td class="cell-clip cell-prob">
               {{ prob.problem_number }}
               {% if prob.session_total and prob.session_total > 1 %}
               {% set _pct = (prob.progress_after * 100)|int %}
               {% set _f = (prob.progress_after * 8)|int %}
-              <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--green);margin-left:8px;letter-spacing:0;">[{% for _i in range(_f) %}█{% endfor %}{% for _i in range(8 - _f) %}░{% endfor %}] {{ _pct }}% ({{ prob.session_index }}/{{ prob.session_total }})</span>
+              <span class="progress-tag">[{% for _i in range(_f) %}█{% endfor %}{% for _i in range(8 - _f) %}░{% endfor %}] {{ _pct }}% ({{ prob.session_index }}/{{ prob.session_total }})</span>
               {% endif %}
             </td>
-            <td style="color:
-              {%- if prob.mastery_int == 1 %} var(--rose)
-              {%- elif prob.mastery_int == 2 %} var(--amber)
-              {%- else %} var(--green){%- endif %};">
+            <td class="m-{{ prob.mastery_int if prob.mastery_int in [1, 2] else 3 }}">
               {{ prob.mastery }}
             </td>
             <td class="date-col">{{ prob.estimated_minutes }}</td>
-            <td style="font-size:11px;max-width:200px;overflow:hidden;
-              text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);
-              font-family:'Noto Serif JP',serif;">
-              {{ prob.instruction or '—' }}
-            </td>
+            <td class="cell-clip cell-inst">{{ prob.instruction or '—' }}</td>
           </tr>
           {% endfor %}
         {% endfor %}
@@ -319,14 +270,10 @@
       {% if preview_data.unassigned is mapping %}
         {% set unassigned_rows = preview_data.unassigned.get(subject, []) %}
         {% if unassigned_rows %}
-        <div style="margin-top:8px;font-family:'DM Mono',monospace;font-size:10px;
-          color:var(--rose);letter-spacing:1px;padding:8px 12px;
-          background:rgba(240,98,146,0.05);border-left:2px solid var(--rose);">
+        <div class="unassigned-note">
           Unassigned ({{ unassigned_rows|length }}):
           {% for u in unassigned_rows %}
-          <span style="margin-left:6px;color:var(--text-muted);">
-            {{ u.problem_number }}
-          </span>
+          <span>{{ u.problem_number }}</span>
           {% endfor %}
         </div>
         {% endif %}
@@ -335,8 +282,9 @@
     {% endfor %}
   </div>
   {% endif %}
+{% endblock %}
 
-</div>
+{% block script %}
 <script>
 const studentSubjects = {{ student_subjects | tojson }};
 
@@ -423,5 +371,4 @@ function loadSections() {
   xhr.send();
 }
 </script>
-</body>
-</html>
+{% endblock %}

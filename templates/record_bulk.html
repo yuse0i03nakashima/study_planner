@@ -1,106 +1,90 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Bulk Record — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image:linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      color:#f5a623; letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-muted); letter-spacing:1.5px; text-decoration:none; }
-    .page-header-back::before { content:'← '; }
-    .card { background:var(--surface); border:1px solid var(--border); padding:20px 24px; margin-bottom:16px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:1.5px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px; }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:4px; }
-    select, input[type="date"] {
-      background:var(--surface2); border:1px solid var(--border-light);
-      color:var(--text); padding:8px 12px; font-size:13px; outline:none; width:100%; }
-    select:focus, input:focus { border-color:var(--blue); }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:8px 20px; border:none; cursor:pointer; transition:all 0.15s; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-ghost { background:transparent; border:1px solid var(--border-light); color:var(--text-muted); }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      margin-top:4px; letter-spacing:0.5px; }
-    /* Score buttons */
-    .score-btns { display:flex; gap:4px; }
-    .score-btn {
-      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
-      padding:4px 8px; border:1px solid var(--border-light); cursor:pointer;
-      background:var(--surface2); color:var(--text-muted); transition:all 0.12s;
-      white-space:nowrap;
-    }
-    .score-btn:hover { border-color:var(--text-muted); }
-    .score-btn.sel-5 { background:rgba(62,207,142,0.15); border-color:var(--green); color:var(--green); }
-    .score-btn.sel-4 { background:rgba(91,143,249,0.15); border-color:var(--blue); color:var(--blue); }
-    .score-btn.sel-3 { background:rgba(245,166,35,0.15); border-color:var(--amber); color:var(--amber); }
-    .score-btn.sel-2 { background:rgba(240,98,146,0.15); border-color:var(--rose); color:var(--rose); }
-    .score-btn.sel-1 { background:rgba(239,68,68,0.15); border-color:var(--red); color:var(--red); }
-    .prob-row { display:flex; align-items:center; gap:12px; padding:10px 14px;
-      border-bottom:1px solid var(--border); font-size:12px; }
-    .prob-row:last-child { border-bottom:none; }
-    .prob-name { font-family:'Noto Serif JP',serif; flex:1; }
-    .prob-meta { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); min-width:120px; }
-    .prob-skip { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      cursor:pointer; padding:4px 8px; border:1px solid var(--border); background:none; }
-    .prob-row.skipped { opacity:0.35; }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light);
-      color:var(--text); font-family:'DM Mono',monospace; font-size:11px;
-      letter-spacing:1px; padding:12px 24px; opacity:0;
-      transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set container_w = "1100px" %}
+{% set page_label = "04 / Records" %}
+{% set page_title = "Bulk Record" %}
+{% set page_title_ja = "授業まとめ記録" %}
+{% set title_color = "var(--amber)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">04 / Records</div>
-      <div class="page-title">Add Record</div>
-      <div class="page-title-ja">Add Records</div>
-    </div>
-    <div style="display:flex;gap:16px;"><a class="page-header-back" href="/">TOP</a><a style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);letter-spacing:1.5px;text-decoration:none;" href="/record/list">Edit Records →</a></div>
+{% block title %}Bulk Record — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  /* ── ページ内サブナビ ── */
+  .page-links { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .page-links a {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-muted); text-decoration:none;
+    border:1px solid var(--border-light); padding:6px 14px; transition:all 0.15s;
+  }
+  .page-links a:hover { color:var(--text); border-color:var(--text-muted); text-decoration:none; }
+  .page-links a.current { color:var(--amber); border-color:var(--amber); cursor:default; }
+
+  .settings-grid { margin-bottom:16px; }
+  .load-row { display:flex; align-items:flex-end; gap:8px; }
+
+  /* ── スコアボタン（行内・小型） ── */
+  .score-btns { display:flex; gap:4px; flex-wrap:wrap; }
+  .score-btn {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1px;
+    padding:4px 8px; border:1px solid var(--border-light); cursor:pointer;
+    background:var(--surface2); color:var(--text-muted); transition:all 0.12s;
+    white-space:nowrap; min-height:28px;
+  }
+  .score-btn:hover { border-color:var(--text-muted); }
+  .score-btn.sel-5 { background:rgba(62,207,142,0.15); border-color:var(--green); color:var(--green); }
+  .score-btn.sel-4 { background:rgba(91,143,249,0.15); border-color:var(--blue);  color:var(--blue); }
+  .score-btn.sel-3 { background:rgba(245,166,35,0.15); border-color:var(--amber); color:var(--amber); }
+  .score-btn.sel-2 { background:rgba(240,98,146,0.15); border-color:var(--rose);  color:var(--rose); }
+  .score-btn.sel-1 { background:rgba(239,68,68,0.15);  border-color:var(--red);   color:var(--red); }
+
+  /* ── 問題行 ── */
+  .prob-row {
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    border-bottom:1px solid var(--border); font-size:12px; flex-wrap:wrap;
+  }
+  .prob-row:last-child { border-bottom:none; }
+  .prob-name { font-family:var(--font-ja); flex:1; min-width:120px; }
+  .prob-meta {
+    font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+    min-width:200px;
+  }
+  .prob-row.skipped { opacity:0.35; }
+  .prob-check { flex-shrink:0; }
+  .cat-chip {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1px;
+    padding:2px 7px; border:1px solid currentColor; flex-shrink:0;
+  }
+  .cat-chip-empty { width:52px; flex-shrink:0; display:inline-block; }
+
+  /* ── 折りたたみセクションバー ── */
+  .sec-bar {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-muted); background:var(--surface2);
+    border-top:1px solid var(--border); padding:8px 14px; cursor:pointer;
+    display:flex; align-items:center; gap:8px; user-select:none;
+  }
+  .sec-bar:hover { color:var(--text); }
+
+  .problems-head {
+    display:flex; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;
+  }
+  .problems-head .card-title { margin:0; padding:0; border:none; }
+  .problems-actions { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="page-links fade-in">
+    <a href="/record">1問記録 →</a>
+    <a class="current" href="/record/bulk">授業まとめ記録</a>
+    <a href="/record/list">記録一覧 →</a>
   </div>
 
   <div class="card fade-in">
     <div class="card-title">Session Settings</div>
-    <div class="grid-3">
+    <div class="grid-3 settings-grid">
       <div>
         <label>Student</label>
         <select id="br-student" onchange="loadBrTextbooks()">
@@ -120,63 +104,69 @@
         </select>
       </div>
     </div>
-    <div class="grid-2">
+    <div class="grid-2 settings-grid">
       <div>
-        <label>Section <span style="color:var(--text-dim);font-size:9px;">(optional)</span></label>
+        <label>Section <span class="meta-text">(optional)</span></label>
         <select id="br-section" onchange="loadBrProblems()">
           <option value="">— All Sections —</option>
         </select>
       </div>
-      <div style="display:flex;align-items:flex-end;gap:8px;">
+      <div class="load-row">
         <button type="button" class="btn btn-ghost" onclick="loadBrProblems()">Load Problems</button>
       </div>
     </div>
   </div>
 
+  <!-- 読み込み前の案内 -->
+  <div class="card fade-in" id="br-empty-card">
+    <div class="empty-state">
+      <div class="empty-title">No Problems Loaded</div>
+      生徒と日付、テキストを選んで <strong>LOAD PROBLEMS</strong> を押すと、<br>
+      その授業で扱う問題がここに並びます。<br>
+      並んだ問題のチェックを外した分は記録されません。
+    </div>
+  </div>
+
   <div id="br-problems-card" style="display:none;" class="card fade-in">
-    <div style="display:flex;align-items:center;margin-bottom:12px;gap:12px;">
-      <div class="card-title" style="margin:0;">Problems</div>
-      <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-        <button type="button" onclick="setAllScores(5)"
-          class="score-btn" style="font-size:9px;">All Perfect</button>
-        <button type="button" onclick="setDefaultScores()"
-          class="score-btn" style="font-size:9px;">Auto (by Dif)</button>
-        <button type="button" class="btn btn-success" onclick="submitBulkRecord()">
+    <div class="problems-head">
+      <div class="card-title">Problems</div>
+      <div class="problems-actions">
+        <button type="button" onclick="setAllScores(5)" class="score-btn">All Perfect</button>
+        <button type="button" onclick="setDefaultScores()" class="score-btn">Auto (by Dif)</button>
+        <button type="button" class="btn btn-success btn-sm" onclick="submitBulkRecord()">
           ✓ Register All</button>
       </div>
     </div>
     <div id="br-problems-list"></div>
   </div>
+{% endblock %}
 
-</div>
-<div id="toast"></div>
-
+{% block script %}
 <script>
-function showToast(msg, type='success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-
 const CAT_COLOR = {New:'var(--blue)',Recall:'var(--green)',Drill:'var(--amber)',Reinforce:'var(--rose)'};
+
+// 読み込み前の案内カードと問題カードの表示を切り替える
+function setProblemsVisible(visible) {
+  document.getElementById('br-problems-card').style.display = visible ? 'block' : 'none';
+  document.getElementById('br-empty-card').style.display    = visible ? 'none'  : 'block';
+}
 
 function probRowHtml(p, checked) {
   const cat   = p.category || '';
   const color = CAT_COLOR[cat] || 'var(--text-dim)';
   const catBadge = cat
-    ? `<span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1px;padding:2px 7px;border:1px solid ${color};color:${color};flex-shrink:0;">${cat}</span>`
-    : `<span style="width:52px;flex-shrink:0;"></span>`;
+    ? `<span class="cat-chip" style="color:${color};">${cat}</span>`
+    : `<span class="cat-chip-empty"></span>`;
   const dateStr = !p.scheduled_date ? '—'
                 : p.scheduled_date === '2099-12-31' ? 'Undecided'
                 : p.scheduled_date;
   const defScore = p.difficulty <= 3 ? 5 : 4;
   const chk = checked ? 'checked' : '';
   return `<div class="prob-row${checked ? '' : ' skipped'}" id="bpr-${p.problem_id}" data-problem="${p.problem_id}" data-difficulty="${p.difficulty}">
-    <input type="checkbox" class="br-check" ${chk} style="accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;" onchange="toggleProbRow(this,${p.problem_id})">
+    <input type="checkbox" class="br-check prob-check" ${chk} onchange="toggleProbRow(this,${p.problem_id})">
     ${catBadge}
     <div class="prob-name">${p.problem_number}</div>
-    <div class="prob-meta" style="min-width:200px;">${dateStr} · Imp:${p.importance} Dif:${p.difficulty} ${p.estimated_minutes}min</div>
+    <div class="prob-meta">${dateStr} · Imp:${p.importance} Dif:${p.difficulty} ${p.estimated_minutes}min</div>
     <div class="score-btns" id="scores-${p.problem_id}">
       ${[5,4,3,2,1].map(s=>`<button type="button" class="score-btn${s===defScore?' sel-'+s:''}" data-score="${s}" onclick="setScore(${p.problem_id},${s})">${s} ${['','Failed','Retry','Recall','Good','Perfect'][s]}</button>`).join('')}
     </div>
@@ -186,7 +176,7 @@ function probRowHtml(p, checked) {
 function appendSection(container, sectionId, items, label, checked) {
   if (!items.length) return;
   const bar = document.createElement('div');
-  bar.style.cssText = 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);background:var(--surface2);border-top:1px solid var(--border);padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;';
+  bar.className = 'sec-bar';
   bar.innerHTML = `<span id="arrow-${sectionId}">▶</span> ${items.length} ${label}`;
   bar.onclick = () => {
     const sec = document.getElementById('sec-' + sectionId);
@@ -217,7 +207,7 @@ function loadBrTextbooks() {
         sel.appendChild(opt);
       });
       document.getElementById('br-section').innerHTML = '<option value="">— All Sections —</option>';
-      document.getElementById('br-problems-card').style.display = 'none';
+      setProblemsVisible(false);
     });
 }
 
@@ -225,7 +215,7 @@ function loadBrSections() {
   const tbId = document.getElementById('br-textbook').value;
   const secSel = document.getElementById('br-section');
   secSel.innerHTML = '<option value="">— All Sections —</option>';
-  document.getElementById('br-problems-card').style.display = 'none';
+  setProblemsVisible(false);
   if (!tbId) return;
   fetch('/api/sections_by_textbook?textbook_id=' + tbId)
     .then(r => r.json())
@@ -243,7 +233,7 @@ function loadBrProblems() {
   const sid   = document.getElementById('br-student').value;
   const tbId  = document.getElementById('br-textbook').value;
   const secId = document.getElementById('br-section').value;
-  if (!tbId) return;
+  if (!tbId) { setProblemsVisible(false); return; }
   const date = document.getElementById('br-date').value;
 
   fetch('/api/problems_for_record?student_id=' + sid + '&textbook_id=' + tbId + '&section_id=' + secId + '&date=' + date)
@@ -254,14 +244,16 @@ function loadBrProblems() {
       const undecided = data.filter(p => p.scheduled_date === '2099-12-31');
       const noAssign  = data.filter(p => !p.scheduled_date);
 
-      const card = document.getElementById('br-problems-card');
       const list = document.getElementById('br-problems-list');
       list.innerHTML = '';
 
       if (!data.length) {
-        list.innerHTML = '<div style="padding:16px;font-family:DM Mono,monospace;font-size:10px;color:var(--text-dim);">No problems found.</div>';
+        list.innerHTML = '<div class="empty-state"><div class="empty-title">No Problems</div>'
+          + 'この条件に合う問題がありません。</div>';
       } else if (!due.length) {
-        list.innerHTML = '<div style="padding:10px 14px;font-family:DM Mono,monospace;font-size:10px;color:var(--text-dim);">No due problems for this date.</div>';
+        list.innerHTML = '<div class="empty-state"><div class="empty-title">Nothing Due</div>'
+          + 'この日付までに出題予定の問題はありません。<br>'
+          + '下の折りたたみから予定外の問題を開いて記録できます。</div>';
       } else {
         list.insertAdjacentHTML('beforeend', due.map(p => probRowHtml(p, true)).join(''));
       }
@@ -270,7 +262,7 @@ function loadBrProblems() {
       appendSection(list, 'undecided', undecided, 'Undecided',         false);
       appendSection(list, 'noassign',  noAssign,  'No Assignment',     false);
 
-      card.style.display = 'block';
+      setProblemsVisible(true);
     });
 }
 
@@ -327,7 +319,7 @@ async function submitBulkRecord() {
     showToast('✓ ' + data.added + ' records saved', 'success');
     setTimeout(() => location.reload(), 1200);
   } else {
-    showToast('Error: ' + (data.message || 'failed'), 'warn');
+    showToast('Error: ' + (data.message || 'failed'), 'error');
   }
 }
 
@@ -336,5 +328,4 @@ document.addEventListener('DOMContentLoaded', function() {
   loadBrTextbooks();
 });
 </script>
-</body>
-</html>
+{% endblock %}

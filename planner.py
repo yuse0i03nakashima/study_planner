@@ -10,6 +10,17 @@ CATEGORY_GROUP  = {"Recall": 0, "Drill": 0, "Reinforce": 0, "New": 1}
 DISPLAY_ORDER   = {"Recall": 0, "Drill": 1, "Reinforce": 2, "New": 3}
 # 1日の割当時間を最大この割合まで超過して問題を割り当てる（0.10 = 10%）
 OVERFLOW_FACTOR = 0.10
+# 定着・再定着（Drill/Reinforce）に使える時間の上限（週キャパに対する割合）。
+# 2026-09-30: 期限超過の定着課題がキャパの限りに詰め込まれるのを防ぐ。溢れた分は翌週へ繰り越す
+TEICHAKU_CAP_RATIO = 0.40
+
+
+def teichaku_priority(item):
+    """定着・再定着の選抜順: 復習価値の高い順 → 期限超過の長い順（scheduled_date 昇順）→ 習熟度低い順"""
+    review_val = int(item.get("review_value", 3) or 3)
+    mastery    = int(item.get("mastery_int", 1) or 1)
+    importance = int(item.get("importance", 3) or 3)
+    return (-review_val, item.get("scheduled_date") or "9999-12-31", mastery, -importance)
 
 
 def get_adjusted_minutes(item):
@@ -424,33 +435,33 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
             item["assigned_date"] = None
             unassigned.append(item)
 
-    # ── 定着・再定着：均等分散、代表問題優先 ─────────────────────────
-    teichaku_items = [p for p in plan if p["category"] in ("Drill", "Reinforce")]
-
-    rep_items = sorted(
-        [p for p in teichaku_items
-         if int(p.get("review_value", 0) or 0) >= 4
+    # ── 定着・再定着：週上限つき、代表問題（復習価値高）→期限超過の長い順 ─────
+    # 期限超過の定着課題は週全体が窓になるため、上限が無いとキャパの限りに詰め込まれて
+    # 出題数が膨張する。週キャパの TEICHAKU_CAP_RATIO までに抑え、溢れた分は
+    # 「翌週へ繰り越し」(carried) として未割当と区別して返す（assignments は残るので翌週に再候補になる）
+    teichaku_items = sorted(
+        [p for p in plan if p["category"] in ("Drill", "Reinforce")
          and p.get("problem_id") not in suppressed_ids],
-        key=priority_score)
+        key=teichaku_priority)
 
-    normal_items = sorted(
-        [p for p in teichaku_items
-         if int(p.get("review_value", 0) or 0) < 4
-         and p.get("problem_id") not in suppressed_ids],
-        key=priority_score)
-
-    for item in rep_items:
-        if not try_assign_balanced(item, dates_sorted):
+    teichaku_cap = sum(original_time.values()) * TEICHAKU_CAP_RATIO
+    teichaku_used = 0
+    carried = []
+    for item in teichaku_items:
+        minutes = get_adjusted_minutes(item)
+        if teichaku_used + minutes > teichaku_cap + 1e-6:
             item["assigned_date"] = None
-            unassigned.append(item)
-
-    for item in normal_items:
-        if not try_assign_balanced(item, dates_sorted):
+            item["carried_over"] = True
+            carried.append(item)
+            continue
+        if try_assign_balanced(item, dates_sorted):
+            teichaku_used += minutes
+        else:
             item["assigned_date"] = None
             unassigned.append(item)
 
     context = {"assigned": assigned, "remaining": remaining,
-               "original_time": original_time}
+               "original_time": original_time, "carried": carried}
     return assigned, unassigned, context
 
 
@@ -544,6 +555,12 @@ def build_plan_data(student_id, start_date_str, target_date_str,
         subject: [i for i in unassigned if i["subject"] == subject]
         for subject in subjects
     }
+    # 定着系の週上限で今週に入らなかった問題（翌週へ繰り越し。未割当とは区別する）
+    carried_all = [i for ctx in contexts for i in ctx.get("carried", [])]
+    carried_by_subject = {
+        subject: [i for i in carried_all if i["subject"] == subject]
+        for subject in subjects
+    }
 
     # キャパがあるのに1問も割り当てられなかった日（課題不足の週で発生。
     # 前倒しは行わず、問題登録の見直し判断のために明示して返す）
@@ -557,6 +574,7 @@ def build_plan_data(student_id, start_date_str, target_date_str,
         "plan_mode":    plan_mode,
         "rows":         rows,
         "unassigned":   unassigned_by_subject,
+        "carried_over": carried_by_subject,
         "schedule":     global_schedule,
         "empty_days":   empty_days,
     }
@@ -597,5 +615,17 @@ def plan_days_snapshot(data):
                 "textbook":       it.get("textbook"),
                 "category":       it.get("category"),
             })
+    carried = []
+    for subj, items in data.get("carried_over", {}).items():
+        for it in items:
+            carried.append({
+                "subject":        subj,
+                "problem_id":     it.get("problem_id"),
+                "problem_number": it.get("problem_number"),
+                "textbook":       it.get("textbook"),
+                "category":       it.get("category"),
+                "scheduled_date": it.get("scheduled_date"),
+            })
     return {"format": "days_v1", "days": days, "unassigned": unassigned,
+            "carried_over": carried,
             "empty_days": data.get("empty_days", [])}

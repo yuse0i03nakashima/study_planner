@@ -1,0 +1,379 @@
+/* ============================================================
+   Study Planner — 共通スタイル
+   全テンプレート共通の world view（dark / Noto Serif JP + DM Mono）
+   ページ固有CSSは各テンプレートの {% block style %} に置く
+   ============================================================ */
+
+/* ---------- 1. デザイントークン ---------- */
+:root {
+  /* surfaces */
+  --bg:#0c0d11;
+  --surface:#13151e;
+  --surface2:#1b1e2b;
+  --surface3:#222536;
+  --border:#252838;
+  --border-light:#2f3347;
+
+  /* text */
+  --text:#dde1ec;
+  --text-muted:#9aa3b8;
+  --text-dim:#7b84a3;          /* コントラスト 4.5:1 以上に引き上げ */
+
+  /* accents */
+  --blue:#5b8ff9;
+  --green:#3ecf8e;
+  --amber:#f5a623;
+  --rose:#f06292;
+  --red:#ef4444;
+  --danger:#ef4444;            /* --red と同値。破壊的操作の意味づけ用 */
+  --purple:#a78bfa;
+
+  /* accent backgrounds */
+  --blue-bg:rgba(91,143,249,0.10);
+  --green-bg:rgba(62,207,142,0.10);
+  --amber-bg:rgba(245,166,35,0.10);
+  --rose-bg:rgba(240,98,146,0.10);
+  --red-bg:rgba(239,68,68,0.08);
+  --purple-bg:rgba(167,139,250,0.10);
+
+  /* fonts */
+  --font-ja:'Noto Serif JP', serif;
+  --font-mono:'DM Mono', monospace;
+
+  /* layout */
+  --container-w:1100px;        /* ページ側で style="--container-w:860px" 等で上書き可 */
+}
+
+/* ---------- 2. リセット ---------- */
+:root { color-scheme:dark; }  /* ネイティブ部品(checkbox/date/select)をダーク描画 */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family:var(--font-ja);
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.7;
+  min-height:100vh;
+  padding:40px 32px 80px;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* 格子背景 */
+body::after {
+  content:''; position:fixed; inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:48px 48px;
+  opacity:0.15;
+  pointer-events:none;
+  z-index:0;
+}
+
+a { color:var(--blue); text-decoration:none; }
+a:hover { text-decoration:underline; }
+
+:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+
+/* ---------- 3. レイアウト ---------- */
+.container {
+  max-width:var(--container-w);
+  margin:0 auto;
+  position:relative;
+  z-index:1;
+}
+
+/* ---------- 4. グローバルナビ ---------- */
+.global-nav {
+  display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+  margin-bottom:26px; padding-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.nav-logo {
+  font-family:var(--font-mono); font-weight:500; font-size:13px;
+  letter-spacing:1px; color:var(--text); text-decoration:none;
+  display:inline-flex; align-items:center;
+}
+.nav-logo:hover { text-decoration:none; color:var(--blue); }
+.nav-logo .bracket { color:var(--border-light); font-weight:300; }
+.nav-links { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.nav-link {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--text-dim); text-decoration:none;
+  padding:4px 0; border-bottom:1px solid transparent;
+  transition:color 0.15s, border-color 0.15s;
+}
+.nav-link:hover { color:var(--text); text-decoration:none; }
+.nav-link.active { color:var(--nav-accent, var(--blue)); border-bottom-color:var(--nav-accent, var(--blue)); }
+.nav-link.nav-master   { --nav-accent:var(--red); }
+.nav-link.nav-students { --nav-accent:var(--blue); }
+.nav-link.nav-plan     { --nav-accent:var(--green); }
+.nav-link.nav-records  { --nav-accent:var(--amber); }
+
+/* ---------- 5. ページヘッダー ---------- */
+.page-header {
+  display:flex; align-items:flex-end; justify-content:space-between;
+  margin-bottom:28px; padding-bottom:18px;
+  border-bottom:1px solid var(--border-light);
+}
+.page-label {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2.5px;
+  text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;
+}
+.page-title {
+  font-family:var(--font-mono); font-weight:500; font-size:18px;
+  letter-spacing:2px; text-transform:uppercase; line-height:1.3;
+}
+.page-title-ja {
+  font-family:var(--font-ja); font-weight:300; font-size:13px;
+  color:var(--text-muted); margin-top:4px;
+}
+.page-header-back {
+  font-family:var(--font-mono); font-size:10px; color:var(--text-muted);
+  letter-spacing:1.5px; text-decoration:none; white-space:nowrap;
+  transition:color 0.15s;
+}
+.page-header-back::before { content:'← '; }
+.page-header-back:hover { color:var(--text); text-decoration:none; }
+
+/* ---------- 6. カード ---------- */
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  padding:24px 28px; margin-bottom:20px;
+}
+.card-title {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--text-muted);
+  margin-bottom:16px; padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+
+/* ---------- 7. フォーム ---------- */
+label {
+  display:block; font-family:var(--font-mono); font-size:10px;
+  letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
+  margin-bottom:6px; margin-top:16px;
+}
+label:first-child { margin-top:0; }
+
+input[type="text"], input[type="date"], input[type="number"],
+input[type="time"], input[type="password"], input[type="search"],
+select, textarea {
+  width:100%; padding:9px 12px;
+  background:var(--surface2); border:1px solid var(--border-light);
+  color:var(--text); font-family:var(--font-ja); font-size:13px;
+  line-height:1.6; outline:none; transition:border-color 0.15s;
+}
+input:focus, select:focus, textarea:focus { border-color:var(--blue); }
+select option { background:var(--surface2); }
+textarea { resize:vertical; min-height:60px; }
+
+input[type="checkbox"], input[type="radio"] { accent-color:var(--blue); }
+input[type="checkbox"] { width:14px; height:14px; }
+
+.hint {
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+  margin-top:5px; letter-spacing:0.5px;
+}
+.meta-text {
+  font-family:var(--font-mono); font-size:10px; color:var(--text-dim);
+  letter-spacing:1px;
+}
+.badge {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:1px;
+  padding:2px 8px; display:inline-block;
+}
+
+/* ---------- 8. ボタン ---------- */
+.btn {
+  font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+  text-transform:uppercase; padding:10px 22px;
+  border:none; cursor:pointer; transition:all 0.15s;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  line-height:1.2; text-decoration:none;
+}
+.btn:hover { text-decoration:none; }
+.btn:disabled { opacity:0.45; cursor:not-allowed; }
+.btn-sm { padding:6px 14px; font-size:10px; min-height:32px; }
+
+.btn-primary { background:var(--blue);  color:#0c0d11; }
+.btn-primary:hover { background:#7aaafb; }
+.btn-success { background:var(--green); color:#0c0d11; }
+.btn-success:hover { background:#5eddaa; }
+.btn-warn    { background:var(--amber); color:#0c0d11; }
+.btn-warn:hover { background:#f7b84e; }
+.btn-danger  { background:var(--danger); color:#fff; }
+.btn-danger:hover  { background:#f87171; }
+.btn-ghost   { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
+.btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
+.btn-purple  { background:var(--purple-bg); color:var(--purple); border:1px solid rgba(167,139,250,0.35); }
+.btn-purple:hover { background:rgba(167,139,250,0.2); }
+
+/* ---------- 9. グリッド ---------- */
+.grid-2, .row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.grid-3, .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+.grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
+
+/* ---------- 10. テーブル ---------- */
+.table-scroll { overflow-x:auto; }
+.data-table {
+  width:100%; border-collapse:collapse;
+  background:var(--surface); font-size:12px;
+}
+.data-table thead th {
+  position:sticky; top:0; z-index:1;
+  background:var(--surface2); color:var(--text-muted);
+  font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:10px 12px; text-align:center;
+  border-bottom:1px solid var(--border-light); white-space:nowrap;
+}
+.data-table td {
+  padding:9px 12px; border-bottom:1px solid var(--border);
+  text-align:center; vertical-align:middle;
+}
+.data-table tr:hover td { background:var(--surface2); }
+.data-table td.left { text-align:left; font-family:var(--font-ja); }
+.data-table td.nowrap, .data-table th.nowrap { white-space:nowrap; }
+
+/* ---------- 11. アラート ---------- */
+.alert {
+  font-family:var(--font-mono); font-size:11px; letter-spacing:1px;
+  padding:10px 16px; margin-bottom:16px; border-left:2px solid;
+}
+.alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
+.alert-info    { background:var(--blue-bg);  color:var(--blue);  border-color:var(--blue); }
+.alert-warn    { background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
+.alert-error   { background:var(--red-bg);   color:#f87171;      border-color:var(--danger); }
+
+/* ---------- 12. 空状態 ---------- */
+.empty-state {
+  padding:48px 24px; text-align:center;
+  color:var(--text-muted); font-family:var(--font-ja);
+  font-size:13px; line-height:1.9;
+}
+.empty-state .empty-title {
+  font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--text-dim); margin-bottom:8px;
+}
+
+/* ---------- 13. タブ ---------- */
+.tabs, .tab-bar {
+  display:flex; gap:0; flex-wrap:wrap;
+  border-bottom:1px solid var(--border-light);
+}
+.tab-btn {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+  text-transform:uppercase; padding:12px 24px; background:transparent;
+  border:none; border-bottom:2px solid transparent; color:var(--text-muted);
+  cursor:pointer; transition:all 0.15s; margin-bottom:-1px;
+}
+.tab-btn:hover { color:var(--text); }
+.tab-btn.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tab-content { display:none; padding-top:24px; }
+.tab-content.active { display:block; }
+
+/* ---------- 14. トースト ---------- */
+#toast {
+  position:fixed; bottom:32px; left:50%;
+  transform:translateX(-50%) translateY(20px);
+  background:var(--surface2); border:1px solid var(--border-light);
+  color:var(--text); font-family:var(--font-mono);
+  font-size:11px; letter-spacing:1px; padding:12px 24px;
+  max-width:calc(100vw - 32px);
+  opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999;
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#toast.success { border-left:2px solid var(--green); color:var(--green); }
+#toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
+#toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
+#toast.error   { border-left:2px solid var(--danger); color:#f87171; }
+
+/* ---------- 15. 確認モーダル ---------- */
+#confirm-modal {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.75); z-index:2000;
+  align-items:center; justify-content:center; padding:16px;
+}
+#confirm-modal.show { display:flex; }
+.confirm-box {
+  background:var(--surface); border:1px solid var(--border-light);
+  border-left:3px solid var(--blue); padding:24px 28px;
+  min-width:280px; max-width:460px; width:100%;
+}
+#confirm-modal.danger .confirm-box { border-left-color:var(--danger); }
+.confirm-title {
+  font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--blue); margin-bottom:12px;
+}
+#confirm-modal.danger .confirm-title { color:var(--danger); }
+.confirm-message {
+  font-family:var(--font-ja); font-size:13px; color:var(--text-muted);
+  margin-bottom:20px; line-height:1.8; white-space:pre-line;
+}
+.confirm-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+
+/* ---------- 16. アニメーション ---------- */
+.fade-in { animation:fadeIn 0.3s ease both; }
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:0.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important;
+  }
+}
+
+/* ---------- 18. 共通ユーティリティ（第2フェーズ要望） ---------- */
+.page-links { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; --nav-accent:var(--blue); }
+.page-links a {
+  font-family:var(--font-mono); font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--text-muted); border:1px solid var(--border-light); padding:6px 12px;
+  text-decoration:none; transition:all 0.15s;
+}
+.page-links a:hover { color:var(--text); border-color:var(--text-muted); text-decoration:none; }
+.page-links a.current { color:var(--nav-accent); border-color:var(--nav-accent); cursor:default; }
+.inline-form { display:inline-block; margin:0; }
+.row-actions { display:flex; gap:6px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+.btn-ghost.is-danger { color:var(--danger); border-color:rgba(239,68,68,0.45); }
+.btn-ghost.is-danger:hover { border-color:var(--danger); background:var(--red-bg, rgba(239,68,68,0.10)); }
+.empty-state strong { font-family:var(--font-mono); font-weight:500; color:var(--text); letter-spacing:1px; }
+.tabs, .tab-bar { align-items:stretch; row-gap:0; }
+.tab-btn { white-space:nowrap; }
+.table-scroll--tall { overflow-y:auto; max-height:70vh; }
+.btn-xs { padding:3px 9px; font-size:10px; min-height:24px; letter-spacing:1px; }
+.row-action-hidden { opacity:0; pointer-events:none; transition:opacity 0.15s; }
+tr:hover .row-action-hidden, tr:focus-within .row-action-hidden { opacity:1; pointer-events:auto; }
+@media (hover:none) { .row-action-hidden { opacity:1; pointer-events:auto; } }
+.w-auto { width:auto !important; }
+.form-inline label { margin-top:0; }
+.form-inline select, .form-inline input { width:auto; }
+.clip { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* ---------- 17. レスポンシブ ---------- */
+@media (max-width:640px) {
+  body { padding:24px 16px 64px; }
+
+  .global-nav { gap:14px; }
+  .nav-links { gap:12px; row-gap:8px; }
+
+  .page-header {
+    flex-direction:column; align-items:flex-start; gap:12px;
+  }
+  .page-header-back { order:-1; }
+
+  .card { padding:18px 16px; }
+
+  .grid-2, .grid-3, .grid-4,
+  .row2, .row3 { grid-template-columns:1fr; }
+
+  .tabs, .tab-bar { flex-wrap:wrap; }
+  .tab-btn { padding:10px 14px; }
+
+  .btn { padding:10px 18px; }
+  .confirm-actions { justify-content:stretch; }
+  .confirm-actions .btn { flex:1; }
+}

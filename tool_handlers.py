@@ -116,14 +116,15 @@ def _calc_new_mastery_c(c, student_id, problem_id, score, record_date):
 def _update_assignments_after_record_c(c, student_id, problem_id, record_date, new_mastery):
     """database.update_assignments_after_record と同一ロジックのカーソル版。
     次回出題日を返す（problems に該当がなければ None）。"""
-    from database import get_next_date
+    from database import get_next_date, get_correct_streak_c
     c.execute("DELETE FROM assignments WHERE student_id=? AND problem_id=?",
               (student_id, problem_id))
     c.execute("SELECT review_value FROM problems WHERE problem_id=?", (problem_id,))
     row = c.fetchone()
     if not row:
         return None
-    next_date = get_next_date(row["review_value"], new_mastery, record_date)
+    streak = get_correct_streak_c(c, student_id, problem_id)
+    next_date = get_next_date(row["review_value"], new_mastery, record_date, streak)
     category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
     c.execute("""
         INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
@@ -146,9 +147,10 @@ SUPPORTED_TOOLS = [
     "delete_assignment", "delete_problem", "delete_record",
     "set_class_schedule", "set_next_class_date", "clear_suppression",
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
+    "set_problem_sections", "get_linked_problems",
 ]
 
-SERVER_VERSION = "2026-09-21-export-plan-api"
+SERVER_VERSION = "2026-09-30-srs-linked-v2"
 
 
 def handle_tool(name: str, arguments: dict):
@@ -163,6 +165,19 @@ def handle_tool(name: str, arguments: dict):
         mode = arguments.get("mode", "dry_run")
         if mode not in ("dry_run", "apply", "diagnose_orphans", "reassign_ids_dry", "reassign_ids"):
             return {"error": "mode は 'dry_run' / 'apply' / 'diagnose_orphans' / 'reassign_ids_dry' / 'reassign_ids'"}
+        if mode in ("apply", "reassign_ids"):
+            # 破壊的モードは confirm=true 必須（delete_record と同じ運用）
+            if not arguments.get("confirm"):
+                return {"error": f"mode='{mode}' は破壊的操作です。dry_run の結果を確認のうえ confirm=true を付けて再実行してください",
+                        "preview": migrate_renumber.run(DB_PATH, mode.replace("reassign_ids", "reassign_ids_dry") if mode == "reassign_ids" else "dry_run")}
+            import shutil
+            from datetime import datetime as _dt
+            backup = f"{DB_PATH}.bak_{_dt.now():%Y%m%d_%H%M%S}"
+            shutil.copy2(DB_PATH, backup)
+            result = migrate_renumber.run(DB_PATH, mode)
+            if isinstance(result, dict):
+                result["backup"] = backup
+            return result
         return migrate_renumber.run(DB_PATH, mode)
 
     # ── 参照系 ──────────────────────────────────────────────────────────
@@ -214,8 +229,11 @@ def handle_tool(name: str, arguments: dict):
         query = """
             SELECT p.problem_id, p.subject, p.textbook, p.textbook_id,
                    p.problem_number, p.importance, p.difficulty,
-                   p.review_value, p.estimated_minutes, p.instruction, p.order_in_textbook
-            FROM problems p WHERE 1=1
+                   p.review_value, p.estimated_minutes, p.instruction, p.order_in_textbook,
+                   p.section_id, s.name AS section_name, p.representative_of
+            FROM problems p
+            LEFT JOIN textbook_sections s ON s.section_id = p.section_id
+            WHERE 1=1
         """
         params = []
         if student_id:
@@ -383,6 +401,8 @@ def handle_tool(name: str, arguments: dict):
                     "history_id":     r["history_id"],
                     "days":           days,
                     "unassigned":     unassigned,
+                    "carried_over":   [x for x in payload.get("carried_over", [])
+                                       if not subject or x.get("subject") == subject],
                     "empty_days":     payload.get("empty_days", []),
                 }
             # スナップショットが無ければ再計算（sourceで明示して返す）
@@ -420,6 +440,18 @@ def handle_tool(name: str, arguments: dict):
                     "category":       it.get("category"),
                 })
 
+        carried = []
+        for subj, items in data.get("carried_over", {}).items():
+            for it in items:
+                carried.append({
+                    "subject":        subj,
+                    "problem_id":     it.get("problem_id"),
+                    "problem_number": it.get("problem_number"),
+                    "textbook":       it.get("textbook"),
+                    "category":       it.get("category"),
+                    "scheduled_date": it.get("scheduled_date"),
+                })
+
         return {
             "student_id":   student_id,
             "student_name": data["student_name"],
@@ -430,6 +462,7 @@ def handle_tool(name: str, arguments: dict):
             "snapshot_found": False if source == "snapshot" else None,
             "days":         rows,
             "unassigned":   unassigned,
+            "carried_over": carried,
             "empty_days":   data.get("empty_days", []),
         }
 
@@ -538,12 +571,22 @@ def handle_tool(name: str, arguments: dict):
         total_minutes     = arguments.get("total_minutes")
         section_id        = arguments.get("section_id")
         section_name      = arguments.get("section_name", "").strip()
+        representative_of = arguments.get("representative_of")
 
         conn = get_connection()
         c = conn.cursor()
         c.execute("SELECT name FROM textbooks WHERE textbook_id=?", (textbook_id,))
         tb_row = c.fetchone()
         textbook = tb_row["name"] if tb_row else ""
+        if representative_of:
+            c.execute("SELECT review_value FROM problems WHERE problem_id=?", (int(representative_of),))
+            rep = c.fetchone()
+            if not rep:
+                conn.close()
+                return {"error": f"representative_of の問題が見つかりません: problem_id={representative_of}"}
+            representative_of = int(representative_of)
+        else:
+            representative_of = None
         # 重複チェック：同テキスト内に同じ問題番号が既にあれば登録しない
         c.execute("SELECT problem_id FROM problems WHERE textbook_id=? AND problem_number=?",
                   (textbook_id, problem_number))
@@ -584,11 +627,13 @@ def handle_tool(name: str, arguments: dict):
             INSERT INTO problems
             (problem_id, subject, textbook, textbook_id, section_id, problem_number,
              importance, difficulty, review_value,
-             estimated_minutes, instruction, type, order_in_textbook, total_minutes)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+             estimated_minutes, instruction, type, order_in_textbook, total_minutes,
+             representative_of)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (problem_id, subject, textbook, textbook_id, section_id, problem_number,
               importance, difficulty, review_value,
-              estimated_minutes, instruction, "標準", order_in_textbook, total_minutes))
+              estimated_minutes, instruction, "標準", order_in_textbook, total_minutes,
+              representative_of))
         conn.commit()
         for sid in student_ids:
             if undecided:
@@ -663,8 +708,10 @@ def handle_tool(name: str, arguments: dict):
         """, (student_id, problem_id, record_date, correct, new_mastery, "Record", score))
         conn.commit()
         conn.close()
-        from database import update_assignments_after_record
-        update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
+        from database import update_assignments_after_record, apply_linked_after_record
+        next_date = update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
+        # 代表問題（復習価値4以上）なら周辺問題の出題日を連動させる（習熟度・履歴は触らない）
+        linked = apply_linked_after_record(student_id, problem_id, record_date, score)
         auto_results = []
         if auto_sweep:
             try:
@@ -678,6 +725,8 @@ def handle_tool(name: str, arguments: dict):
             "score": score,
             "score_label": SCORE_LABELS.get(score, str(score)),
             "correct": correct,
+            "next_scheduled_date": next_date,
+            "linked": linked,
             "auto_sweep": auto_sweep,
             "auto_recorded": auto_results,
         }
@@ -728,6 +777,13 @@ def handle_tool(name: str, arguments: dict):
                     "mastery_stars": "★" * new_mastery,
                     "next_scheduled_date": next_date,
                 })
+            # 全件の記録が済んでから代表問題の連動を行う（同日に明示記録した問題は動かさない）
+            from database import apply_linked_after_record_c
+            recorded_ids = [r["problem_id"] for r in results]
+            linked = []
+            for r in results:
+                linked.extend(apply_linked_after_record_c(
+                    c, student_id, r["problem_id"], record_date, r["score"], recorded_ids))
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -745,6 +801,7 @@ def handle_tool(name: str, arguments: dict):
             "recorded_count": len(results),
             "date": record_date,
             "records": results,
+            "linked": linked,
             "auto_sweep": auto_sweep,
             "auto_recorded": auto_results,
         }
@@ -774,9 +831,157 @@ def handle_tool(name: str, arguments: dict):
             if field in arguments:
                 c.execute(f"UPDATE problems SET {field}=? WHERE problem_id=?",
                           (arguments[field], problem_id))
+        changed = {}
+        # セクションの事後修正: section_id（既存ID）または section_name（検索→無ければ作成）
+        if "section_id" in arguments or arguments.get("section_name"):
+            c.execute("SELECT textbook_id FROM problems WHERE problem_id=?", (problem_id,))
+            prow = c.fetchone()
+            if not prow:
+                conn.close()
+                return {"error": f"問題が見つかりません: problem_id={problem_id}"}
+            if arguments.get("section_name"):
+                from database import resolve_section_c
+                sec_id, created = resolve_section_c(c, prow["textbook_id"], arguments["section_name"])
+                changed["section"] = {"section_id": sec_id, "name": arguments["section_name"].strip(),
+                                      "created": created}
+            else:
+                sec_id = arguments["section_id"]
+                if sec_id is not None:
+                    c.execute("SELECT textbook_id FROM textbook_sections WHERE section_id=?", (sec_id,))
+                    srow = c.fetchone()
+                    if not srow:
+                        conn.close()
+                        return {"error": f"セクションが見つかりません: section_id={sec_id}"}
+                    if srow["textbook_id"] != prow["textbook_id"]:
+                        conn.close()
+                        return {"error": f"section_id={sec_id} は別テキスト(textbook_id={srow['textbook_id']})のセクションです"}
+                changed["section"] = {"section_id": sec_id}
+            c.execute("UPDATE problems SET section_id=? WHERE problem_id=?", (sec_id, problem_id))
+        # 代表問題の事後指定: representative_of=問題ID で紐づけ、null/0 で解除
+        if "representative_of" in arguments:
+            rep = arguments["representative_of"]
+            if rep in (None, 0, "", "null"):
+                c.execute("UPDATE problems SET representative_of=NULL WHERE problem_id=?", (problem_id,))
+                changed["representative_of"] = None
+            else:
+                rep = int(rep)
+                if rep == int(problem_id):
+                    conn.close()
+                    return {"error": "representative_of に自分自身は指定できません"}
+                c.execute("SELECT review_value, problem_number FROM problems WHERE problem_id=?", (rep,))
+                rrow = c.fetchone()
+                if not rrow:
+                    conn.close()
+                    return {"error": f"代表問題が見つかりません: problem_id={rep}"}
+                c.execute("UPDATE problems SET representative_of=? WHERE problem_id=?", (rep, problem_id))
+                changed["representative_of"] = rep
+                if int(rrow["review_value"] or 0) < 4:
+                    changed["warning"] = (f"代表問題 {rep}（{rrow['problem_number']}）の復習価値は "
+                                          f"{rrow['review_value']} です。4以上でないと連動は発火しません")
         conn.commit()
         conn.close()
-        return {"status": "ok", "problem_id": problem_id}
+        return {"status": "ok", "problem_id": problem_id, "changed": changed}
+
+    elif name == "get_linked_problems":
+        # 代表問題に連動する周辺問題を確認する（事後修正の検証用。DBは変更しない）
+        from database import get_linked_problems
+        student_id = arguments["student_id"]
+        problem_id = int(arguments["problem_id"])
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT p.problem_id, p.problem_number, p.textbook, p.review_value, p.section_id,
+                   s.name AS section_name, p.representative_of
+            FROM problems p LEFT JOIN textbook_sections s ON s.section_id=p.section_id
+            WHERE p.problem_id=?
+        """, (problem_id,))
+        rep = c.fetchone()
+        conn.close()
+        if not rep:
+            return {"error": f"問題が見つかりません: problem_id={problem_id}"}
+        rep = dict(rep)
+        rep["is_representative"] = int(rep["review_value"] or 0) >= 4
+        return {"representative": rep,
+                "linked": get_linked_problems(student_id, problem_id),
+                "note": "正答(score>=4)で linked の出題日を代表の次回日以降へ送り、誤答(score<=2)で代表の次回日に Recall で戻す。"
+                        "同日に明示記録した問題は動かさない"}
+
+    elif name == "set_problem_sections":
+        # セクションの一括バックフィル。confirm 無しはプレビューのみ
+        from database import resolve_section_c
+        entries = arguments.get("entries") or []
+        confirm = bool(arguments.get("confirm", False))
+        if not entries:
+            return {"error": "entries が空です。[{problem_id, section_name}, ...] を指定してください"}
+        conn = get_connection()
+        c = conn.cursor()
+        preview, errors = [], []
+        for e in entries:
+            try:
+                pid = int(e["problem_id"])
+                sname = str(e.get("section_name", "")).strip()
+            except (KeyError, TypeError, ValueError):
+                errors.append({"entry": e, "error": "problem_id と section_name が必要です"})
+                continue
+            if not sname:
+                errors.append({"problem_id": pid, "error": "section_name が空です"})
+                continue
+            c.execute("""
+                SELECT p.problem_number, p.textbook, p.textbook_id, p.section_id, s.name AS current_name
+                FROM problems p LEFT JOIN textbook_sections s ON s.section_id=p.section_id
+                WHERE p.problem_id=?
+            """, (pid,))
+            prow = c.fetchone()
+            if not prow:
+                errors.append({"problem_id": pid, "error": "問題が見つかりません"})
+                continue
+            if prow["textbook_id"] is None:
+                errors.append({"problem_id": pid, "error": "textbook_id が未設定のためセクションを付けられません"})
+                continue
+            c.execute("SELECT section_id FROM textbook_sections WHERE textbook_id=? AND name=?",
+                      (prow["textbook_id"], sname))
+            srow = c.fetchone()
+            preview.append({
+                "problem_id": pid, "problem_number": prow["problem_number"], "textbook": prow["textbook"],
+                "textbook_id": prow["textbook_id"],
+                "current": {"section_id": prow["section_id"], "name": prow["current_name"]},
+                "target": {"section_id": srow["section_id"] if srow else None, "name": sname,
+                           "create": srow is None},
+                "unchanged": (srow is not None and srow["section_id"] == prow["section_id"]),
+            })
+        new_names = sorted({(p["textbook_id"], p["target"]["name"]) for p in preview if p["target"]["create"]})
+        summary = {"entries": len(entries), "valid": len(preview), "errors": len(errors),
+                   "to_change": sum(1 for p in preview if not p["unchanged"]),
+                   "overwrite_existing": sum(1 for p in preview
+                                             if not p["unchanged"] and p["current"]["section_id"] is not None),
+                   "sections_to_create": [{"textbook_id": t, "name": n} for t, n in new_names]}
+        if not confirm or errors:
+            conn.close()
+            return {"mode": "preview", "summary": summary, "preview": preview, "errors": errors,
+                    "note": ("errors を解消してから confirm=true で適用してください" if errors else
+                             "内容を確認のうえ confirm=true で適用してください（適用前にDBを .bak_日時 にコピーします）")}
+        import shutil
+        from datetime import datetime as _dt
+        backup = f"{DB_PATH}.bak_{_dt.now():%Y%m%d_%H%M%S}"
+        shutil.copy2(DB_PATH, backup)
+        applied, created = [], []
+        try:
+            for p in preview:
+                if p["unchanged"]:
+                    continue
+                sec_id, was_created = resolve_section_c(c, p["textbook_id"], p["target"]["name"])
+                if was_created:
+                    created.append({"section_id": sec_id, "textbook_id": p["textbook_id"], "name": p["target"]["name"]})
+                c.execute("UPDATE problems SET section_id=? WHERE problem_id=?", (sec_id, p["problem_id"]))
+                applied.append({"problem_id": p["problem_id"], "section_id": sec_id, "name": p["target"]["name"]})
+            conn.commit()
+        except Exception as ex:
+            conn.rollback()
+            conn.close()
+            return {"error": f"適用に失敗しました（ロールバック済み）: {ex}", "backup": backup}
+        conn.close()
+        return {"mode": "applied", "summary": summary, "applied_count": len(applied),
+                "sections_created": created, "applied": applied, "backup": backup}
 
     elif name == "delete_assignment":
         assignment_id = arguments.get("assignment_id")

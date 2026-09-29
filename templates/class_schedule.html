@@ -1,165 +1,75 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Class Schedule — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1000px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border);
-      padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover  { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted);
-      border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .btn-warn { background:var(--amber-bg); color:var(--amber);
-      border:1px solid rgba(245,166,35,0.3); }
-    .btn-warn:hover { background:rgba(245,166,35,0.2); }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted);
-      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
-      text-transform:uppercase; padding:10px 12px; text-align:center;
-      border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-    .grid-7 { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-dim); letter-spacing:1px; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim);
-      margin-top:5px; letter-spacing:0.5px; }
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); text-decoration:none; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    /* 曜日チェックボックス */
-    .dow-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
-    .dow-btn { display:flex; flex-direction:column; align-items:center; padding:10px 6px;
-      background:var(--surface2); border:1px solid var(--border-light); cursor:pointer;
-      transition:all 0.15s; user-select:none; }
-    .dow-btn:has(input:checked) { background:var(--blue-bg); border-color:rgba(91,143,249,0.4); }
-    .dow-btn span { font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted);
-      margin-top:4px; }
-    .dow-btn:has(input:checked) span { color:var(--blue); }
-    .dow-btn input { accent-color:var(--blue); }
-    /* 時間入力グリッド */
-    .time-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
-    .time-cell { display:flex; flex-direction:column; align-items:center; gap:6px; }
-    .time-cell .day-label { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-muted); letter-spacing:1px; }
-    .time-cell input { text-align:center; padding:8px 4px; }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-  </style>
-</head>
-<body>
-<div class="container">
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">02 / Schedule</div>
-      <div class="page-title" style="color:var(--green);">Class Schedule</div>
-      <div class="page-title-ja">Class Schedule</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+{% extends "base.html" %}
+{% set container_w = "1000px" %}
+{% set page_label = "02 / Students / Class Days" %}
+{% set page_title = "Class Schedule" %}
+{% set page_title_ja = "授業曜日・次回授業日" %}
+{% set title_color = "var(--blue)" %}
+{% set back_href = "/students" %}
+{% set back_label = "Students" %}
 
-  {% with messages = get_flashed_messages(with_categories=true) %}
-  {% for cat, msg in messages %}
-  <div class="alert alert-{{ 'success' if cat == 'success' else 'error' }} fade-in">{{ msg }}</div>
-  {% endfor %}
-  {% endwith %}
+{% block title %}Class Schedule — Study Planner{% endblock %}
 
+{% block style %}
+<style>
+  /* ---- 教科ごとのブロック ---- */
+  .subject-row {
+    margin-bottom:24px; padding-bottom:24px;
+    border-bottom:1px solid var(--border);
+  }
+  .subject-row:last-child { margin-bottom:0; padding-bottom:0; border-bottom:none; }
+  .subject-label {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:14px;
+  }
+
+  /* ---- 授業曜日タイル（チェックボックスの色は app.css の accent-color） ---- */
+  .dow-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; margin-top:8px; }
+  .dow-btn {
+    display:flex; flex-direction:column; align-items:center; padding:10px 6px;
+    margin:0; background:var(--surface2); border:1px solid var(--border-light);
+    cursor:pointer; transition:all 0.15s; user-select:none;
+  }
+  .dow-btn:has(input:checked) { background:var(--blue-bg); border-color:rgba(91,143,249,0.4); }
+  .dow-btn span.en { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); margin-top:4px; }
+  .dow-btn span.ja { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); margin-top:2px; }
+  .dow-btn:has(input:checked) span { color:var(--blue); }
+
+  /* ---- 次回授業日 ---- */
+  .next-class-row { display:flex; gap:12px; align-items:flex-end; }
+  .next-class-row > div { flex:1; }
+  .next-class-row .btn { white-space:nowrap; min-height:41px; }
+
+  @media (max-width:640px) {
+    .dow-grid { grid-template-columns:repeat(4,1fr); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
   {% for student in students %}
   <div class="card fade-in">
     <div class="card-title">{{ student.name }} — {{ student.student_id }}</div>
 
     {% for subject in student.subjects.split(',') %}
     {% set subj = subject.strip() %}
-    <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border);">
-      <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;
-        text-transform:uppercase;color:var(--text-muted);margin-bottom:14px;">
-        {{ subj }}
-      </div>
+    <div class="subject-row">
+      <div class="subject-label">{{ subj }}</div>
 
       <!-- 曜日設定 -->
       <form method="POST" action="/class_schedule/set">
         <input type="hidden" name="student_id" value="{{ student.student_id }}">
         <input type="hidden" name="subject" value="{{ subj }}">
-        <label>Class Days</label>
+        <label style="margin-top:0;">Class Days</label>
         <div class="dow-grid">
           {% for i in range(7) %}
           {% set dv = ['mon','tue','wed','thu','fri','sat','sun'][i] %}
           {% set de = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i] %}
           {% set dj = ['月','火','水','木','金','土','日'][i] %}
-          <label class="dow-btn" style="margin:0;">
+          <label class="dow-btn">
             <input type="checkbox" name="dows" value="{{ dv }}"
               {% if schedule_map.get(student.student_id, {}).get(subj, {}).get(dv) %}checked{% endif %}>
-            <span>{{ de }}<br><span style="font-size:10px;color:var(--text-dim);">{{ dj }}</span></span>
+            <span class="en">{{ de }}</span>
+            <span class="ja">{{ dj }}</span>
           </label>
           {% endfor %}
         </div>
@@ -173,14 +83,12 @@
         <input type="hidden" name="student_id" value="{{ student.student_id }}">
         <input type="hidden" name="subject" value="{{ subj }}">
         <label>Next Class Date</label>
-        <div style="display:flex;gap:12px;align-items:flex-end;">
-          <div style="flex:1;">
+        <div class="next-class-row">
+          <div>
             <input type="date" name="next_class_date"
               value="{{ next_class_map.get(student.student_id, {}).get(subj, '') }}">
           </div>
-          <button type="submit" class="btn btn-primary btn-sm" style="white-space:nowrap;">
-            Set →
-          </button>
+          <button type="submit" class="btn btn-primary btn-sm">Set →</button>
         </div>
         <p class="hint">Leave blank to reset the next class date</p>
       </form>
@@ -188,7 +96,37 @@
     {% endfor %}
   </div>
   {% endfor %}
+{% endblock %}
 
-</div>
-</body>
-</html>
+{% block script %}
+<script>
+/* POST → redirect でページ先頭に戻るのを防ぐ。
+   submit 時にスクロール位置を sessionStorage へ保存し、
+   同じパスで再読込されたときだけ復元する。 */
+(function () {
+  'use strict';
+  var KEY = 'sp:scroll:' + location.pathname;
+  var MAX_AGE = 10000;   // 確認モーダルでキャンセルした場合の取り残しを無効化
+
+  document.addEventListener('submit', function () {
+    try {
+      sessionStorage.setItem(KEY, (window.pageYOffset || 0) + '|' + Date.now());
+    } catch (e) { /* noop */ }
+  }, true);
+
+  try {
+    var saved = sessionStorage.getItem(KEY);
+    if (saved) {
+      sessionStorage.removeItem(KEY);
+      var parts = saved.split('|');
+      var y = parseInt(parts[0], 10) || 0;
+      var ts = parseInt(parts[1], 10) || 0;
+      if (y > 0 && Date.now() - ts < MAX_AGE) {
+        if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }
+        window.requestAnimationFrame(function () { window.scrollTo(0, y); });
+      }
+    }
+  } catch (e) { /* noop */ }
+})();
+</script>
+{% endblock %}

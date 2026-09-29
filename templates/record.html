@@ -1,114 +1,71 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Add Record — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:800px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:32px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px; color:#f5a623;
-      letter-spacing:2px; text-transform:uppercase;  }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:28px 32px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:20px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:18px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], select {
-      width:100%; padding:10px 14px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus, select:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    select option.divider { color:var(--text-dim); font-size:11px; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-    /* 5段階スコア選択 */
-    .score-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
-    .score-btn {
-      display:flex; flex-direction:column; align-items:center; justify-content:center;
-      padding:12px 8px; background:var(--surface2); border:1px solid var(--border-light);
-      cursor:pointer; transition:all 0.15s; user-select:none;
-    }
-    .score-btn:hover { border-color:var(--text-muted); background:var(--surface); }
-    .score-btn.selected { border-color:currentColor; }
-    .score-btn[data-score="5"].selected { background:rgba(62,207,142,0.12); border-color:var(--green); color:var(--green); }
-    .score-btn[data-score="4"].selected { background:rgba(91,143,249,0.12); border-color:var(--blue);  color:var(--blue); }
-    .score-btn[data-score="3"].selected { background:rgba(245,166,35,0.12); border-color:var(--amber); color:var(--amber); }
-    .score-btn[data-score="2"].selected { background:rgba(240,98,146,0.12); border-color:var(--rose);  color:var(--rose); }
-    .score-btn[data-score="1"].selected { background:rgba(239,68,68,0.12);  border-color:var(--red);   color:var(--red); }
-    .score-num { font-family:'DM Mono',monospace; font-size:22px; font-weight:500; line-height:1; }
-    .score-label { font-family:'Noto Serif JP',serif; font-size:10px; font-weight:300;
-      color:var(--text-muted); margin-top:6px; text-align:center; line-height:1.3; }
-    .score-btn.selected .score-label { color:inherit; }
-    input[type="hidden"]#score-input { display:none; }
-    /* 送信ボタン */
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:12px 28px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-primary:disabled { background:var(--surface2); color:var(--text-dim); cursor:not-allowed; }
-    /* アラート */
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 18px; margin-bottom:20px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    /* 今期の問題を示すグループ */
-    optgroup { font-family:'DM Mono',monospace; font-size:11px; }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set container_w = "800px" %}
+{% set page_label = "04 / Records" %}
+{% set page_title = "Single Record" %}
+{% set page_title_ja = "1問記録" %}
+{% set title_color = "var(--amber)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">04 / Records</div>
-      <div class="page-title">Add Record</div>
-      <div class="page-title-ja">Add Record</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+{% block title %}Single Record — Study Planner{% endblock %}
 
-  {%- with messages = get_flashed_messages(with_categories=true) %}
-  {%- for cat, msg in messages %}
-  <div class="alert alert-{{ 'success' if cat == 'success' else 'error' }} fade-in">
-    {{ msg }}
+{% block style %}
+<style>
+  /* ── ページ内サブナビ ── */
+  .page-links { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .page-links a {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-muted); text-decoration:none;
+    border:1px solid var(--border-light); padding:6px 14px; transition:all 0.15s;
+  }
+  .page-links a:hover { color:var(--text); border-color:var(--text-muted); text-decoration:none; }
+  .page-links a.current { color:var(--amber); border-color:var(--amber); cursor:default; }
+
+  /* ── 5段階スコア選択（このアプリで最も使うUI） ── */
+  .score-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-top:8px; }
+  .score-btn {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:12px 8px; background:var(--surface2); border:1px solid var(--border-light);
+    cursor:pointer; transition:all 0.15s; user-select:none;
+  }
+  .score-btn:hover { border-color:var(--text-muted); background:var(--surface); }
+  .score-btn.selected { border-color:currentColor; }
+  .score-btn[data-score="5"].selected { background:rgba(62,207,142,0.12); border-color:var(--green); color:var(--green); }
+  .score-btn[data-score="4"].selected { background:rgba(91,143,249,0.12); border-color:var(--blue);  color:var(--blue); }
+  .score-btn[data-score="3"].selected { background:rgba(245,166,35,0.12); border-color:var(--amber); color:var(--amber); }
+  .score-btn[data-score="2"].selected { background:rgba(240,98,146,0.12); border-color:var(--rose);  color:var(--rose); }
+  .score-btn[data-score="1"].selected { background:rgba(239,68,68,0.12);  border-color:var(--red);   color:var(--red); }
+  .score-num { font-family:var(--font-mono); font-size:22px; font-weight:500; line-height:1; }
+  .score-label {
+    font-family:var(--font-ja); font-size:10px; font-weight:300;
+    color:var(--text-muted); margin-top:6px; text-align:center; line-height:1.3;
+  }
+  .score-btn.selected .score-label { color:inherit; }
+
+  /* ── 未定問題トグル ── */
+  .undecided-btn {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1px;
+    text-transform:uppercase; color:var(--text-muted); background:none; border:none;
+    cursor:pointer; padding:4px 0; display:flex; align-items:center; gap:6px;
+  }
+  .undecided-btn:hover { color:var(--text); }
+
+  /* ── モバイル：タイルが細くなりすぎないよう最小高さを確保 ── */
+  @media (max-width:640px) {
+    .score-grid { gap:5px; }
+    .score-btn { min-height:44px; padding:8px 2px; }
+    .score-num { font-size:18px; }
+    .score-label { margin-top:4px; letter-spacing:0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="page-links fade-in">
+    <a class="current" href="/record">1問記録</a>
+    <a href="/record/bulk">授業まとめ記録 →</a>
+    <a href="/record/list">記録一覧 →</a>
   </div>
-  {%- endfor %}
-  {%- endwith %}
 
   <div class="card fade-in">
     <div class="card-title">Record Entry</div>
@@ -142,16 +99,12 @@
 
       <!-- 未定問題トグル -->
       <div id="undecided-toggle" style="display:none;margin-top:6px;">
-        <button type="button" onclick="toggleUndecided()" id="undecided-btn"
-          style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;
-            text-transform:uppercase;color:var(--text-dim);background:none;border:none;
-            cursor:pointer;padding:4px 0;display:flex;align-items:center;gap:6px;">
+        <button type="button" class="undecided-btn" onclick="toggleUndecided()" id="undecided-btn">
           <span id="undecided-arrow">▶</span>
           <span id="undecided-label"></span>
         </button>
       </div>
-      <div id="undecided-info" style="display:none;font-family:'DM Mono',monospace;
-        font-size:9px;color:var(--text-dim);margin-top:3px;letter-spacing:0.5px;">
+      <div id="undecided-info" class="hint" style="display:none;">
         Problems with undecided dates. Select to record.
       </div>
 
@@ -186,9 +139,9 @@
       </div>
     </form>
   </div>
+{% endblock %}
 
-</div>
-
+{% block script %}
 <script>
 let _allAssignments = [];
 let _showUndecided = false;
@@ -300,5 +253,4 @@ function selectScore(score) {
 // 初期化
 document.addEventListener('DOMContentLoaded', onStudentChange);
 </script>
-</body>
-</html>
+{% endblock %}

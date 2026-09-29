@@ -1,33 +1,31 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <title>Edit Problem — Study Planner</title>
-  <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; background: #f5f7fa; }
-    h1 { color: #2c3e50; }
-    .form-box { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-    label { display: block; margin-top: 12px; font-weight: bold; }
-    input[type="text"], select, textarea {
-      width: 100%; padding: 8px; margin-top: 4px; border: 1px solid #ccc;
-      border-radius: 4px; font-size: 15px; box-sizing: border-box;
-    }
-    textarea { height: 70px; resize: vertical; }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
-    .hint { font-size: 12px; color: #888; margin-top: 2px; }
-    button { margin-top: 16px; padding: 10px 28px; background: #4472C4; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
-    button:hover { background: #2c5fa8; }
-    a { color: #4472C4; }
-  </style>
-</head>
-<body>
-  <h1>問題編集</h1>
-  <div class="form-box">
+{% extends "base.html" %}
+{% set container_w = "760px" %}
+{% set page_label = "01 / Master Data / Edit" %}
+{% set page_title = "Edit Problem" %}
+{% set page_title_ja = "問題編集" %}
+{% set title_color = "var(--red)" %}
+{% set back_href = "/problems/list" %}
+{% set back_label = "PROBLEM LIST" %}
+
+{% block title %}Edit Problem — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  .problem-ref {
+    font-family:var(--font-mono); font-size:11px; letter-spacing:1px;
+    color:var(--text-dim); margin-bottom:16px;
+  }
+  textarea[name="instruction"] { min-height:80px; }
+</style>
+{% endblock %}
+
+{% block content %}
+  <!-- 問題の編集 -->
+  <div class="card fade-in">
+    <div class="card-title">Problem Detail</div>
+    <div class="problem-ref">PROBLEM ID {{ problem.problem_id }}</div>
     <form method="POST">
-      <div class="row2">
+      <div class="grid-2">
         <div>
           <label>Subject</label>
           <input type="text" name="subject" value="{{ problem.subject }}" required>
@@ -37,9 +35,11 @@
           <input type="text" name="textbook" value="{{ problem.textbook }}" required>
         </div>
       </div>
+
       <label>Problem Name / No.</label>
       <input type="text" name="problem_number" value="{{ problem.problem_number }}" required>
-      <div class="row3">
+
+      <div class="grid-3">
         <div>
           <label>Importance (1–5)</label>
           <select name="importance">
@@ -74,7 +74,8 @@
           <p class="hint">Value of repeated practice</p>
         </div>
       </div>
-      <div class="row2">
+
+      <div class="grid-2">
         <div>
           <label>Est. Minutes</label>
           <select name="estimated_minutes">
@@ -84,35 +85,47 @@
           </select>
         </div>
       </div>
+
       <label>Instruction (optional)</label>
       <textarea name="instruction">{{ problem.instruction or "" }}</textarea>
-      <button type="submit">更新する</button>
+
+      <div style="margin-top:20px;">
+        <button type="submit" class="btn btn-primary">Update →</button>
+      </div>
     </form>
   </div>
 
-  <div class="form-box" style="margin-top:24px;">
-    <h2 style="font-size:16px;color:#2c3e50;">出題予定の追加</h2>
+  <!-- 出題予定の追加 -->
+  <div class="card fade-in">
+    <div class="card-title">Add Assignment — 出題予定の追加</div>
     <form method="POST" action="/problems/assign/{{ problem.problem_id }}">
-      <label>Students</label>
-      <select name="student_id" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
-        {% for s in students %}
-        <option value="{{ s.student_id }}">{{ s.name }}</option>
-        {% endfor %}
-      </select>
-      <label>Category</label>
-      <select name="category" style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
-        <option value="New">New</option>
-        <option value="Recall">Recall</option>
-        <option value="Drill">Drill</option>
-        <option value="Reinforce">Reinforce</option>
-      </select>
-      <label>Scheduled Date (optional)</label>
-      <input type="date" name="scheduled_date" style="width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:4px;font-size:15px;box-sizing:border-box;">
-      <p style="font-size:12px;color:#888;margin-top:4px;">空欄の場合は出題日未定として登録されます。</p>
-      <button type="submit" style="margin-top:12px;padding:8px 20px;background:#27ae60;color:white;border:none;border-radius:6px;font-size:14px;cursor:pointer;">出題予定に追加</button>
+      <div class="grid-3">
+        <div>
+          <label>Students</label>
+          <select name="student_id">
+            {% for s in students %}
+            <option value="{{ s.student_id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Category</label>
+          <select name="category">
+            <option value="New">New</option>
+            <option value="Recall">Recall</option>
+            <option value="Drill">Drill</option>
+            <option value="Reinforce">Reinforce</option>
+          </select>
+        </div>
+        <div>
+          <label>Scheduled Date (optional)</label>
+          <input type="date" name="scheduled_date">
+          <p class="hint">空欄の場合は出題日未定として登録されます。</p>
+        </div>
+      </div>
+      <div style="margin-top:20px;">
+        <button type="submit" class="btn btn-success">出題予定に追加 →</button>
+      </div>
     </form>
   </div>
-
-  <p><a href="/problems">← 問題マスタ一覧に戻る</a></p>
-</body>
-</html>
+{% endblock %}

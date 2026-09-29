@@ -6,7 +6,8 @@ from export_theme import get_palette, normalize_theme
 
 
 def _write_excel_sheet(ws, subjects, rows, unassigned,
-                       student_name, start_date, end_date, theme="dark"):
+                       student_name, start_date, end_date, theme="dark",
+                       carried=None):
     """全教科を1シートに出力する（theme: "dark" / "light"）"""
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -227,24 +228,28 @@ def _write_excel_sheet(ws, subjects, rows, unassigned,
             ws.row_dimensions[cur].height = row_h
             cur += 1
 
-    # ── 未割当ブロック ──
-    all_unassigned = []
-    for subj in subjects:
-        for item in unassigned.get(subj, []):
-            all_unassigned.append((subj, item))
+    # ── 未割当ブロック／繰り越しブロック ──
+    # 未割当: 今週のキャパに収まらなかった問題。繰り越し: 定着系の週上限で翌週へ回した問題
+    for label, group in (("── UNASSIGNED ──", unassigned),
+                         ("── CARRY OVER（翌週へ繰り越し）──", carried or {})):
+        all_items = []
+        for subj in subjects:
+            for item in group.get(subj, []):
+                all_items.append((subj, item))
+        if not all_items:
+            continue
 
-    if all_unassigned:
         # 区切り
         ws.merge_cells(f"A{cur}:{get_column_letter(N_COLS)}{cur}")
         sep = ws.cell(row=cur, column=1)
-        sep.value = "── UNASSIGNED ──"
+        sep.value = label
         sep.fill = fill(BG_UNASSIGNED)
         sep.font = Font(color=C_RED, size=8, name="Consolas")
         sep.alignment = aln("left", "center")
         ws.row_dimensions[cur].height = 14
         cur += 1
 
-        for subj, item in all_unassigned:
+        for subj, item in all_items:
             cat = item.get("category", "")
             cat_color = CAT_COLORS.get(cat, C_DIM)
             vals = ["—", "—", subj, cat,
@@ -297,7 +302,7 @@ def export_excel(student_id, start_date_str, end_date_str, subject_filter=None,
     ws = wb.create_sheet(title="Plan")
     _write_excel_sheet(ws, subjects, rows, unassigned,
                        student_name, start_date_str, end_date_str,
-                       theme=theme)
+                       theme=theme, carried=plan_data.get("carried_over", {}))
 
     # 保存
     archive_dir = os.path.join(os.path.dirname(__file__), "plan_archives")

@@ -1,135 +1,76 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Sections — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; color:#f87171; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="number"] {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s; }
-    input:focus { border-color:var(--blue); }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover  { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
-      font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 12px;
-      text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
-    .editable { cursor:pointer; padding:2px 6px; border-radius:2px;
-      border:1px dashed transparent; transition:border-color 0.12s, background 0.12s; }
-    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
-    .editable.editing { display:none; }
-    .inline-input { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    /* アコーディオン */
-    .section-name-btn {
-      cursor:pointer; display:flex; align-items:center; gap:10px;
-      padding:4px 0; width:100%; background:none; border:none;
-      color:var(--text); font-family:'Noto Serif JP',serif;
-      font-size:12px; text-align:left; outline:none;
-    }
-    .section-name-btn:focus { outline:none; }
-    .section-name-btn:hover .section-name-text { color:var(--blue); }
-    .chevron { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-dim); transition:transform 0.2s;
-      display:inline-block; min-width:12px; }
-    .chevron.open { transform:rotate(90deg); }
-    .accordion-row td { padding:0; border:none; }
-    .accordion-inner { padding:12px 16px; background:var(--surface2);
-      border-top:1px solid var(--border); }
-    /* 削除確認モーダル */
-    #confirm-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.75); z-index:1000;
-      align-items:center; justify-content:center; }
-    #confirm-modal.show { display:flex; }
-    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
-      border-left:3px solid var(--red); padding:24px 28px;
-      min-width:320px; max-width:460px; width:90%; }
-    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--red);
-      margin-bottom:12px; }
-    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
-      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
-    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
-    /* toast */
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue); color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set page_label = "01 / Master" %}
+{% set page_title = "Sections" %}
+{% set page_title_ja = "セクション管理" %}
+{% set title_color = "var(--red)" %}
+{% set back_href = "/textbooks" %}
+{% set back_label = "TEXTBOOKS" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">01 / Master Data</div>
-      <div class="page-title">Sections</div>
-      <div class="page-title-ja">Section Management</div>
-    </div>
-    <a class="page-header-back" href="/textbooks">Textbooks</a>
-  </div>
+{% block title %}Sections — Study Planner{% endblock %}
 
+{% block style %}
+<style>
+  /* ── セクション名アコーディオン ── */
+  .section-name-btn {
+    cursor:pointer; display:flex; align-items:center; gap:10px;
+    padding:4px 0; width:100%; background:none; border:none;
+    color:var(--text); font-family:var(--font-ja);
+    font-size:12px; text-align:left;
+  }
+  .section-name-btn:hover .section-name-text { color:var(--blue); }
+  .chevron {
+    font-family:var(--font-mono); font-size:10px;
+    color:var(--text-dim); transition:transform 0.2s;
+    display:inline-block; min-width:12px;
+  }
+  .chevron.open { transform:rotate(90deg); }
+  .accordion-row td { padding:0; border:none; }
+  .accordion-inner {
+    padding:12px 16px; background:var(--surface2);
+    border-top:1px solid var(--border);
+  }
+
+  /* ── 一括セクション割当バー ── */
+  .card-head {
+    display:flex; align-items:center; gap:12px;
+    flex-wrap:wrap; margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--border);
+  }
+  .card-head .card-title { margin:0; padding-bottom:0; border-bottom:none; }
+  .bulk-section-bar {
+    display:flex; margin-left:auto; align-items:center;
+    gap:8px; flex-wrap:wrap;
+  }
+  .bulk-section-bar select {
+    width:auto; min-width:180px; padding:5px 8px;
+    font-family:var(--font-mono); font-size:10px;
+  }
+
+  /* ── No. インライン編集 ── */
+  .editable {
+    cursor:pointer; padding:2px 6px; border-radius:2px;
+    border:1px dashed transparent;
+    transition:border-color 0.12s, background 0.12s;
+  }
+  .editable:hover { border-color:var(--border-light); background:var(--surface3); }
+  .editable.editing { display:none; }
+  .inline-input {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:3px 6px; font-size:12px;
+  }
+
+  .num-cell { font-family:var(--font-mono); font-size:11px; }
+  .sec-cell { font-family:var(--font-mono); font-size:10px; color:var(--text-dim); }
+  .inline-form { display:inline; }
+
+  @media (max-width:640px) {
+    .bulk-section-bar { margin-left:0; width:100%; }
+    .bulk-section-bar select { flex:1 1 140px; min-width:0; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
   <div class="meta-text fade-in" style="margin-bottom:20px;">
     {{ textbook.series_name or '—' }} &rsaquo; {{ textbook.name }}
     <span style="margin-left:12px;color:var(--text-muted);">{{ textbook.subject }}</span>
@@ -138,8 +79,8 @@
   <!-- Add Section -->
   <div class="card fade-in">
     <div class="card-title">Add Section</div>
-    <form method="POST" style="display:flex;gap:16px;align-items:flex-end;">
-      <div style="flex:1;">
+    <form method="POST" style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:220px;">
         <label>Section Name</label>
         <input type="text" name="name" placeholder="e.g. Chapter 1: Expansion and Factorization" required>
       </div>
@@ -154,6 +95,8 @@
   <!-- Section List（アコーディオン） -->
   <div class="card fade-in">
     <div class="card-title">Section List</div>
+    {% if sections %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
@@ -176,8 +119,13 @@
         </td>
         <td class="meta-text">{{ s.problem_count }}</td>
         <td>
-          <button class="btn btn-danger btn-sm del-btn" type="button" data-msg=
-              'Delete section "{{ s.name }}"?\nProblems will be unlinked but not deleted.' data-action='/textbooks/sections/delete/{{ s.section_id }}'>×</button>
+          <form class="inline-form" method="POST"
+                action="/textbooks/sections/delete/{{ s.section_id }}"
+                data-confirm-title="Confirm Delete"
+                data-confirm-ok="Delete"
+                data-confirm="セクション「{{ s.name }}」を削除しますか？&#10;問題は削除されず、セクションの紐づけだけが解除されます。">
+            <button type="submit" class="btn btn-danger btn-sm">×</button>
+          </form>
         </td>
       </tr>
       <!-- アコーディオン行 -->
@@ -191,41 +139,40 @@
       {% endfor %}
       </tbody>
     </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-title">No Sections</div>
+      このテキストにはセクションがまだ登録されていません。
+    </div>
+    {% endif %}
   </div>
 
   <!-- Problems in this Textbook -->
   <div class="card fade-in">
-    <div style="display:flex;align-items:center;margin-bottom:12px;gap:12px;">
-      <div class="card-title" style="margin:0;">Problems in this Textbook</div>
-      <div id="bulk-section-bar" style="display:flex;margin-left:auto;align-items:center;gap:8px;">
-        <span id="sp-sel-count" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-dim);"></span>
-        <select id="sp-target-section"
-          style="background:var(--surface2);border:1px solid var(--border-light);
-            color:var(--text);padding:5px 8px;font-family:'DM Mono',monospace;
-            font-size:10px;outline:none;">
+    <div class="card-head">
+      <div class="card-title">Problems in this Textbook</div>
+      {% if problems %}
+      <div class="bulk-section-bar" id="bulk-section-bar">
+        <span id="sp-sel-count" class="meta-text"></span>
+        <select id="sp-target-section">
           <option value="">— Assign to Section —</option>
           {% for s in sections %}
           <option value="{{ s.section_id }}">{{ s.name }}</option>
           {% endfor %}
         </select>
-        <button type="button" onclick="assignToSection()"
-          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-            text-transform:uppercase;background:var(--green);color:#0c0d11;
-            border:none;padding:6px 14px;cursor:pointer;">→ Assign</button>
-        <button type="button" onclick="removeFromSection()"
-          style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.5px;
-            text-transform:uppercase;background:var(--surface2);color:var(--text-dim);
-            border:1px solid var(--border-light);padding:6px 14px;cursor:pointer;">
-          ✕ Remove</button>
+        <button type="button" class="btn btn-success btn-sm" onclick="assignToSection()">→ Assign</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="removeFromSection()">✕ Remove</button>
       </div>
+      {% endif %}
     </div>
-    <div style="overflow-x:auto;">
+
+    {% if problems %}
+    <div class="table-scroll">
     <table class="data-table" id="section-prob-table">
       <thead><tr>
         <th style="width:32px;">
-          <input type="checkbox" id="sp-check-all"
-            onchange="toggleAllSP(this)"
-            style="accent-color:var(--blue);width:14px;height:14px;">
+          <input type="checkbox" id="sp-check-all" onchange="toggleAllSP(this)">
         </th>
         <th>No.</th><th>Problem</th><th>Section</th>
         <th>Subject</th><th>Imp</th><th>Dif</th><th>RV</th>
@@ -235,53 +182,35 @@
       <tr id="sp-{{ p.problem_id }}">
         <td>
           <input type="checkbox" class="sp-check" value="{{ p.problem_id }}"
-            onchange="updateSPCount()"
-            style="accent-color:var(--blue);width:14px;height:14px;">
+            onchange="updateSPCount()">
         </td>
         <td class="editable-cell" data-problem="{{ p.problem_id }}"
           data-field="order_in_textbook">
-          <span class="editable" ondblclick="startOrderEdit(this)"
-            style="font-family:'DM Mono',monospace;font-size:11px;">
+          <span class="editable num-cell" ondblclick="startOrderEdit(this)">
             {{ p.order_in_textbook or '—' }}
           </span>
         </td>
         <td class="left" style="font-size:11px;">{{ p.problem_number }}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-dim);">
-          {{ p.section_name or '—' }}
-        </td>
+        <td class="sec-cell">{{ p.section_name or '—' }}</td>
         <td class="meta-text">{{ p.subject }}</td>
         <td class="meta-text">{{ p.importance }}</td>
         <td class="meta-text">{{ p.difficulty }}</td>
         <td class="meta-text">{{ p.review_value }}</td>
       </tr>
       {% endfor %}
-      {% if not problems %}
-      <tr><td colspan="8" style="font-family:'DM Mono',monospace;font-size:11px;
-        color:var(--text-dim);padding:20px;text-align:center;">
-        No problems registered for this textbook.
-      </td></tr>
-      {% endif %}
       </tbody>
     </table>
     </div>
-  </div>
-
-</div>
-
-<!-- 削除確認モーダル -->
-<div id="confirm-modal">
-  <div class="confirm-box">
-    <div class="confirm-title">Confirm Delete</div>
-    <div class="confirm-message" id="confirm-message"></div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
-      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-title">No Problems</div>
+      このテキストには問題がまだ登録されていません。
     </div>
+    {% endif %}
   </div>
-</div>
+{% endblock %}
 
-<div id="toast"></div>
-
+{% block script %}
 <script>
 // ── グローバル関数（onclick属性から呼び出されるもの）──────
 function toggleAllSP(cb) {
@@ -319,44 +248,26 @@ async function removeFromSection() {
   const checked = Array.from(document.querySelectorAll('.sp-check:checked'))
                        .map(c => parseInt(c.value));
   if (checked.length === 0) { showToast('Select problems first', 'warn'); return; }
-  openConfirm('Remove ' + checked.length + ' problem(s) from their sections?', async () => {
-    const res = await fetch('/sections/bulk_assign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ problem_ids: checked, section_id: null })
-    });
-    const data = await res.json();
-    if (res.ok && data.ok) {
-      location.reload();
-    } else {
-      showToast('Error: ' + (data.message || 'failed'), 'warn');
-    }
+
+  const ok = await showConfirm({
+    title: 'Confirm Remove',
+    message: '選択した ' + checked.length + ' 問をセクションから外しますか？\n問題自体は削除されません。',
+    okLabel: 'Remove',
+    danger: true
   });
-}
+  if (!ok) return;
 
-// ── 削除確認モーダル ──────────────────────────────────
-function openConfirm(message, onOk) {
-  const modal = document.getElementById('confirm-modal');
-  document.getElementById('confirm-message').textContent = message;
-  modal.classList.add('show');
-  const okBtn = document.getElementById('confirm-ok');
-  const newOk = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOk, okBtn);
-  newOk.onclick = () => { closeConfirm(); onOk(); };
-}
-
-function confirmDelete(message, action) {
-  openConfirm(message, () => {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = action;
-    document.body.appendChild(form);
-    form.submit();
+  const res = await fetch('/sections/bulk_assign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ problem_ids: checked, section_id: null })
   });
-}
-
-function closeConfirm() {
-  document.getElementById('confirm-modal').classList.remove('show');
+  const data = await res.json();
+  if (res.ok && data.ok) {
+    location.reload();
+  } else {
+    showToast('Error: ' + (data.message || 'failed'), 'warn');
+  }
 }
 
 // ── セクションアコーディオン ──────────────────────────
@@ -396,17 +307,16 @@ function loadSectionProblems(id) {
       if (el) el.innerHTML = html;
     } else {
       document.getElementById('acc-content-' + id).innerHTML =
-        '<span style="color:#ef4444;font-family:monospace;font-size:11px;">Error: ' + xhr.status + '</span>';
+        '<span class="meta-text" style="color:var(--red);">Error: ' + xhr.status + '</span>';
     }
   };
   xhr.onerror = function() {
     document.getElementById('acc-content-' + id).innerHTML =
-      '<span style="color:#ef4444;font-family:monospace;font-size:11px;">Network error.</span>';
+      '<span class="meta-text" style="color:var(--red);">Network error.</span>';
   };
   xhr.send();
 }
 
-// ── No.インライン編集 ─────────────────────────────────
 function escHtml(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -417,8 +327,7 @@ function escHtml(str) {
 
 function buildTable(problems) {
   if (!problems || !problems.length) {
-    return '<span style="font-family:monospace;font-size:10px;' +
-           'color:var(--text-dim);">No problems in this section.</span>';
+    return '<span class="meta-text">No problems in this section.</span>';
   }
   let rows = '';
   for (let i = 0; i < problems.length; i++) {
@@ -429,27 +338,27 @@ function buildTable(problems) {
     const dif = p.difficulty   !== null ? p.difficulty   : '&mdash;';
     const rv  = p.review_value !== null ? p.review_value : '&mdash;';
     rows += '<tr>' +
-      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+      '<td style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
              'color:var(--text-dim);text-align:center;">' + no + '</td>' +
       '<td style="padding:5px 10px;font-size:11px;max-width:340px;' +
              'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
              'text-align:left;">' + escHtml(p.problem_number) + '</td>' +
-      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+      '<td style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
              'color:var(--text-dim);text-align:center;">' + imp + '</td>' +
-      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+      '<td style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
              'color:var(--text-dim);text-align:center;">' + dif + '</td>' +
-      '<td style="padding:5px 10px;font-family:monospace;font-size:10px;' +
+      '<td style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
              'color:var(--text-dim);text-align:center;">' + rv  + '</td>' +
     '</tr>';
   }
   const th = (label, w) =>
-    '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
+    '<th style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
     'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
     'text-align:center;' + (w ? 'width:' + w + ';' : '') + '">' + label + '</th>';
   return '<table style="width:100%;border-collapse:collapse;">' +
     '<thead><tr style="background:var(--surface3);">' +
       th('No.', '60px') +
-      '<th style="padding:5px 10px;font-family:monospace;font-size:8px;' +
+      '<th style="padding:5px 10px;font-family:var(--font-mono);font-size:10px;' +
            'letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);' +
            'text-align:left;">Problem</th>' +
       th('Imp', '50px') + th('Dif', '50px') + th('RV', '50px') +
@@ -457,13 +366,7 @@ function buildTable(problems) {
     '<tbody>' + rows + '</tbody></table>';
 }
 
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-
+// ── No.インライン編集 ─────────────────────────────────
 function startOrderEdit(span) {
   const cell      = span.closest('.editable-cell');
   const problemId = cell.dataset.problem;
@@ -507,26 +410,6 @@ function startOrderEdit(span) {
 
 // ── DOMContentLoaded: イベント登録のみ ───────────────
 document.addEventListener('DOMContentLoaded', function() {
-  // モーダルCancelボタン
-  const cancelBtn = document.getElementById('cancel-btn');
-  if (cancelBtn) cancelBtn.onclick = closeConfirm;
-
-  // モーダル背景クリックで閉じる
-  const modal = document.getElementById('confirm-modal');
-  if (modal) modal.onclick = function(e) {
-    if (e.target === this) closeConfirm();
-  };
-
-  // 削除ボタン
-  document.querySelectorAll('.del-btn').forEach(function(btn) {
-    btn.onclick = function() {
-      confirmDelete(
-        this.getAttribute('data-msg'),
-        this.getAttribute('data-action')
-      );
-    };
-  });
-
   // セクション名ボタン（アコーディオン）
   document.querySelectorAll('.section-name-btn').forEach(function(btn) {
     btn.onclick = function() {
@@ -543,5 +426,4 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-</body>
-</html>
+{% endblock %}

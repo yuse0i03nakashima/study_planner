@@ -1,6 +1,9 @@
 import sqlite3
 import os
+import logging
 from datetime import date, timedelta
+
+log = logging.getLogger('study_planner.database')
 
 DB_PATH = os.environ.get(
     'DB_PATH',
@@ -8,8 +11,10 @@ DB_PATH = os.environ.get(
 )
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def init_db():
@@ -175,6 +180,7 @@ def init_db():
         ("problems",    "section_id INTEGER"),
         ("problems",    "order_in_textbook INTEGER DEFAULT 1"),
         ("problems",    "total_minutes INTEGER"),
+        ("problems",    "representative_of INTEGER"),  # 代表問題の明示指定（周辺→代表）
         ("history",     "score INTEGER"),
         ("assignments", "assigned_minutes INTEGER"),
         ("assignments", "progress_before REAL DEFAULT 0.0"),
@@ -189,20 +195,33 @@ def init_db():
     for table, col_def in migrations:
         try:
             c.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
-        except Exception:
-            pass  # already exists
+        except sqlite3.OperationalError as e:
+            if "duplicate column" not in str(e).lower():
+                raise
 
-    students = [
-        ("S001", "神田悠帆", "数学,古典,社会"),
-        ("S002", "小山たみ", "数学"),
-        ("S003", "齊藤匠海", "数学"),
-        ("S004", "長友想典", "数学,英語"),
-    ]
-    c.executemany("""
-        INSERT OR IGNORE INTO students (student_id, name, subjects)
-        VALUES (?, ?, ?)
-    """, students)
+    # ── 索引（頻出の検索キー） ────────────────────────────
+    for name, ddl in [
+        ("idx_history_student_problem",
+         "history(student_id, problem_id, date)"),
+        ("idx_history_student_date", "history(student_id, date)"),
+        ("idx_assignments_student_date",
+         "assignments(student_id, scheduled_date)"),
+        ("idx_assignments_problem", "assignments(problem_id)"),
+        ("idx_problems_textbook_section",
+         "problems(textbook_id, section_id)"),
+    ]:
+        c.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {ddl}")
+    # セクション名は同一テキスト内で一意（section_name 指定の検索→作成が重複を作らないため）
+    try:
+        c.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_textbook_sections_name "
+                  "ON textbook_sections(textbook_id, name)")
+    except sqlite3.IntegrityError as e:
+        log.warning("textbook_sections に同名セクションの重複があるため一意索引を作成できません: %s", e)
     conn.commit()
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.OperationalError:
+        pass  # 読み取り専用FS等では無視
     conn.close()
 
 
@@ -210,14 +229,58 @@ def init_db():
 
 INTERVAL_WEEKS_COMMON = {1: 1, 2: 3}
 INTERVAL_WEEKS_MASTERY3 = {5: 6, 4: 8, 3: 12, 2: 18, 1: 24}
+# 習熟度3で正答を重ねるごとに間隔を伸ばす（卒業はさせない。上限で必ず再出題する）
+INTERVAL_GROWTH = 1.5
+INTERVAL_MAX_WEEKS = 36
+# 連続正答として数える履歴種別（自動昇格・連動は数えない）
+STREAK_CATEGORIES = ("Record", "Auto", "Manual")
 
-def get_next_date(review_value, mastery, last_date_str):
-    last_date = date.fromisoformat(last_date_str)
+
+def get_correct_streak_c(c, student_id, problem_id):
+    """
+    習熟度3のまま正答した直接記録の連続回数（最新行から遡る）。
+    score 3（解き直し）は数えず中断もしない。score 2 以下または習熟度3未満の行で打ち切る。
+    AutoPromotion / LinkedPromotion の行は無視する。
+    """
+    c.execute("""
+        SELECT correct, mastery, category, score FROM history
+        WHERE student_id=? AND problem_id=?
+        ORDER BY date DESC, history_id DESC
+    """, (student_id, problem_id))
+    streak = 0
+    for r in c.fetchall():
+        if r["category"] not in STREAK_CATEGORIES:
+            continue
+        score = r["score"] if r["score"] is not None else (4 if r["correct"] else 2)
+        if score == 3:
+            continue
+        if score >= 4 and int(r["mastery"] or 1) >= 3:
+            streak += 1
+        else:
+            break
+    return streak
+
+
+def get_correct_streak(student_id, problem_id):
+    conn = get_connection()
+    try:
+        return get_correct_streak_c(conn.cursor(), student_id, problem_id)
+    finally:
+        conn.close()
+
+
+def interval_weeks(review_value, mastery, streak=0):
+    """次回出題までの週数。習熟度3は復習価値別の基準週×1.5^(連続正答-1)、上限36週"""
     if mastery <= 2:
-        weeks = INTERVAL_WEEKS_COMMON.get(mastery, 1)
-    else:
-        weeks = INTERVAL_WEEKS_MASTERY3.get(review_value, 12)
-    return last_date + timedelta(weeks=weeks)
+        return INTERVAL_WEEKS_COMMON.get(mastery, 1)
+    base = INTERVAL_WEEKS_MASTERY3.get(review_value, 12)
+    weeks = base * (INTERVAL_GROWTH ** max(0, streak - 1))
+    return min(INTERVAL_MAX_WEEKS, int(round(weeks)))
+
+
+def get_next_date(review_value, mastery, last_date_str, streak=0):
+    last_date = date.fromisoformat(last_date_str)
+    return last_date + timedelta(weeks=interval_weeks(review_value, mastery, streak))
 
 def calc_new_mastery(student_id, problem_id, correct, today_str):
     conn = get_connection()
@@ -253,22 +316,27 @@ def calc_new_mastery(student_id, problem_id, correct, today_str):
     return current_mastery
 
 def update_assignments_after_record(student_id, problem_id, today_str, new_mastery):
+    """記録後の出題予定を再登録する。次回出題日(ISO文字列)を返す（問題が無ければ None）"""
     conn = get_connection()
     c = conn.cursor()
     c.execute("DELETE FROM assignments WHERE student_id=? AND problem_id=?",
               (student_id, problem_id))
     c.execute("SELECT review_value FROM problems WHERE problem_id=?", (problem_id,))
     row = c.fetchone()
+    next_iso = None
     if row:
         review_value = row["review_value"]
-        next_date = get_next_date(review_value, new_mastery, today_str)
+        streak = get_correct_streak_c(c, student_id, problem_id)
+        next_date = get_next_date(review_value, new_mastery, today_str, streak)
         category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
+        next_iso = next_date.isoformat()
         c.execute("""
             INSERT INTO assignments (student_id, problem_id, scheduled_date, category)
             VALUES (?, ?, ?, ?)
-        """, (student_id, problem_id, next_date.isoformat(), category))
+        """, (student_id, problem_id, next_iso, category))
     conn.commit()
     conn.close()
+    return next_iso
 
 
 # ─── 授業スケジュール取得 ──────────────────────────────
@@ -635,228 +703,188 @@ def auto_promote_past_assignments(student_id):
 
 
 
-def get_same_class_problems(student_id, problem_id):
-    """同じ授業日に登録された問題IDを取得する（周辺問題）"""
+# ─── 代表問題の連動（復習価値4以上の問題に正答/誤答したとき周辺問題の出題日を動かす） ───
+# 2026-09-30 再設計: 周辺問題の習熟度・history は触らず assignments の日付だけを動かす。
+#   正答(score>=4): 周辺の次回日を「自身の次回日と代表の次回日の遅い方」へ送る（短期の重複出題を避ける）
+#   誤答(score<=2): 周辺を代表と同じ次回日に Recall で戻す
+#   score 3 は何もしない。同じ日に明示記録がある問題は動かさない。
+# 周辺問題の定義（優先順）:
+#   1. problems.representative_of がこの代表を指す問題（明示指定。復習価値は問わない）
+#   2. 代表に section_id があれば、同テキスト・同セクションで復習価値がより低い問題
+#   3. section_id が無ければ、同テキストでセクション未設定かつ初回授業日（history の最初の日、
+#      無ければ scheduled_date）が同じで復習価値がより低い問題（過去問・テスト直しなど
+#      単元概念の無いセットの受け皿）。グループが LINK_FALLBACK_MAX 問を超える場合は連動しない。
+#   明示的に別の代表を指している問題は 2・3 の対象から外す。
+
+LINK_EXPLICIT_CATEGORIES = ("Record", "Manual", "Auto")
+LINK_FALLBACK_MAX = 12  # 初回授業日フォールバックで連動させる周辺問題数の上限
+
+_ORIGIN_SQL = """COALESCE((SELECT MIN(h.date) FROM history h
+                           WHERE h.student_id=a.student_id AND h.problem_id=a.problem_id),
+                          a.scheduled_date)"""
+
+
+def get_linked_problems_c(c, student_id, problem_id):
+    """
+    代表問題 problem_id に連動する周辺問題（この生徒に出題予定があるもの）を返す。
+    戻り値: [{problem_id, problem_number, textbook, assignment_id, scheduled_date, category,
+              review_value, link}]  link は "explicit" / "section" / "origin_date"
+    授業日未定(2099-12-31)の予定は対象外。
+    """
+    c.execute("""
+        SELECT p.problem_id, p.subject, p.textbook_id, p.section_id, p.review_value,
+               (SELECT MIN(h.date) FROM history h
+                 WHERE h.student_id=? AND h.problem_id=p.problem_id) AS first_date,
+               (SELECT a.scheduled_date FROM assignments a
+                 WHERE a.student_id=? AND a.problem_id=p.problem_id
+                 ORDER BY a.assignment_id DESC LIMIT 1) AS scheduled_date
+        FROM problems p WHERE p.problem_id=?
+    """, (student_id, student_id, problem_id))
+    rep = c.fetchone()
+    if not rep:
+        return []
+    rep_rv = int(rep["review_value"] or 0)
+    base_select = f"""
+        SELECT p.problem_id, p.problem_number, p.textbook, p.review_value,
+               a.assignment_id, a.scheduled_date, a.category
+        FROM assignments a JOIN problems p ON p.problem_id = a.problem_id
+        WHERE a.student_id=? AND a.problem_id<>? AND a.scheduled_date<>'2099-12-31'
+    """
+    found = {}
+
+    def add(rows, link):
+        for r in rows:
+            if r["problem_id"] not in found:
+                d = dict(r)
+                d["link"] = link
+                found[r["problem_id"]] = d
+
+    # 1. 明示指定
+    c.execute(base_select + " AND p.representative_of=?", (student_id, problem_id, problem_id))
+    add(c.fetchall(), "explicit")
+
+    if rep["section_id"] is not None:
+        # 2. 同セクション
+        c.execute(base_select + """
+              AND p.textbook_id=? AND p.section_id=? AND p.review_value<?
+              AND (p.representative_of IS NULL OR p.representative_of=?)
+        """, (student_id, problem_id, rep["textbook_id"], rep["section_id"], rep_rv, problem_id))
+        add(c.fetchall(), "section")
+    else:
+        # 3. 同テキスト・同じ初回授業日（セクション未設定の問題どうし）
+        #    一括登録日の問題をまとめて拾うと代表1問に数十問が連動するため、
+        #    グループが LINK_FALLBACK_MAX を超える場合は「1回の授業のセット」とみなさず連動しない
+        origin = rep["first_date"] or rep["scheduled_date"]
+        if origin and origin != "2099-12-31":
+            c.execute(base_select + f"""
+                  AND p.textbook_id=? AND p.section_id IS NULL AND p.review_value<?
+                  AND (p.representative_of IS NULL OR p.representative_of=?)
+                  AND {_ORIGIN_SQL} = ?
+            """, (student_id, problem_id, rep["textbook_id"], rep_rv, problem_id, origin))
+            rows = c.fetchall()
+            if len(rows) <= LINK_FALLBACK_MAX:
+                add(rows, "origin_date")
+            else:
+                log.info("代表問題 %s の初回授業日グループが %d 問と大きいため連動しない（上限 %d）",
+                         problem_id, len(rows), LINK_FALLBACK_MAX)
+
+    # 重複した出題予定行がある場合は assignment_id の大きい方を採用する
+    return sorted(found.values(), key=lambda d: d["problem_id"])
+
+
+def get_linked_problems(student_id, problem_id):
     conn = get_connection()
-    c = conn.cursor()
-    # 対象問題の出題日を取得
+    try:
+        return get_linked_problems_c(conn.cursor(), student_id, problem_id)
+    finally:
+        conn.close()
+
+
+def apply_linked_after_record_c(c, student_id, problem_id, record_date, score, explicit_ids=()):
+    """
+    記録済みの代表問題について周辺問題の出題予定を動かす（同一カーソル内。commit は呼び出し側）。
+    代表の次回日は assignments から読むので、update_assignments_after_record の後に呼ぶこと。
+    戻り値: [{problem_id, problem_number, textbook, link, action, old_date, new_date, category}]
+      action: "deferred"（正答で後ろへ送った）/ "recalled"（誤答で Recall に戻した）/
+              "skipped_explicit"（同日に明示記録があるため対象外）
+    """
+    score = int(score)
+    if score == 3:
+        return []
+    c.execute("SELECT review_value FROM problems WHERE problem_id=?", (problem_id,))
+    p = c.fetchone()
+    if not p or int(p["review_value"] or 0) < 4:
+        return []
     c.execute("""
         SELECT scheduled_date FROM assignments
-        WHERE student_id=? AND problem_id=?
-        ORDER BY assignment_id DESC LIMIT 1
+        WHERE student_id=? AND problem_id=? ORDER BY assignment_id DESC LIMIT 1
     """, (student_id, problem_id))
-    row = c.fetchone()
-    if not row:
-        conn.close()
+    a = c.fetchone()
+    if not a or a["scheduled_date"] == "2099-12-31":
         return []
-    scheduled_date = row["scheduled_date"]
+    rep_next = a["scheduled_date"]
 
-    # 同じ授業日の問題を取得（対象問題は除く）
-    c.execute("""
-        SELECT problem_id FROM assignments
-        WHERE student_id=? AND scheduled_date=? AND problem_id!=?
-    """, (student_id, scheduled_date, problem_id))
-    result = [r["problem_id"] for r in c.fetchall()]
-    conn.close()
-    return result
+    c.execute(f"""
+        SELECT DISTINCT problem_id FROM history
+        WHERE student_id=? AND date=? AND category IN ({",".join("?" * len(LINK_EXPLICIT_CATEGORIES))})
+    """, (student_id, record_date, *LINK_EXPLICIT_CATEGORIES))
+    explicit = {int(r["problem_id"]) for r in c.fetchall()} | {int(x) for x in explicit_ids}
+
+    results = []
+    for L in get_linked_problems_c(c, student_id, problem_id):
+        base = {"problem_id": L["problem_id"], "problem_number": L["problem_number"],
+                "textbook": L["textbook"], "link": L["link"],
+                "old_date": L["scheduled_date"], "old_category": L["category"]}
+        if L["problem_id"] in explicit:
+            results.append({**base, "action": "skipped_explicit",
+                            "new_date": L["scheduled_date"], "category": L["category"]})
+            continue
+        if score >= 4:
+            new_date = max(L["scheduled_date"], rep_next)
+            new_cat = L["category"]
+            action = "deferred"
+        else:
+            new_date = min(L["scheduled_date"], rep_next)
+            new_cat = "Recall"
+            action = "recalled"
+        if new_date == L["scheduled_date"] and new_cat == L["category"]:
+            continue
+        c.execute("UPDATE assignments SET scheduled_date=?, category=? WHERE assignment_id=?",
+                  (new_date, new_cat, L["assignment_id"]))
+        results.append({**base, "action": action, "new_date": new_date, "category": new_cat})
+    if results:
+        log.info("代表問題連動: student=%s rep=%s score=%s → %s",
+                 student_id, problem_id, score,
+                 [(r["problem_id"], r["action"], r["new_date"]) for r in results])
+    return results
 
 
-def is_suppressed(student_id, problem_id):
-    """問題が抑制中かどうかを確認する"""
+def apply_linked_after_record(student_id, problem_id, record_date, score, explicit_ids=()):
     conn = get_connection()
-    c = conn.cursor()
-    today = date.today().isoformat()
-    c.execute("""
-        SELECT suppressed_until FROM suppression
-        WHERE student_id=? AND problem_id=? AND suppressed_until >= ?
-    """, (student_id, problem_id, today))
+    try:
+        results = apply_linked_after_record_c(conn.cursor(), student_id, problem_id,
+                                              record_date, score, explicit_ids)
+        conn.commit()
+        return results
+    finally:
+        conn.close()
+
+
+def resolve_section_c(c, textbook_id, section_name):
+    """セクション名から section_id を返す。無ければ作成する（order_index は末尾）。戻り値 (section_id, created)"""
+    section_name = (section_name or "").strip()
+    if not section_name:
+        return None, False
+    c.execute("SELECT section_id FROM textbook_sections WHERE textbook_id=? AND name=?",
+              (textbook_id, section_name))
     row = c.fetchone()
-    conn.close()
-    return row is not None
-
-
-def set_suppression(student_id, problem_id, suppressed_until, reason=""):
-    """問題の抑制を設定する"""
-    conn = get_connection()
-    c = conn.cursor()
-    today = date.today().isoformat()
-    c.execute("""
-        INSERT INTO suppression
-        (student_id, problem_id, suppressed_until, reason, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(student_id, problem_id)
-        DO UPDATE SET suppressed_until=?, reason=?, created_at=?
-    """, (student_id, problem_id, suppressed_until, reason, today,
-          suppressed_until, reason, today))
-    conn.commit()
-    conn.close()
-
-
-def clear_suppression(student_id, problem_id):
-    """問題の抑制を解除する"""
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("""
-        DELETE FROM suppression
-        WHERE student_id=? AND problem_id=?
-    """, (student_id, problem_id))
-    conn.commit()
-    conn.close()
-
-
-def process_representative_correct(student_id, problem_id, record_date):
-    """
-    代表問題（復習価値4以上）の正答処理。
-    同じ授業日の周辺問題の習熟度を+1し、抑制を設定する。
-    """
-    conn = get_connection()
-    c = conn.cursor()
-
-    # 代表問題かどうか確認
-    c.execute("SELECT review_value FROM problems WHERE problem_id=?",
-              (problem_id,))
-    p_row = c.fetchone()
-    if not p_row or p_row["review_value"] < 4:
-        conn.close()
-        return 0
-
-    # 代表問題の現在の習熟度と次回出題間隔を取得
-    c.execute("""
-        SELECT mastery FROM history
-        WHERE student_id=? AND problem_id=?
-        ORDER BY date DESC LIMIT 1
-    """, (student_id, problem_id))
-    h_row = c.fetchone()
-    current_mastery = h_row["mastery"] if h_row else 1
-    review_value = p_row["review_value"]
-
-    # 抑制期間を計算（次回出題間隔の50%）
-    next_date_obj = get_next_date(review_value, current_mastery, record_date)
-    record_date_obj = date.fromisoformat(record_date)
-    interval_days = (next_date_obj - record_date_obj).days
-    suppress_days = max(7, interval_days // 2)
-    suppressed_until = (record_date_obj +
-                        timedelta(days=suppress_days)).isoformat()
-
-    # 周辺問題を取得
-    conn.close()
-    surrounding_ids = get_same_class_problems(student_id, problem_id)
-    promoted = 0
-
-    for sur_id in surrounding_ids:
-        conn2 = get_connection()
-        c2 = conn2.cursor()
-
-        # 現在の習熟度を取得
-        c2.execute("""
-            SELECT mastery FROM history
-            WHERE student_id=? AND problem_id=?
-            ORDER BY date DESC LIMIT 1
-        """, (student_id, sur_id))
-        sur_row = c2.fetchone()
-        sur_mastery = sur_row["mastery"] if sur_row else 1
-        new_mastery = min(sur_mastery + 1, 3)
-
-        # 習熟度を更新（historyに記録）
-        c2.execute("""
-            INSERT INTO history
-            (student_id, problem_id, date, correct, mastery, category)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (student_id, sur_id, record_date, 1, new_mastery, "LinkedPromotion"))
-
-        # 出題予定を更新
-        c2.execute("SELECT review_value FROM problems WHERE problem_id=?",
-                   (sur_id,))
-        sur_p = c2.fetchone()
-        if sur_p:
-            sur_next = get_next_date(sur_p["review_value"], new_mastery,
-                                     record_date)
-            category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
-            c2.execute("""
-                DELETE FROM assignments
-                WHERE student_id=? AND problem_id=?
-            """, (student_id, sur_id))
-            c2.execute("""
-                INSERT INTO assignments
-                (student_id, problem_id, scheduled_date, category)
-                VALUES (?, ?, ?, ?)
-            """, (student_id, sur_id, sur_next.isoformat(), category))
-
-        conn2.commit()
-        conn2.close()
-
-        # 抑制を設定
-        set_suppression(student_id, sur_id, suppressed_until,
-                        f"代表問題(ID:{problem_id})正答による抑制")
-        promoted += 1
-
-    return promoted
-
-
-def process_representative_wrong(student_id, problem_id, record_date):
-    """
-    代表問題の誤答処理。
-    同じ授業日の周辺問題の習熟度を-1し、抑制を解除する。
-    """
-    conn = get_connection()
-    c = conn.cursor()
-
-    # 代表問題かどうか確認
-    c.execute("SELECT review_value FROM problems WHERE problem_id=?",
-              (problem_id,))
-    p_row = c.fetchone()
-    if not p_row or p_row["review_value"] < 4:
-        conn.close()
-        return 0
-
-    conn.close()
-    surrounding_ids = get_same_class_problems(student_id, problem_id)
-
-    for sur_id in surrounding_ids:
-        conn2 = get_connection()
-        c2 = conn2.cursor()
-
-        # 現在の習熟度を取得
-        c2.execute("""
-            SELECT mastery FROM history
-            WHERE student_id=? AND problem_id=?
-            ORDER BY date DESC LIMIT 1
-        """, (student_id, sur_id))
-        sur_row = c2.fetchone()
-        sur_mastery = sur_row["mastery"] if sur_row else 1
-        new_mastery = max(sur_mastery - 1, 1)
-
-        # 習熟度を更新
-        c2.execute("""
-            INSERT INTO history
-            (student_id, problem_id, date, correct, mastery, category)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (student_id, sur_id, record_date, 0, new_mastery, "LinkedPromotion"))
-
-        # 出題予定を更新
-        c2.execute("SELECT review_value FROM problems WHERE problem_id=?",
-                   (sur_id,))
-        sur_p = c2.fetchone()
-        if sur_p:
-            sur_next = get_next_date(sur_p["review_value"], new_mastery,
-                                     record_date)
-            category = {1: "Recall", 2: "Drill"}.get(new_mastery, "Reinforce")
-            c2.execute("""
-                DELETE FROM assignments WHERE student_id=? AND problem_id=?
-            """, (student_id, sur_id))
-            c2.execute("""
-                INSERT INTO assignments
-                (student_id, problem_id, scheduled_date, category)
-                VALUES (?, ?, ?, ?)
-            """, (student_id, sur_id, sur_next.isoformat(), category))
-
-        conn2.commit()
-        conn2.close()
-
-        # 抑制を解除
-        clear_suppression(student_id, sur_id)
-
-    return len(surrounding_ids)
+    if row:
+        return row["section_id"], False
+    c.execute("SELECT MAX(order_index) AS m FROM textbook_sections WHERE textbook_id=?", (textbook_id,))
+    max_order = c.fetchone()["m"] or 0
+    c.execute("INSERT INTO textbook_sections (textbook_id, name, order_index) VALUES (?,?,?)",
+              (textbook_id, section_name, max_order + 1))
+    return c.lastrowid, True
 
 
 def get_suppressed_problems(student_id):

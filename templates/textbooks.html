@@ -1,129 +1,47 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Textbooks — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none; transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    textarea { resize:vertical; min-height:60px; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover  { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
-      font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 12px;
-      text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; display:inline-block; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); margin-top:5px; letter-spacing:0.5px; }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    #confirm-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.75); z-index:2000;
-      align-items:center; justify-content:center; }
-    #confirm-modal.show { display:flex; }
-    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
-      border-left:3px solid var(--red); padding:24px 28px;
-      min-width:320px; max-width:460px; width:90%; }
-    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
-    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
-      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
-    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
-  </style>
-</head>
-<body>
-<div class="container">
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">01 / Master Data</div>
-      <div class="page-title" style="color:#f87171;">Textbooks</div>
-      <div class="page-title-ja">Textbook Management</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+{% extends "base.html" %}
+{% set page_label = "01 / Master Data" %}
+{% set page_title = "Textbooks" %}
+{% set page_title_ja = "テキスト・シリーズ管理" %}
+{% set title_color = "var(--red)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
 
+{% block title %}Textbooks — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  .student-link-box {
+    display:none; background:var(--surface2); border:1px solid var(--border-light);
+    border-left:2px solid var(--blue); padding:16px 20px; margin-bottom:8px;
+  }
+  .student-link-box.open { display:block; }
+  .student-link-head {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+  }
+  .student-link-close {
+    background:transparent; border:none; color:var(--text-muted);
+    cursor:pointer; font-size:16px; line-height:1;
+  }
+  .student-link-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+  .student-link-row > div { flex:1; min-width:180px; }
+  .tb-name-link {
+    color:var(--text); text-decoration:none;
+    border-bottom:1px dashed var(--border-light); transition:color 0.15s;
+  }
+  .tb-name-link:hover { color:var(--blue); text-decoration:none; }
+  .td-students { white-space:nowrap; font-size:11px; }
+  .inline-form { display:inline; }
+</style>
+{% endblock %}
+
+{% block content %}
   <!-- シリーズ登録 -->
   <div class="card fade-in">
     <div class="card-title">Add Series</div>
-    <form method="POST" action="/textbooks/series/add" style="display:flex;gap:16px;align-items:flex-end;">
-      <div style="flex:1;">
+    <form method="POST" action="/textbooks/series/add" style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+      <div style="flex:1;min-width:200px;">
         <label>Series Name</label>
         <input type="text" name="name" placeholder="e.g. Ao Chart" required>
       </div>
@@ -174,12 +92,13 @@
   <!-- テキスト一覧 -->
   <div class="card fade-in">
     <div class="card-title">Textbook List</div>
-    <div style="overflow-x:auto;">
+    {% if textbooks %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
           <th>ID</th><th>Series</th><th>Textbook</th><th>Subject</th>
-          <th>Problems</th><th>Students</th><th>Sections</th><th>Students</th><th></th>
+          <th>Problems</th><th>Students</th><th>Sections</th><th>Actions</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -188,57 +107,51 @@
         <td class="meta-text">{{ t.textbook_id }}</td>
         <td class="meta-text">{{ t.series_name or '—' }}</td>
         <td class="left">
-          <a href="/problems/list?textbook_id={{ t.textbook_id }}"
-             style="color:var(--text);text-decoration:none;
-                    border-bottom:1px dashed var(--border-light);
-                    transition:color 0.15s;"
-             onmouseover="this.style.color='var(--blue)'"
-             onmouseout="this.style.color='var(--text)'">
-            {{ t.name }}
-          </a>
+          <a class="tb-name-link" href="/problems/list?textbook_id={{ t.textbook_id }}">{{ t.name }}</a>
         </td>
         <td class="meta-text">{{ t.subject }}</td>
         <td class="meta-text">{{ t.problem_count }}</td>
-        <td class="meta-text" style="font-size:11px;">{{ t.students or '—' }}</td>
+        <td class="meta-text td-students">{{ t.students or '—' }}</td>
         <td>
-          <a href="/textbooks/{{ t.textbook_id }}/sections"
-            class="btn btn-ghost btn-sm">Sections</a>
+          <a href="/textbooks/{{ t.textbook_id }}/sections" class="btn btn-ghost btn-sm">Sections</a>
         </td>
         <td>
-          <button class="btn btn-ghost btn-sm"
+          <button type="button" class="btn btn-ghost btn-sm"
             onclick="toggleStudentForm({{ t.textbook_id }})">Students</button>
         </td>
         <td>
-          <button class="btn btn-danger btn-sm"
-            onclick="confirmDelete('{{ t.name }}{% if t.problem_count > 0 %} と登録中の問題 {{ t.problem_count }} 問{% endif %}を削除しますか？', '/textbooks/delete/{{ t.textbook_id }}')">×</button>
+          <form class="inline-form" method="POST" action="/textbooks/delete/{{ t.textbook_id }}"
+                data-confirm-title="Confirm Delete"
+                data-confirm-ok="Delete"
+                data-confirm="{{ t.name }}{% if t.problem_count > 0 %} と登録中の問題 {{ t.problem_count }} 問{% endif %}を削除しますか？">
+            <button type="submit" class="btn btn-danger btn-sm">×</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-title">No Textbooks</div>
+      テキストがまだ登録されていません。
+    </div>
+    {% endif %}
   </div>
 
   <!-- 生徒紐づけフォーム（トグル表示） -->
   {% for t in textbooks %}
-  <div id="student-form-{{ t.textbook_id }}"
-    style="display:none;background:var(--surface2);border:1px solid var(--border-light);
-      border-left:2px solid var(--blue);padding:16px 20px;margin-bottom:8px;">
-    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
-      text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;
-      display:flex;justify-content:space-between;align-items:center;">
+  <div class="student-link-box" id="student-form-{{ t.textbook_id }}">
+    <div class="student-link-head">
       <span>{{ t.name }} — Student Link</span>
-      <button type="button" onclick="toggleStudentForm({{ t.textbook_id }})"
-        style="background:transparent;border:none;color:var(--text-muted);
-          cursor:pointer;font-size:16px;line-height:1;">×</button>
+      <button type="button" class="student-link-close"
+        onclick="toggleStudentForm({{ t.textbook_id }})">×</button>
     </div>
     <form method="POST" action="/textbooks/{{ t.textbook_id }}/students">
-      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-        <div style="flex:1;">
-          <select name="student_ids"
-            style="width:100%;background:var(--surface);
-              border:1px solid var(--border-light);
-              color:var(--text);padding:8px 12px;font-size:13px;outline:none;">
+      <div class="student-link-row">
+        <div>
+          <select name="student_ids">
             <option value="">— None —</option>
             {% for s in all_students %}
             <option value="{{ s.student_id }}"
@@ -257,7 +170,8 @@
   <!-- シリーズ一覧 -->
   <div class="card fade-in">
     <div class="card-title">Series List</div>
-    <div style="overflow-x:auto;">
+    {% if series_list %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr><th>ID</th><th>Series Name</th><th>Textbooks</th><th></th></tr>
@@ -269,81 +183,36 @@
         <td class="left">{{ s.name }}</td>
         <td class="meta-text">{{ s.textbook_count }}</td>
         <td>
-          <button class="btn btn-danger btn-sm"
-            onclick="confirmDelete('Delete this series?', '/textbooks/series/delete/{{ s.series_id }}')">×</button>
+          <form class="inline-form" method="POST" action="/textbooks/series/delete/{{ s.series_id }}"
+                data-confirm-title="Confirm Delete"
+                data-confirm-ok="Delete"
+                data-confirm="シリーズ「{{ s.name }}」を削除しますか？">
+            <button type="submit" class="btn btn-danger btn-sm">×</button>
+          </form>
         </td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     </div>
-  </div>
-
-</div>
-
-<!-- 削除確認モーダル -->
-<div id="confirm-modal">
-  <div class="confirm-box">
-    <div class="confirm-title">Confirm Delete</div>
-    <div class="confirm-message" id="confirm-message"></div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
-      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-title">No Series</div>
+      シリーズがまだ登録されていません。
     </div>
+    {% endif %}
   </div>
-</div>
+{% endblock %}
 
-<div id="toast"></div>
-
+{% block script %}
 <script>
 function toggleStudentForm(id) {
-  const el = document.getElementById('student-form-' + id);
+  var el = document.getElementById('student-form-' + id);
   if (!el) { console.error('student-form-' + id + ' not found'); return; }
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-  // 表示時はスクロールして見えるようにする
-  if (el.style.display === 'block') {
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) {
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
-
-function openConfirm(message, onOk) {
-  const modal = document.getElementById('confirm-modal');
-  document.getElementById('confirm-message').textContent = message;
-  modal.classList.add('show');
-  const okBtn = document.getElementById('confirm-ok');
-  const newOk = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOk, okBtn);
-  newOk.onclick = () => { closeConfirm(); onOk(); };
-}
-
-function confirmDelete(message, action) {
-  openConfirm(message, () => {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = action;
-    document.body.appendChild(form);
-    form.submit();
-  });
-}
-
-function closeConfirm() {
-  document.getElementById('confirm-modal').classList.remove('show');
-}
-
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = document.getElementById('confirm-modal');
-  if (modal) {
-    modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(); });
-    document.getElementById('cancel-btn').onclick = closeConfirm;
-  }
-});
 </script>
-</body>
-</html>
+{% endblock %}

@@ -1,184 +1,142 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>History — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:"Noto Serif JP",serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:""; position:fixed; inset:0;
-      background-image:linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1200px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:"DM Mono",monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:"DM Mono",monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--green); }
-    .page-title-ja { font-family:"Noto Serif JP",serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:"DM Mono",monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:"← "; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border);
-      padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    .data-table { width:100%; border-collapse:collapse; font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted);
-      font-family:"DM Mono",monospace; font-size:9px; letter-spacing:1.5px;
-      text-transform:uppercase; padding:10px 12px; text-align:center;
-      border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; }
-    .meta-text { font-family:"DM Mono",monospace; font-size:10px;
-      color:var(--text-dim); letter-spacing:1px; }
-    .btn { font-family:"DM Mono",monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px;
-      text-decoration:none; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-ghost { background:transparent; color:var(--text-muted);
-      border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-danger { background:var(--red); color:white; }
-    .btn-sm { padding:5px 12px; font-size:9px; letter-spacing:1px; }
-    .badge { font-family:"DM Mono",monospace; font-size:9px; letter-spacing:1px;
-      padding:2px 8px; display:inline-block; border-radius:2px; }
-    .badge-confirmed  { background:var(--green-bg); color:var(--green);
-      border:1px solid rgba(62,207,142,0.3); }
-    .badge-pending    { background:var(--amber-bg); color:var(--amber);
-      border:1px solid rgba(245,166,35,0.3); }
-    .badge-subject    { background:var(--blue-bg); color:var(--blue);
-      border:1px solid rgba(91,143,249,0.3); font-size:9px; }
-    /* プレビューモーダル */
-    #preview-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.8); z-index:1000;
-      align-items:flex-start; justify-content:center;
-      padding:40px 20px; overflow-y:auto; }
-    #preview-modal.show { display:flex; }
-    .preview-box { background:var(--surface); border:1px solid var(--border-light);
-      border-top:2px solid var(--green); width:100%; max-width:960px;
-      padding:28px; position:relative; }
-    .preview-header { display:flex; justify-content:space-between;
-      align-items:flex-start; margin-bottom:20px;
-      padding-bottom:14px; border-bottom:1px solid var(--border); }
-    .preview-title { font-family:"DM Mono",monospace; font-size:13px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--green); }
-    .preview-meta { font-family:"DM Mono",monospace; font-size:10px;
-      color:var(--text-dim); margin-top:4px; }
-    .preview-close { font-family:"DM Mono",monospace; font-size:11px;
-      background:none; border:1px solid var(--border-light); color:var(--text-muted);
-      padding:6px 14px; cursor:pointer; letter-spacing:1px; }
-    .preview-close:hover { border-color:var(--text-muted); color:var(--text); }
-    .preview-body { max-height:70vh; overflow-y:auto; }
-    /* 日付ブロック */
-    .day-block { margin-bottom:16px; }
-    .day-label { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-dim);
-      padding:6px 12px; background:var(--surface2);
-      border-left:2px solid var(--border-light); margin-bottom:4px; }
-    .day-label .dow { color:var(--blue); margin-left:8px; }
-    .day-table { width:100%; border-collapse:collapse; font-size:11px; }
-    .day-table th { padding:5px 10px; font-family:"DM Mono",monospace; font-size:8px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);
-      background:var(--surface3); text-align:center; border-bottom:1px solid var(--border); }
-    .day-table td { padding:6px 10px; border-bottom:1px solid var(--border);
-      vertical-align:middle; text-align:center; }
-    .day-table td.left { text-align:left; font-family:"Noto Serif JP",serif; }
-    .day-table tr:last-child td { border-bottom:none; }
-    .cat-badge { font-family:"DM Mono",monospace; font-size:8px; letter-spacing:1px;
-      padding:1px 6px; border-radius:1px; }
-    .cat-予習   { background:rgba(91,143,249,0.15); color:var(--blue); }
-    .cat-復習   { background:rgba(245,166,35,0.15); color:var(--amber); }
-    .cat-定着   { background:rgba(62,207,142,0.15); color:var(--green); }
-    .cat-再定着  { background:rgba(240,98,146,0.15); color:#f06292; }
-    .mastery-stars { color:var(--amber); letter-spacing:1px; }
-    select { padding:7px 10px; background:var(--surface2); border:1px solid var(--border-light);
-      color:var(--text); font-family:"Noto Serif JP",serif; font-size:13px; outline:none; }
-    select:focus { border-color:var(--blue); }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:"DM Mono",monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;} }
-    .empty-msg { font-family:"DM Mono",monospace; font-size:11px; color:var(--text-dim);
-      padding:20px; text-align:center; }
-    /* 確認モーダル */
-    #confirm-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.75); z-index:2000;
-      align-items:center; justify-content:center; }
-    #confirm-modal.show { display:flex; }
-    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
-      border-left:3px solid var(--red); padding:24px 28px; min-width:320px; max-width:460px; }
-    .confirm-title { font-family:"DM Mono",monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--red); margin-bottom:12px; }
-    .confirm-msg { font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
-    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
-  </style>
-</head>
-<body>
-<div class="container">
+{% extends "base.html" %}
+{% set container_w = "1200px" %}
+{% set page_label = "03 / Plan" %}
+{% set page_title = "History" %}
+{% set page_title_ja = "計画表 出力履歴" %}
+{% set title_color = "var(--green)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
 
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">03 / Plan</div>
-      <div class="page-title">History</div>
-      <div class="page-title-ja">Plan History</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
-  </div>
+{% block title %}History — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  /* ── フィルタ ── */
+  .filter-card { padding:14px 20px; }
+  .filter-row { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+  .filter-row label { margin:0 0 4px 0; }
+  .filter-row select { width:auto; min-width:170px; }
+  .filter-count { margin-left:auto; }
+
+  /* ── ステータス凡例 ── */
+  .status-legend {
+    display:flex; gap:20px; flex-wrap:wrap; align-items:center;
+    background:var(--surface2); border:1px solid var(--border);
+    padding:10px 16px; margin-bottom:16px;
+    font-family:var(--font-ja); font-size:13px; color:var(--text-muted);
+    line-height:1.8;
+  }
+  .status-legend .legend-item { display:flex; gap:8px; align-items:center; }
+
+  /* ── バッジ ── */
+  .badge-confirmed { background:var(--green-bg); color:var(--green);
+    border:1px solid rgba(62,207,142,0.3); }
+  .badge-pending   { background:var(--amber-bg); color:var(--amber);
+    border:1px solid rgba(245,166,35,0.3); }
+  .badge-subject   { background:var(--blue-bg); color:var(--blue);
+    border:1px solid rgba(91,143,249,0.3); }
+
+  /* ── Actions 列（見出しとボタン位置を揃える） ── */
+  .data-table th.col-actions, .data-table td.col-actions { text-align:right; }
+  .row-actions { display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap; }
+  .inline-form { display:inline-block; margin:0; }
+  .td-student { font-family:var(--font-ja); font-size:12px; }
+
+  /* ── プレビューモーダル ── */
+  #preview-modal { display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.8); z-index:1000;
+    align-items:flex-start; justify-content:center;
+    padding:40px 20px; overflow-y:auto; }
+  #preview-modal.show { display:flex; }
+  .preview-box { background:var(--surface); border:1px solid var(--border-light);
+    border-top:2px solid var(--green); width:100%; max-width:960px;
+    padding:28px; position:relative; }
+  .preview-header { display:flex; justify-content:space-between;
+    align-items:flex-start; gap:12px; margin-bottom:20px;
+    padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .preview-title { font-family:var(--font-mono); font-size:13px;
+    letter-spacing:2px; text-transform:uppercase; color:var(--green); }
+  .preview-meta { font-family:var(--font-mono); font-size:10px;
+    color:var(--text-muted); margin-top:4px; }
+  .preview-body { max-height:70vh; overflow-y:auto; }
+
+  /* ── 日付ブロック（モーダル内） ── */
+  .day-block { margin-bottom:16px; }
+  .day-label { font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted);
+    padding:6px 12px; background:var(--surface2);
+    border-left:2px solid var(--border-light); margin-bottom:4px; }
+  .day-label .dow { color:var(--blue); margin-left:8px; }
+  .day-table { width:100%; border-collapse:collapse; font-size:11px; }
+  .day-table th { padding:5px 10px; font-family:var(--font-mono); font-size:10px;
+    letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim);
+    background:var(--surface3); text-align:center; border-bottom:1px solid var(--border); }
+  .day-table td { padding:6px 10px; border-bottom:1px solid var(--border);
+    vertical-align:middle; text-align:center; }
+  .day-table td.left { text-align:left; font-family:var(--font-ja); }
+  .day-table tr:last-child td { border-bottom:none; }
+  .cat-badge { font-family:var(--font-mono); font-size:10px; letter-spacing:1px;
+    padding:1px 6px; }
+  .cat-予習,  .cat-New       { background:var(--blue-bg);  color:var(--blue); }
+  .cat-復習,  .cat-Recall    { background:var(--amber-bg); color:var(--amber); }
+  .cat-定着,  .cat-Drill     { background:var(--green-bg); color:var(--green); }
+  .cat-再定着, .cat-Reinforce { background:var(--rose-bg);  color:var(--rose); }
+  .mastery-stars { color:var(--amber); letter-spacing:1px; }
+  .tb-tag { font-size:10px; color:var(--text-dim); margin-right:6px;
+    font-family:var(--font-mono); }
+  /* モーダル内の空表示（JS からも生成する） */
+  .empty-msg { font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
+    padding:20px; text-align:center; }
+
+  @media (max-width:640px) {
+    .row-actions { justify-content:flex-start; }
+    .data-table th.col-actions, .data-table td.col-actions { text-align:left; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
 
   <!-- フィルター -->
-  <div class="card fade-in" style="padding:14px 20px;">
-    <form method="GET" style="display:flex;gap:12px;align-items:center;">
-      <select name="student_id" onchange="this.form.submit()" style="width:160px;">
-        <option value="">— 全生徒 —</option>
-        {% for s in students %}
-        <option value="{{ s.student_id }}"
-          {% if s.student_id == selected_student %}selected{% endif %}>
-          {{ s.name }}
-        </option>
-        {% endfor %}
-      </select>
-      <span class="meta-text" style="margin-left:auto;">
+  <div class="card filter-card fade-in">
+    <form method="GET" class="filter-row">
+      <div>
+        <label for="filter-student">Student</label>
+        <select id="filter-student" name="student_id" onchange="this.form.submit()">
+          <option value="">— 全生徒 —</option>
+          {% for s in students %}
+          <option value="{{ s.student_id }}"
+            {% if s.student_id == selected_student %}selected{% endif %}>
+            {{ s.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <span class="meta-text filter-count">
         {{ unconfirmed|length + confirmed|length }} 件
       </span>
     </form>
   </div>
 
+  <!-- ステータス凡例 -->
+  <div class="status-legend fade-in">
+    <span class="legend-item">
+      <span class="badge badge-pending">Pending</span>
+      未確定。いま有効な最新の出力
+    </span>
+    <span class="legend-item">
+      <span class="badge badge-confirmed">Confirmed</span>
+      確定済み。次の期間の計画表を出力したことで締め切られた過去の出力
+    </span>
+  </div>
+
   <!-- ── Archived Plans（出力記録）── -->
   <div class="card fade-in">
     <div class="card-title">Archived Plans
-      <span class="meta-text" style="margin-left:8px;">出力記録</span>
+      <span class="meta-text" style="margin-left:8px;">出力記録（未確定）</span>
     </div>
     {% if unconfirmed %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
@@ -187,16 +145,14 @@
           <th>Subject</th>
           <th>Period</th>
           <th>Status</th>
-          <th colspan="3">Actions</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
       {% for h in unconfirmed %}
       <tr>
-        <td class="meta-text">{{ h.generated_date }}</td>
-        <td style="font-family:'Noto Serif JP',serif;font-size:12px;">
-          {{ h.student_name }}
-        </td>
+        <td class="meta-text nowrap">{{ h.generated_date }}</td>
+        <td class="td-student">{{ h.student_name }}</td>
         <td>
           {% if h.subject %}
           <span class="badge badge-subject">{{ h.subject }}</span>
@@ -204,32 +160,40 @@
           <span class="meta-text">全教科</span>
           {% endif %}
         </td>
-        <td class="meta-text">{{ h.start_date }} ~ {{ h.end_date }}</td>
+        <td class="meta-text nowrap">{{ h.start_date }} ~ {{ h.end_date }}</td>
         <td>
-          <span class="badge badge-pending">Pending</span>
+          <span class="badge badge-pending"
+            title="未確定。次の期間の計画表を出力すると Confirmed になります">Pending</span>
         </td>
-        <td>
-          {% if h.excel_path %}
-          <a href="/history/download/{{ h.history_id }}?type=excel"
-             class="btn btn-ghost btn-sm">Excel↓</a>
-          {% endif %}
-        </td>
-        <td>
-          {% if h.pdf_path %}
-          <a href="/history/download/{{ h.history_id }}?type=pdf"
-             class="btn btn-ghost btn-sm">PDF↓</a>
-          {% endif %}
-        </td>
-        <td>
-          <button class="btn btn-danger btn-sm"
-            onclick="confirmDelete({{ h.history_id }})">×</button>
+        <td class="col-actions">
+          <div class="row-actions">
+            {% if h.excel_path %}
+            <a href="/history/download/{{ h.history_id }}?type=excel"
+               class="btn btn-ghost btn-sm" title="Excel をダウンロード">Excel↓</a>
+            {% endif %}
+            {% if h.pdf_path %}
+            <a href="/history/download/{{ h.history_id }}?type=pdf"
+               class="btn btn-ghost btn-sm" title="PDF をダウンロード">PDF↓</a>
+            {% endif %}
+            <form class="inline-form" method="POST" action="/history/delete/{{ h.history_id }}"
+                  data-confirm-title="Confirm Delete"
+                  data-confirm-ok="Delete"
+                  data-confirm="{{ h.student_name }} の出力記録（{{ h.start_date }} ~ {{ h.end_date }}）を削除しますか？">
+              <button type="submit" class="btn btn-danger btn-sm"
+                title="この出力記録を削除">×</button>
+            </form>
+          </div>
         </td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <div class="empty-msg">No archived plans yet.</div>
+    <div class="empty-state">
+      <div class="empty-title">No Archived Plans</div>
+      未確定の出力記録はありません。
+    </div>
     {% endif %}
   </div>
 
@@ -239,6 +203,7 @@
       <span class="meta-text" style="margin-left:8px;">確定済み計画表</span>
     </div>
     {% if confirmed %}
+    <div class="table-scroll">
     <table class="data-table">
       <thead>
         <tr>
@@ -247,16 +212,14 @@
           <th>Subject</th>
           <th>Period</th>
           <th>Status</th>
-          <th colspan="3">Actions</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
       {% for h in confirmed %}
       <tr>
-        <td class="meta-text">{{ h.generated_date }}</td>
-        <td style="font-family:'Noto Serif JP',serif;font-size:12px;">
-          {{ h.student_name }}
-        </td>
+        <td class="meta-text nowrap">{{ h.generated_date }}</td>
+        <td class="td-student">{{ h.student_name }}</td>
         <td>
           {% if h.subject %}
           <span class="badge badge-subject">{{ h.subject }}</span>
@@ -264,41 +227,42 @@
           <span class="meta-text">全教科</span>
           {% endif %}
         </td>
-        <td class="meta-text">{{ h.start_date }} ~ {{ h.end_date }}</td>
+        <td class="meta-text nowrap">{{ h.start_date }} ~ {{ h.end_date }}</td>
         <td>
-          <span class="badge badge-confirmed">Confirmed</span>
+          <span class="badge badge-confirmed"
+            title="確定済み。次の期間の計画表を出力したため締め切られました">Confirmed</span>
         </td>
-        <td>
-          {% if h.excel_path %}
-          <a href="/history/download/{{ h.history_id }}?type=excel"
-             class="btn btn-ghost btn-sm">Excel↓</a>
-          {% endif %}
-        </td>
-        <td>
-          {% if h.pdf_path %}
-          <a href="/history/download/{{ h.history_id }}?type=pdf"
-             class="btn btn-ghost btn-sm">PDF↓</a>
-          {% endif %}
-        </td>
-        <td>
-          <button class="btn btn-primary btn-sm"
-            onclick="openNew({{ h.history_id }})">New</button>
+        <td class="col-actions">
+          <div class="row-actions">
+            {% if h.excel_path %}
+            <a href="/history/download/{{ h.history_id }}?type=excel"
+               class="btn btn-ghost btn-sm" title="Excel をダウンロード">Excel↓</a>
+            {% endif %}
+            {% if h.pdf_path %}
+            <a href="/history/download/{{ h.history_id }}?type=pdf"
+               class="btn btn-ghost btn-sm" title="PDF をダウンロード">PDF↓</a>
+            {% endif %}
+            <button type="button" class="btn btn-primary btn-sm"
+              title="この計画表の日別配置をブラウザで表示"
+              onclick="openNew({{ h.history_id }})">New</button>
+          </div>
         </td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
-    <div class="empty-msg">No confirmed plans yet.
-      <span class="meta-text" style="display:block;margin-top:4px;">
-        次の期間の計画表を出力すると前の期間が確定します。
-      </span>
+    <div class="empty-state">
+      <div class="empty-title">No Confirmed Plans</div>
+      確定済みの計画表はまだありません。<br>
+      次の期間の計画表を出力すると前の期間が確定します。
     </div>
     {% endif %}
   </div>
+{% endblock %}
 
-</div>
-
+{% block after_container %}
 <!-- プレビューモーダル -->
 <div id="preview-modal">
   <div class="preview-box">
@@ -307,45 +271,17 @@
         <div class="preview-title" id="preview-title">Plan New</div>
         <div class="preview-meta" id="preview-meta"></div>
       </div>
-      <button class="preview-close" onclick="closeNew()">× Close</button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeNew()">× Close</button>
     </div>
     <div class="preview-body" id="preview-body">
       <div class="empty-msg">Loading...</div>
     </div>
   </div>
 </div>
+{% endblock %}
 
-<!-- 削除確認モーダル -->
-<div id="confirm-modal">
-  <div class="confirm-box">
-    <div class="confirm-title">Confirm Delete</div>
-    <div class="confirm-msg" id="confirm-msg">この出力記録を削除しますか？</div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm"
-        onclick="document.getElementById('confirm-modal').classList.remove('show')">
-        Cancel
-      </button>
-      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
-    </div>
-  </div>
-</div>
-
-<div id="toast"></div>
-
+{% block script %}
 <script>
-// ── 削除確認 ──────────────────────────────────────────
-function confirmDelete(historyId) {
-  document.getElementById("confirm-modal").classList.add("show");
-  document.getElementById("confirm-ok").onclick = function() {
-    document.getElementById("confirm-modal").classList.remove("show");
-    var form = document.createElement("form");
-    form.method = "POST";
-    form.action = "/history/delete/" + historyId;
-    document.body.appendChild(form);
-    form.submit();
-  };
-}
-
 // ── プレビューモーダル ─────────────────────────────────
 function openNew(historyId) {
   document.getElementById("preview-modal").classList.add("show");
@@ -384,6 +320,13 @@ function closeNew() {
 
 document.getElementById("preview-modal").addEventListener("click", function(e) {
   if (e.target === this) closeNew();
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    var m = document.getElementById("preview-modal");
+    if (m && m.classList.contains("show")) closeNew();
+  }
 });
 
 // ── プレビューHTML生成 ────────────────────────────────
@@ -429,7 +372,7 @@ function buildNew(plan) {
       html += "<tr>" +
         "<td class='meta-text'>" + escHtml(item.subject || "") + "</td>" +
         "<td><span class='cat-badge cat-" + escHtml(cat) + "'>" + escHtml(cat) + "</span></td>" +
-        "<td class='left'><span style='font-size:10px;color:var(--text-dim);margin-right:6px;font-family:monospace;'>" +
+        "<td class='left'><span class='tb-tag'>" +
           escHtml(item.textbook || "") + "</span>" +
           escHtml(item.problem_number || "") + "</td>" +
         "<td><span class='mastery-stars'>" + escHtml(mastery) + "</span></td>" +
@@ -446,13 +389,5 @@ function escHtml(str) {
     .replace(/&/g,"&amp;").replace(/</g,"&lt;")
     .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
-
-function showToast(msg, type) {
-  type = type || "success";
-  var t = document.getElementById("toast");
-  t.textContent = msg; t.className = "show " + type;
-  setTimeout(function() { t.className = ""; }, 3000);
-}
 </script>
-</body>
-</html>
+{% endblock %}

@@ -1,168 +1,87 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg:           #0c0d11;
-      --surface:      #13151e;
-      --surface2:     #1b1e2b;
-      --surface3:     #222536;
-      --border:       #252838;
-      --border-light: #2f3347;
-      --text:         #dde1ec;
-      --text-muted:   #9aa3b8;
-      --text-dim:     #555d7a;
-      --blue:   #5b8ff9;
-      --green:  #3ecf8e;
-      --amber:  #f5a623;
-      --rose:   #f06292;
-      --red:    #ef4444;
-      --blue-bg:  rgba(91,143,249,0.10);
-      --green-bg: rgba(62,207,142,0.10);
-      --amber-bg: rgba(245,166,35,0.10);
-      --rose-bg:  rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: 'Noto Serif JP', serif;
-      background: var(--bg); color: var(--text);
-      min-height: 100vh; padding: 40px 32px 80px;
-      -webkit-font-smoothing: antialiased;
-    }
-    body::after {
-      content: ''; position: fixed; inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 48px 48px; opacity: 0.15;
-      pointer-events: none; z-index: 0;
-    }
-    .container { max-width:1200px; margin:0 auto; position:relative; z-index:1; }
-    .page-header {
-      display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px;
-      border-bottom:1px solid var(--border-light);
-    }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px;
-      letter-spacing:2.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500;
-      font-size:18px; letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300;
-      font-size:11px; color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-muted); letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none;
-      transition:border-color 0.15s;
-    }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    textarea { resize:vertical; min-height:60px; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted);
-      font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1.5px;
-      text-transform:uppercase; padding:10px 12px; text-align:center;
-      border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; font-family:'Noto Serif JP',serif; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; }
-    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px;
-      padding:2px 8px; display:inline-block; }
-    .badge-予習  { background:var(--blue-bg);  color:var(--blue);  border:1px solid rgba(91,143,249,0.3); }
-    .badge-復習  { background:var(--green-bg); color:var(--green); border:1px solid rgba(62,207,142,0.3); }
-    .badge-定着  { background:var(--amber-bg); color:var(--amber); border:1px solid rgba(245,166,35,0.3); }
-    .badge-再定着 { background:var(--rose-bg);  color:var(--rose);  border:1px solid rgba(240,98,146,0.3); }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .filter-bar { background:var(--surface); border:1px solid var(--border);
-      padding:16px 20px; margin-bottom:16px;
-      display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
-    .filter-bar label { margin:0 0 4px 0; }
-    .filter-bar select, .filter-bar input { width:auto; }
-    .bulk-bar { background:var(--surface2); border:1px solid var(--border-light);
-      border-left:2px solid var(--green); padding:12px 20px; margin-bottom:12px;
-      display:flex; align-items:center; gap:16px; }
-    .bulk-label { font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted); }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px;
-      color:var(--text-dim); letter-spacing:1px; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    .mastery-1 { color:var(--rose); }
-    .mastery-2 { color:var(--amber); }
-    .mastery-3 { color:var(--green); }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    .editable { cursor:pointer; padding:2px 6px; border-radius:2px; transition:background 0.12s; }
-    .editable:hover { background:var(--surface3); outline:1px dashed var(--border-light); }
-    .editable.editing { display:none; }
-    .inline-input { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:4px 8px; font-size:12px; outline:none; }
-    .inline-select { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:4px 6px; font-size:12px; outline:none; }
-    .row-予習  { border-left:2px solid var(--blue); }
-    .row-復習  { border-left:2px solid var(--green); }
-    .row-定着  { border-left:2px solid var(--amber); }
-    .row-再定着 { border-left:2px solid var(--rose); }
-    #toast {
-      position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light);
-      color:var(--text); font-family:'DM Mono',monospace; font-size:11px;
-      letter-spacing:1px; padding:12px 24px; opacity:0;
-      transition:all 0.3s ease; pointer-events:none; z-index:9999;
-    }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-  </style>
-  <title>Edit Records — Study Planner</title>
-</head>
-<body>
-<div class="container">
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">04 / Records</div>
-      <div class="page-title" style="color:#f5a623;">Edit Records</div>
-      <div class="page-title-ja">Edit Records</div>
-    </div>
-    <a class="page-header-back" href="/">TOP</a>
+{% extends "base.html" %}
+{% set container_w = "1200px" %}
+{% set page_label = "04 / Records" %}
+{% set page_title = "Edit Records" %}
+{% set page_title_ja = "記録一覧・編集" %}
+{% set title_color = "var(--amber)" %}
+{% set back_href = "/" %}
+{% set back_label = "TOP" %}
+
+{% block title %}Edit Records — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  /* ── ページ内サブナビ ── */
+  .page-links { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
+  .page-links a {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:1.5px;
+    text-transform:uppercase; color:var(--text-muted); text-decoration:none;
+    border:1px solid var(--border-light); padding:6px 14px; transition:all 0.15s;
+  }
+  .page-links a:hover { color:var(--text); border-color:var(--text-muted); text-decoration:none; }
+  .page-links a.current { color:var(--amber); border-color:var(--amber); cursor:default; }
+
+  /* ── フィルタバー ── */
+  .filter-bar {
+    background:var(--surface); border:1px solid var(--border);
+    padding:16px 20px; margin-bottom:16px;
+    display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;
+  }
+  .filter-bar label { margin:0 0 4px 0; }
+  .filter-bar select { width:auto; min-width:160px; }
+  .filter-count { margin-left:auto; }
+
+  /* ── 操作の説明 ── */
+  .usage-note {
+    font-family:var(--font-ja); font-size:13px; color:var(--text-muted);
+    margin-bottom:10px; line-height:1.8;
+  }
+  .usage-note b { font-family:var(--font-mono); font-size:11px;
+    letter-spacing:1px; color:var(--text); font-weight:500; }
+
+  /* ── セル ── */
+  .date-cell { color:var(--text-muted); }     /* --text-dim では薄すぎるため */
+  .cell-clip { font-size:11px; max-width:170px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .score-chip { font-family:var(--font-mono); font-size:11px; letter-spacing:1px; }
+  .score-5 { color:var(--green); }
+  .score-4 { color:var(--blue); }
+  .score-3 { color:var(--amber); }
+  .score-2 { color:var(--rose); }
+  .score-1 { color:var(--red); }
+  .mastery-1 { color:var(--rose); }
+  .mastery-2 { color:var(--amber); }
+  .mastery-3 { color:var(--green); }
+
+  /* ── ダブルクリック編集 ── */
+  .editable { cursor:pointer; padding:2px 6px; transition:background 0.12s; }
+  .editable:hover { background:var(--surface3); outline:1px dashed var(--border-light); }
+  .editable.editing { display:none; }
+  .inline-select {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:4px 6px; font-size:12px; outline:none; width:auto;
+  }
+
+  /* ── 行内の操作ボタン ── */
+  .inline-form { display:inline-block; margin:0; }
+  .row-actions { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; }
+  .btn-reset { border-color:rgba(239,68,68,0.45); color:var(--red); }
+  .btn-reset:hover { border-color:var(--red); color:var(--red); }
+</style>
+{% endblock %}
+
+{% block content %}
+  <div class="page-links fade-in">
+    <a href="/record">1問記録 →</a>
+    <a href="/record/bulk">授業まとめ記録 →</a>
+    <a class="current" href="/record/list">記録一覧</a>
   </div>
 
   <div class="filter-bar fade-in">
     <form method="GET" style="display:contents;">
       <div>
-        <label>Student</label>
-        <select name="student_id" onchange="this.form.submit()" style="min-width:140px;">
+        <label for="filter-student">Student</label>
+        <select id="filter-student" name="student_id" onchange="this.form.submit()">
           {%- for s in students %}
           <option value="{{ s.student_id }}"
             {%- if s.student_id == selected_student %} selected{%- endif %}>
@@ -172,136 +91,115 @@
         </select>
       </div>
     </form>
-    <span class="meta-text" style="margin-left:auto;">{{ records|length }} records</span>
+    <span class="meta-text filter-count">{{ records|length }} records</span>
   </div>
 
-  <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text-muted);
-    margin-bottom:8px;letter-spacing:0.5px;">
-    ※ Double-click to edit Score or Mastery
+  <div class="usage-note fade-in">
+    ※ Score / Mastery はダブルクリックで編集できます。<br>
+    <b>DELETE</b> = この記録1件だけを削除　／
+    <b>RESET MASTERY</b> = この問題の記録をすべて削除して習熟度を初期化（出題予定は New・日付未定に戻る）
   </div>
 
-
-  <div class="fade-in" style="overflow-x:auto;">
+  <div class="table-scroll fade-in">
   <table class="data-table">
     <thead>
       <tr>
         <th>Date</th><th>Subject</th><th>Textbook</th><th>Problem</th>
-        <th>Score</th><th>Mastery</th><th>Source</th><th></th>
+        <th>Score</th><th>Mastery</th><th>Source</th><th>Actions</th>
       </tr>
     </thead>
     <tbody>
     {%- for r in records %}
     <tr id="hrow-{{ r.history_id }}">
-      <td class="meta-text" style="white-space:nowrap;">{{ r.date }}</td>
+      <td class="meta-text date-cell nowrap">{{ r.date }}</td>
       <td class="meta-text">{{ r.subject }}</td>
-      <td class="left" style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        {{ r.textbook }}
-      </td>
-      <td class="left" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        {{ r.problem_number }}
-      </td>
+      <td class="left cell-clip">{{ r.textbook }}</td>
+      <td class="left cell-clip">{{ r.problem_number }}</td>
       {%- set sc = r.score if r.score else (5 if r.correct == 1 else 1) %}
       <td class="score-cell" data-id="{{ r.history_id }}" data-score="{{ sc }}">
-        <span class="editable score-{{ sc }}"
+        <span class="editable"
           ondblclick="startScoreEdit(this, {{ r.history_id }}, {{ sc }})"
-          style="cursor:pointer;">
-          {%- if sc == 5 %}<span style="color:var(--green);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">5 Perfect</span>
-          {%- elif sc == 4 %}<span style="color:var(--blue);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">4 Good</span>
-          {%- elif sc == 3 %}<span style="color:var(--amber);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">3 Recall</span>
-          {%- elif sc == 2 %}<span style="color:var(--rose);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">2 Retry</span>
-          {%- else %}<span style="color:var(--red);font-family:'DM Mono',monospace;font-size:11px;letter-spacing:1px;">1 Failed</span>
+          title="ダブルクリックでスコアを変更">
+          {%- if sc == 5 %}<span class="score-chip score-5">5 Perfect</span>
+          {%- elif sc == 4 %}<span class="score-chip score-4">4 Good</span>
+          {%- elif sc == 3 %}<span class="score-chip score-3">3 Recall</span>
+          {%- elif sc == 2 %}<span class="score-chip score-2">2 Retry</span>
+          {%- else %}<span class="score-chip score-1">1 Failed</span>
           {%- endif %}
         </span>
       </td>
       <td class="mastery-cell" data-id="{{ r.history_id }}" data-mastery="{{ r.mastery }}">
         {%- set m = r.mastery %}
         <span class="editable mastery-{{ m }}"
-          ondblclick="startMasteryEdit(this, {{ r.history_id }}, {{ m }})">
+          ondblclick="startMasteryEdit(this, {{ r.history_id }}, {{ m }})"
+          title="ダブルクリックで習熟度を変更">
           {{ '★' * m }}
         </span>
       </td>
-      <td>{{ r.category | cat_en }}</td>
-      <td style="white-space:nowrap;">
-        <!-- この1件を削除 -->
-        <button class="btn btn-sm" onclick="deleteRecord({{ r.history_id }})"
-          style="background:transparent;border:1px solid var(--border-light);
-            color:var(--text-dim);padding:3px 8px;font-size:10px;margin-right:4px;"
-          title="この記録を1件削除">×</button>
-        <!-- この問題の記録を全リセット -->
-        <button class="btn btn-sm" onclick="openResetModal({{ r.problem_id }},'{{ r.textbook | replace("'","\\'")|replace('"','\\"') }} {{ r.problem_number | replace("'","\\'")|replace('"','\\"') }}')"
-          style="background:transparent;border:1px solid rgba(239,68,68,0.4);
-            color:var(--red);padding:3px 8px;font-size:10px;"
-          title="この問題の記録をすべてリセット">Reset</button>
+      <td class="meta-text">{{ r.category | cat_en }}</td>
+      <td class="nowrap">
+        {%- set prob_label = r.textbook ~ ' ' ~ r.problem_number %}
+        <div class="row-actions">
+          <!-- この1件を削除 -->
+          <button type="button" class="btn btn-ghost btn-sm"
+            title="この記録1件（{{ r.date }}）を削除します"
+            onclick="deleteRecord({{ r.history_id }}, '{{ r.date }}')">Delete</button>
+          <!-- この問題の記録を全リセット -->
+          <form class="inline-form" method="POST" action="/record/reset_problem"
+                data-confirm-title="Confirm Reset"
+                data-confirm-ok="Reset Mastery"
+                data-confirm="「{{ prob_label }}」の記録をすべて削除し、習熟度を初期化します。出題予定は New（日付未定）に戻ります。この操作は取り消せません。">
+            <input type="hidden" name="student_id" value="{{ selected_student }}">
+            <input type="hidden" name="problem_id" value="{{ r.problem_id }}">
+            <button type="submit" class="btn btn-ghost btn-sm btn-reset"
+              title="この問題の記録をすべて削除し、習熟度を初期化します">Reset Mastery</button>
+          </form>
+        </div>
       </td>
     </tr>
     {%- endfor %}
     </tbody>
   </table>
+  </div>
 
-  <!-- 確認モーダル -->
-  <div id="reset-modal" style="display:none;position:fixed;inset:0;
-    background:rgba(0,0,0,0.7);z-index:2000;align-items:center;justify-content:center;">
-    <div style="background:var(--surface);border:1px solid var(--border-light);
-      border-left:3px solid var(--red);padding:28px 32px;max-width:420px;width:90%;">
-      <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
-        text-transform:uppercase;color:var(--red);margin-bottom:12px;">Confirm Reset</div>
-      <div id="reset-msg" style="font-family:'Noto Serif JP',serif;font-size:13px;
-        color:var(--text-muted);margin-bottom:20px;line-height:1.7;"></div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button onclick="closeResetModal()" class="btn btn-ghost btn-sm">Cancel</button>
-        <form id="reset-form" method="POST" action="/record/reset_problem" style="margin:0;">
-          <input type="hidden" name="student_id" value="{{ selected_student }}">
-          <input type="hidden" id="reset-problem-id" name="problem_id" value="">
-          <button type="submit" class="btn btn-danger btn-sm">Reset</button>
-        </form>
-      </div>
+  {% if not records %}
+  <div class="card fade-in">
+    <div class="empty-state">
+      <div class="empty-title">No Records</div>
+      この生徒の授業記録はまだありません。
     </div>
   </div>
-  </div>
-<div id="toast"></div>
+  {% endif %}
+{% endblock %}
 
+{% block script %}
 <script>
-// ── 1件削除 ──
-async function deleteRecord(historyId) {
+// ── 1件削除（確認モーダルを経由） ──
+async function deleteRecord(historyId, dateStr) {
+  const ok = await showConfirm({
+    title: 'Confirm Delete',
+    message: 'この記録1件（' + dateStr + '）を削除しますか？\nこの操作は取り消せません。',
+    okLabel: 'Delete',
+    danger: true
+  });
+  if (!ok) { return; }
+
   const res = await fetch('/record/delete/' + historyId, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   });
   if (res.ok || res.redirected) {
-    document.getElementById('hrow-' + historyId)?.remove();
+    const row = document.getElementById('hrow-' + historyId);
+    if (row) { row.remove(); }
     showToast('✓ Deleted', 'success');
   } else {
-    showToast('Delete failed', 'warn');
+    showToast('Delete failed', 'error');
   }
 }
 
-// ── 問題リセットモーダル ──
-function openResetModal(problemId, label) {
-  document.getElementById('reset-problem-id').value = problemId;
-  document.getElementById('reset-msg').textContent =
-    'Delete all records for "' + label + '" and reset the assignment to New (Undecided). This cannot be undone.';
-  const modal = document.getElementById('reset-modal');
-  modal.style.display = 'flex';
-  modal.addEventListener('click', function(e){ if(e.target===modal) closeResetModal(); }, { once: true });
-}
-function closeResetModal() {
-  document.getElementById('reset-modal').style.display = 'none';
-}
-
-function showToast(msg, type='success') {
-  var t = document.getElementById('toast');
-  if (!t) return;
-  t.textContent = msg;
-  t.className = 'show ' + type;
-  setTimeout(function(){ t.className = ''; }, 3000);
-}
 // ── Score：ダブルクリックで即時保存 ──
 const SCORE_LABELS = {
   5: '5 Perfect', 4: '4 Good', 3: '3 Recall', 2: '2 Retry', 1: '1 Failed'
-};
-const SCORE_COLORS = {
-  5: 'var(--green)', 4: 'var(--blue)', 3: 'var(--amber)',
-  2: 'var(--rose)',  1: 'var(--red)'
 };
 
 function startScoreEdit(outer, historyId, current) {
@@ -310,7 +208,7 @@ function startScoreEdit(outer, historyId, current) {
 
   const sel = document.createElement('select');
   sel.className = 'inline-select';
-  sel.style.width = '100px';
+  sel.style.width = '110px';
   [5, 4, 3, 2, 1].forEach(s => {
     const opt = document.createElement('option');
     opt.value = s; opt.textContent = SCORE_LABELS[s];
@@ -333,16 +231,15 @@ function startScoreEdit(outer, historyId, current) {
           body: JSON.stringify({ history_id: historyId, score: newVal })
         });
         if (res.ok) {
-          outer.innerHTML = '<span style="color:' + SCORE_COLORS[newVal]
-            + ';font-family:\'DM Mono\',monospace;font-size:11px;letter-spacing:1px;">'
+          outer.innerHTML = '<span class="score-chip score-' + newVal + '">'
             + SCORE_LABELS[newVal] + '</span>';
           outer.ondblclick = () => startScoreEdit(outer, historyId, newVal);
           showToast('✓ Score updated', 'success');
         } else {
-          showToast('Update failed', 'warn');
+          showToast('Update failed', 'error');
         }
       } catch(e) {
-        showToast('Network error', 'warn');
+        showToast('Network error', 'error');
       }
     }
     sel.remove();
@@ -364,7 +261,7 @@ function startMasteryEdit(span, historyId, current) {
 
   const sel = document.createElement('select');
   sel.className = 'inline-select';
-  sel.style.width = '64px';
+  sel.style.width = '72px';
   const stars = ['', '★', '★★', '★★★'];
   [1, 2, 3].forEach(m => {
     const opt = document.createElement('option');
@@ -393,10 +290,10 @@ function startMasteryEdit(span, historyId, current) {
           span.ondblclick = () => startMasteryEdit(span, historyId, newVal);
           showToast('✓ Mastery updated', 'success');
         } else {
-          showToast('Update failed', 'warn');
+          showToast('Update failed', 'error');
         }
       } catch(e) {
-        showToast('Network error', 'warn');
+        showToast('Network error', 'error');
       }
     }
     sel.remove();
@@ -411,6 +308,4 @@ function startMasteryEdit(span, historyId, current) {
   });
 }
 </script>
-</div>
-</body>
-</html>
+{% endblock %}

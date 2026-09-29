@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <title>{% block title %}Study Planner{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% block head %}{% endblock %}
+  {% block style %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+<div class="container"{% if container_w is defined %} style="--container-w:{{ container_w }}"{% endif %}>
+
+  {% block nav %}
+  {% if not hide_nav %}
+  {% set nav_items = [
+       ('01 Master',   '/problems',    ('/problems', '/textbooks'),                              'nav-master'),
+       ('02 Students', '/students',    ('/students', '/schedule', '/schedule_subject', '/class_schedule'), 'nav-students'),
+       ('03 Plan',     '/preview',     ('/preview', '/history'),                                 'nav-plan'),
+       ('04 Records',  '/record/bulk', ('/record', '/assignments'),                              'nav-records')
+     ] %}
+  <nav class="global-nav">
+    <a class="nav-logo" href="/"><span class="bracket">[</span>SP<span class="bracket">]</span></a>
+    <div class="nav-links">
+      {% for label, href, prefixes, cls in nav_items %}
+      <a class="nav-link {{ cls }}{% if request.path.startswith(prefixes) %} active{% endif %}"
+         href="{{ href }}">{{ label }}</a>
+      {% endfor %}
+    </div>
+  </nav>
+  {% endif %}
+  {% endblock %}
+
+  {% block header %}
+  {% if page_title is defined %}
+  <div class="page-header fade-in">
+    <div>
+      {% if page_label is defined %}<div class="page-label">{{ page_label }}</div>{% endif %}
+      <div class="page-title"{% if title_color is defined %} style="color:{{ title_color }};"{% endif %}>{{ page_title }}</div>
+      {% if page_title_ja is defined %}<div class="page-title-ja">{{ page_title_ja }}</div>{% endif %}
+    </div>
+    {% if back_href is defined %}
+    <a class="page-header-back" href="{{ back_href }}">{{ back_label if back_label is defined else 'BACK' }}</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endblock %}
+
+  {% block flash %}
+  {%- with messages = get_flashed_messages(with_categories=true) %}
+  {%- if messages %}
+  <div id="flash-data" hidden>
+    {%- for cat, msg in messages %}
+    <span data-cat="{{ cat }}">{{ msg }}</span>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+  {%- endwith %}
+  {% endblock %}
+
+  {% block content %}{% endblock %}
+
+</div>
+
+{% block after_container %}{% endblock %}
+
+<!-- 確認モーダル -->
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirm-title">Confirm</div>
+    <div class="confirm-message" id="confirm-message"></div>
+    <div class="confirm-actions">
+      <button type="button" class="btn btn-ghost btn-sm" id="confirm-cancel">Cancel</button>
+      <button type="button" class="btn btn-danger btn-sm" id="confirm-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト -->
+<div id="toast"></div>
+
+<script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+<script>
+  // Flash メッセージをトーストで表示
+  (function () {
+    var box = document.getElementById('flash-data');
+    if (!box) { return; }
+    var items = box.querySelectorAll('span');
+    var i = 0;
+    function next() {
+      if (i >= items.length) { return; }
+      var el = items[i++];
+      var cat = el.getAttribute('data-cat') || 'success';
+      if (cat === 'danger') { cat = 'error'; }
+      if (cat === 'message') { cat = 'info'; }
+      if (['success', 'info', 'warn', 'error'].indexOf(cat) === -1) { cat = 'info'; }
+      window.showToast(el.textContent.trim(), cat);
+      setTimeout(next, 3400);
+    }
+    next();
+  })();
+</script>
+{% block script %}{% endblock %}
+</body>
+</html>

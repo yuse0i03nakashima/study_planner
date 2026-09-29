@@ -2,9 +2,31 @@ from flask import Flask, render_template, request, redirect, send_file, jsonify,
 from database import (init_db, get_connection,
                       update_assignments_after_record,
                       save_plan_history, get_plan_histories)
-from excel_export import export_excel
 from datetime import date, timedelta
+import hmac
+import logging
 import os
+
+logging.basicConfig(
+    level=os.environ.get('LOG_LEVEL', 'INFO'),
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+log = logging.getLogger('study_planner')
+
+
+def _secret_equal(provided, expected):
+    """秘密情報の比較（タイミング攻撃耐性）。expected が空なら常に False。"""
+    if not expected or provided is None:
+        return False
+    return hmac.compare_digest(str(provided), str(expected))
+
+
+def _safe_next(target, default='/'):
+    """オープンリダイレクト防止: サイト内の相対パスだけ許可する。"""
+    if not target or not isinstance(target, str):
+        return default
+    if target.startswith('/') and not target.startswith('//') and '\\' not in target:
+        return target
+    return default
 
 app = Flask(__name__)
 
@@ -32,14 +54,33 @@ def score_en_filter(v):
     except Exception:
         return str(v) if v else "—"
 
-app.secret_key = os.environ.get('SECRET_KEY', 'study-planner-secret-dev')
+IS_PRODUCTION = bool(os.environ.get('RAILWAY_ENVIRONMENT'))
+_secret = os.environ.get('SECRET_KEY', '')
+if IS_PRODUCTION and (not _secret or not os.environ.get('APP_PASSWORD')):
+    raise RuntimeError('本番環境では SECRET_KEY と APP_PASSWORD の設定が必須です')
+app.secret_key = _secret or 'study-planner-secret-dev'
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=IS_PRODUCTION,
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    MAX_CONTENT_LENGTH=64 * 1024 * 1024,
+)
 
 # gunicorn(Railway)では __main__ が実行されないため before_request で代替
 _auto_promote_done_date = None
 
+# 2026-09-30: 起動時の自動昇格（未報告=正答扱い）は既定で停止。解いていない問題が習熟度3になり
+# 再定着キューを膨らませていたため。未報告の課題は期限超過のまま残し、記録は add_records か
+# 明示的な auto_record_session で行う。従来動作に戻す場合は環境変数 AUTO_PROMOTE_ON_LAUNCH=1。
+AUTO_PROMOTE_ON_LAUNCH = os.environ.get('AUTO_PROMOTE_ON_LAUNCH', '').lower() in ('1', 'true', 'yes')
+
+
 @app.before_request
 def run_auto_promote_once_per_day():
     global _auto_promote_done_date
+    if not AUTO_PROMOTE_ON_LAUNCH:
+        return
     from datetime import date as _d, timedelta as _td
     today = _d.today().isoformat()
     if _auto_promote_done_date == today:
@@ -55,10 +96,10 @@ def run_auto_promote_once_per_day():
             if from_date <= to_date:
                 promoted = auto_promote_on_launch(from_date, to_date)
                 if promoted:
-                    print(f"自動昇格: {promoted}問 ({from_date}〜{to_date})")
+                    log.info("自動昇格: %s問 (%s〜%s)", promoted, from_date, to_date)
         update_last_launch_date()
     except Exception as e:
-        print(f"auto_promote error: {e}")
+        log.exception("auto_promote error: %s", e)
 
 
 @app.before_request
@@ -77,9 +118,10 @@ def require_login():
 def login():
     error = None
     if request.method == 'POST':
-        if request.form.get('password') == os.environ.get('APP_PASSWORD', ''):
+        if _secret_equal(request.form.get('password'), os.environ.get('APP_PASSWORD', '')):
+            session.permanent = True
             session['logged_in'] = True
-            return redirect(request.args.get('next') or '/')
+            return redirect(_safe_next(request.args.get('next')))
         error = 'パスワードが違います'
     return render_template('login.html', error=error)
 
@@ -93,23 +135,45 @@ def logout():
 @app.route('/admin/db-restore', methods=['GET', 'POST'])
 def db_restore():
     token = os.environ.get('DB_RESTORE_TOKEN', '')
-    if not token or request.args.get('token') != token:
+    provided = request.form.get('token') or request.args.get('token')
+    if not _secret_equal(provided, token):
         return 'Not found', 404
     if request.method == 'POST':
         f = request.files.get('db')
         if not f or not f.filename.endswith('.db'):
             return 'SQLite .db ファイルを選択してください', 400
-        import shutil
+        import shutil, sqlite3
+        from datetime import datetime as _dt
         from database import DB_PATH
         tmp = DB_PATH + '.tmp'
         f.save(tmp)
+        with open(tmp, 'rb') as fh:
+            header = fh.read(16)
+        if header != b'SQLite format 3\x00':
+            os.remove(tmp)
+            return 'SQLite データベースではありません', 400
+        try:
+            chk = sqlite3.connect(tmp)
+            ok = chk.execute('PRAGMA integrity_check').fetchone()[0]
+            chk.close()
+        except Exception as e:
+            os.remove(tmp)
+            return f'DBを開けません: {e}', 400
+        if ok != 'ok':
+            os.remove(tmp)
+            return 'integrity_check に失敗しました', 400
+        if os.path.exists(DB_PATH):
+            backup = f"{DB_PATH}.bak_{_dt.now():%Y%m%d_%H%M%S}"
+            shutil.copy2(DB_PATH, backup)
+            log.warning('db-restore: 既存DBを %s に退避', backup)
         shutil.move(tmp, DB_PATH)
+        log.warning('db-restore: DBを差し替えました')
         return '<p>アップロード完了。<a href="/">TOPへ</a></p>'
-    from database import DB_PATH
     return f'''<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px">
 <h2>DB Restore</h2>
-<p>現在のDBパス: <code>{DB_PATH}</code></p>
+<p>既存DBは自動で退避されます。</p>
 <form method="POST" enctype="multipart/form-data">
+  <input type="hidden" name="token" value="{token}">
   <input type="file" name="db" accept=".db" required>
   <button type="submit">アップロード</button>
 </form></body></html>'''
@@ -350,7 +414,7 @@ def record():
     c = conn.cursor()
     if request.method == "POST":
         from database import (calc_new_mastery_v2, update_assignments_after_record,
-                               score_to_correct)
+                               score_to_correct, apply_linked_after_record)
         student_id = request.form["student_id"]
         problem_id = request.form["problem_id"]
         record_date = request.form["record_date"]
@@ -361,10 +425,12 @@ def record():
             INSERT INTO history
             (student_id, problem_id, date, correct, mastery, category, score)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (student_id, problem_id, record_date, correct, new_mastery, "記録", score))
+        """, (student_id, problem_id, record_date, correct, new_mastery, "Record", score))
         conn.commit()
         conn.close()
         update_assignments_after_record(student_id, problem_id, record_date, new_mastery)
+        # 代表問題なら周辺問題の出題日を連動させる（習熟度・履歴は触らない）
+        apply_linked_after_record(student_id, problem_id, record_date, score)
         score_label = {5: "Perfect", 4: "Good", 3: "Review",
                        2: "Retry", 1: "Failed"}
         flash(
@@ -510,40 +576,9 @@ def students():
 
 @app.route("/export", methods=["GET", "POST"])
 def export():
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM students ORDER BY student_id")
-    students = c.fetchall()
-    conn.close()
-
-    if request.method == "POST":
-        student_id = request.form["student_id"]
-        _td = request.form.get("end_date") or request.form.get("date") or ""
-        target_date = _td if _td else (date.today() + timedelta(days=7)).isoformat()
-        start_date = request.form.get("start_date", "")
-        if not start_date:
-            start_date = date.today().isoformat()
-
-        conn2 = get_connection()
-        c2 = conn2.cursor()
-        c2.execute("SELECT name FROM students WHERE student_id = ?", (student_id,))
-        row = c2.fetchone()
-        conn2.close()
-        student_name = row["name"] if row else student_id
-
-        os.makedirs("plan_archives", exist_ok=True)
-        output_path = os.path.join(
-            "plan_archives", f"計画表_{student_name}_{target_date}.xlsx")
-        subject_filter = request.form.get("subject_filter", "")
-        export_excel(target_date, output_path,
-                     student_id=student_id, start_date=start_date,
-                     subject_filter=subject_filter if subject_filter else None)
-        subject_filter = request.form.get("subject_filter", "")
-        save_plan_history(student_id, start_date, target_date, output_path,
-                          pdf_path="", subject=subject_filter)
-        return send_file(output_path, as_attachment=True)
-
-    return render_template("export.html", students=students)
+    """旧エクスポート画面。/preview に統合済み（旧経路はスナップショット未保存で
+    かつ export 関数の旧シグネチャを呼んでおり動作しなかった）。"""
+    return redirect(url_for("preview"))
 
 
 @app.route("/preview", methods=["GET", "POST"])
@@ -813,34 +848,6 @@ def history_download(history_id):
         return send_file(fallback, as_attachment=True)
     return "File not found", 404
 
-
-
-@app.route("/export_pdf", methods=["POST"])
-def export_pdf_route():
-    from pdf_export import export_pdf
-    student_id = request.form["student_id"]
-    target_date = request.form.get("end_date") or request.form.get("date") or ""
-    start_date = request.form.get("start_date", "")
-    if not start_date:
-        start_date = date.today().isoformat()
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT name FROM students WHERE student_id=?", (student_id,))
-    row = c.fetchone()
-    conn.close()
-    student_name = row["name"] if row else student_id
-    os.makedirs("plan_archives", exist_ok=True)
-    output_path = os.path.join(
-        "plan_archives", f"計画表_{student_name}_{target_date}.pdf")
-    subject_filter = request.form.get("subject_filter", "")
-    export_pdf(target_date, output_path,
-               student_id=student_id, start_date=start_date,
-               subject_filter=subject_filter if subject_filter else None)
-    subject_filter_pdf = request.form.get("subject_filter", "")
-    save_plan_history(student_id, start_date, target_date,
-                      excel_path="", pdf_path=output_path,
-                      subject=subject_filter_pdf)
-    return send_file(output_path, as_attachment=True)
 
 
 @app.route("/problems/list")
@@ -1428,7 +1435,7 @@ def mastery_single_update():
     c.execute("""
         INSERT INTO history (student_id, problem_id, date, correct, mastery, category)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (student_id, problem_id, today, 1, mastery, "手動修正"))
+    """, (student_id, problem_id, today, 1, mastery, "Manual"))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -2139,7 +2146,7 @@ def record_bulk():
 def record_bulk_add():
     """授業記録を一括登録する"""
     from database import (calc_new_mastery_v2, score_to_correct,
-                          update_assignments_after_record)
+                          update_assignments_after_record, apply_linked_after_record)
     data       = request.get_json()
     student_id = data.get("student_id")
     date_str   = data.get("date")
@@ -2167,13 +2174,18 @@ def record_bulk_add():
             (student_id, problem_id, date, correct, mastery, category, score)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (student_id, pid, date_str, correct, new_mastery, "Record", score))
-        problem_ids.append((pid, new_mastery))
+        problem_ids.append((pid, new_mastery, score))
         added += 1
     conn.commit()
     conn.close()
-    for pid, new_mastery in problem_ids:
+    for pid, new_mastery, _score in problem_ids:
         update_assignments_after_record(student_id, pid, date_str, new_mastery)
-    return jsonify({"ok": True, "added": added})
+    # 全件の出題予定を更新してから代表問題の連動を行う（同日に記録した問題は動かさない）
+    recorded_ids = [pid for pid, _m, _s in problem_ids]
+    linked = []
+    for pid, _m, score in problem_ids:
+        linked.extend(apply_linked_after_record(student_id, pid, date_str, score, recorded_ids))
+    return jsonify({"ok": True, "added": added, "linked": linked})
 
 
 @app.route("/sections/bulk_assign", methods=["POST"])
@@ -2201,8 +2213,8 @@ def api_export_plan():
     スナップショット付きで plan_history に保存する。
     認証は /api/tool と同じ X-API-Key 方式。
     """
-    api_key = os.environ.get('RAILWAY_API_KEY', '')
-    if not api_key or request.headers.get('X-API-Key') != api_key:
+    if not _secret_equal(request.headers.get('X-API-Key'),
+                         os.environ.get('RAILWAY_API_KEY', '')):
         return jsonify({'error': 'Unauthorized'}), 401
 
     try:
@@ -2287,9 +2299,27 @@ def api_export_plan():
                               subject=subject_filter,
                               plan_data=_make_snapshot())
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        log.exception('api_export_plan failed: %s', e)
+        return jsonify({'error': 'export failed'}), 500
 
     return send_file(path, as_attachment=True)
+
+
+@app.route('/api/tool', methods=['POST'])
+def api_tool():
+    if not _secret_equal(request.headers.get('X-API-Key'),
+                         os.environ.get('RAILWAY_API_KEY', '')):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    name = data.get('name', '')
+    arguments = data.get('arguments', {})
+    from tool_handlers import handle_tool
+    try:
+        result = handle_tool(name, arguments)
+    except Exception as e:
+        log.exception('api_tool %s failed: %s', name, e)
+        return jsonify({'error': f'{type(e).__name__}: {e}'}), 500
+    return jsonify(result)
 
 
 if __name__ == "__main__":
@@ -2302,7 +2332,7 @@ if __name__ == "__main__":
     from datetime import date as _date, timedelta as _timedelta
     last_launch = get_last_launch_date()
     today = _date.today().isoformat()
-    if last_launch < today:
+    if AUTO_PROMOTE_ON_LAUNCH and last_launch < today:
         # 前回起動日の翌日から昨日までを昇格対象とする
         # (今日のは今日の授業が終わってから昇格すべきなので除く)
         from_date = (
@@ -2313,26 +2343,9 @@ if __name__ == "__main__":
         ).isoformat()
         if from_date <= to_date:
             promoted = auto_promote_on_launch(from_date, to_date)
-            print(f"自動昇格:{promoted}問を処理しました"
-                  f"({from_date}〜{to_date})")
+            log.info("自動昇格:%s問を処理しました(%s〜%s)", promoted, from_date, to_date)
     update_last_launch_date()
 
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(host='0.0.0.0', port=port, debug=debug)
-
-
-@app.route('/api/tool', methods=['POST'])
-def api_tool():
-    api_key = os.environ.get('RAILWAY_API_KEY', '')
-    if not api_key or request.headers.get('X-API-Key') != api_key:
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.get_json(force=True)
-    name = data.get('name', '')
-    arguments = data.get('arguments', {})
-    from tool_handlers import handle_tool
-    try:
-        result = handle_tool(name, arguments)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-    return jsonify(result)

@@ -1,144 +1,127 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-  <title>Problem List — Study Planner</title>
-  <style>
-    :root {
-      --bg:#0c0d11; --surface:#13151e; --surface2:#1b1e2b; --surface3:#222536;
-      --border:#252838; --border-light:#2f3347;
-      --text:#dde1ec; --text-muted:#9aa3b8; --text-dim:#555d7a;
-      --blue:#5b8ff9; --green:#3ecf8e; --amber:#f5a623; --rose:#f06292; --red:#ef4444;
-      --blue-bg:rgba(91,143,249,0.10); --green-bg:rgba(62,207,142,0.10);
-      --amber-bg:rgba(245,166,35,0.10); --rose-bg:rgba(240,98,146,0.10);
-    }
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Noto Serif JP',serif; background:var(--bg); color:var(--text);
-      min-height:100vh; padding:40px 32px 80px; -webkit-font-smoothing:antialiased; }
-    body::after { content:''; position:fixed; inset:0;
-      background-image: linear-gradient(var(--border) 1px,transparent 1px),
-        linear-gradient(90deg,var(--border) 1px,transparent 1px);
-      background-size:48px 48px; opacity:0.15; pointer-events:none; z-index:0; }
-    .container { max-width:1100px; margin:0 auto; position:relative; z-index:1; }
-    .page-header { display:flex; align-items:flex-end; justify-content:space-between;
-      margin-bottom:28px; padding-bottom:18px; border-bottom:1px solid var(--border-light); }
-    .page-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:2.5px;
-      text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-    .page-title { font-family:'DM Mono',monospace; font-weight:500; font-size:18px;
-      letter-spacing:2px; text-transform:uppercase; }
-    .page-title-ja { font-family:'Noto Serif JP',serif; font-weight:300; font-size:11px;
-      color:var(--text-muted); margin-top:4px; }
-    .page-header-back { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-muted);
-      letter-spacing:1.5px; text-decoration:none; transition:color 0.15s; }
-    .page-header-back::before { content:'← '; }
-    .page-header-back:hover { color:var(--text); }
-    .card { background:var(--surface); border:1px solid var(--border); padding:24px 28px; margin-bottom:20px; }
-    .card-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:2px;
-      text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
-      padding-bottom:10px; border-bottom:1px solid var(--border); }
-    label { display:block; font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:1.5px; text-transform:uppercase; color:var(--text-muted);
-      margin-bottom:6px; margin-top:16px; }
-    label:first-child { margin-top:0; }
-    input[type="text"], input[type="date"], input[type="number"], select, textarea {
-      width:100%; padding:9px 12px; background:var(--surface2);
-      border:1px solid var(--border-light); color:var(--text);
-      font-family:'Noto Serif JP',serif; font-size:13px; outline:none; transition:border-color 0.15s; }
-    input:focus, select:focus, textarea:focus { border-color:var(--blue); }
-    select option { background:var(--surface2); }
-    textarea { resize:vertical; min-height:60px; }
-    .btn { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px;
-      text-transform:uppercase; padding:10px 24px; border:none; cursor:pointer;
-      transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--blue); color:#0c0d11; }
-    .btn-primary:hover { background:#7aaafb; }
-    .btn-success { background:var(--green); color:#0c0d11; }
-    .btn-success:hover { background:#5eddaa; }
-    .btn-danger  { background:var(--red); color:white; }
-    .btn-danger:hover  { background:#f87171; }
-    .btn-ghost { background:transparent; color:var(--text-muted); border:1px solid var(--border-light); }
-    .btn-ghost:hover { border-color:var(--text-muted); color:var(--text); }
-    .btn-sm { padding:5px 14px; font-size:10px; }
-    .data-table { width:100%; border-collapse:collapse; background:var(--surface); font-size:12px; }
-    .data-table th { background:var(--surface2); color:var(--text-muted); font-family:'DM Mono',monospace;
-      font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 12px;
-      text-align:center; border-bottom:1px solid var(--border-light); white-space:nowrap; }
-    .data-table td { padding:9px 12px; border-bottom:1px solid var(--border);
-      text-align:center; vertical-align:middle; }
-    .data-table tr:hover td { background:var(--surface2); }
-    .data-table td.left { text-align:left; font-family:'Noto Serif JP',serif; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
-    .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px; }
-    .meta-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim); letter-spacing:1px; }
-    input[type="checkbox"] { accent-color:var(--blue); width:14px; height:14px; }
-    .badge { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:1px; padding:2px 8px; display:inline-block; }
-    .hint { font-family:'DM Mono',monospace; font-size:9px; color:var(--text-dim); margin-top:5px; letter-spacing:0.5px; }
-    .fade-in { animation:fadeIn 0.3s ease both; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);} }
-    a { color:var(--blue); text-decoration:none; }
-    a:hover { text-decoration:underline; }
-    .alert { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:10px 16px; margin-bottom:16px; border-left:2px solid; }
-    .alert-success { background:var(--green-bg); color:var(--green); border-color:var(--green); }
-    .alert-error   { background:rgba(239,68,68,0.08); color:#f87171; border-color:var(--red); }
-    #toast { position:fixed; bottom:32px; left:50%; transform:translateX(-50%) translateY(20px);
-      background:var(--surface2); border:1px solid var(--border-light); color:var(--text);
-      font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
-      padding:12px 24px; opacity:0; transition:all 0.3s ease; pointer-events:none; z-index:9999; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-    #toast.success { border-left:2px solid var(--green); color:var(--green); }
-    #toast.info    { border-left:2px solid var(--blue);  color:var(--blue); }
-    #toast.warn    { border-left:2px solid var(--amber); color:var(--amber); }
-    .editable { cursor:pointer; padding:2px 6px; border-radius:2px;
-      border:1px dashed transparent; transition:border-color 0.12s, background 0.12s; }
-    .editable:hover { border-color:var(--border-light); background:var(--surface3); }
-    .editable.editing { display:none; }
-    .inline-input { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:3px 6px; font-size:12px; outline:none; }
-    #confirm-modal { display:none; position:fixed; inset:0;
-      background:rgba(0,0,0,0.75); z-index:2000;
-      align-items:center; justify-content:center; }
-    #confirm-modal.show { display:flex; }
-    .confirm-box { background:var(--surface); border:1px solid var(--border-light);
-      border-left:3px solid var(--red); padding:24px 28px;
-      min-width:320px; max-width:460px; width:90%; }
-    .confirm-title { font-family:'DM Mono',monospace; font-size:10px;
-      letter-spacing:2px; text-transform:uppercase; color:var(--red); margin-bottom:12px; }
-    .confirm-message { font-family:'Noto Serif JP',serif; font-size:13px;
-      color:var(--text-muted); margin-bottom:20px; line-height:1.7; }
-    .confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
-    .inline-textarea { background:var(--surface2); border:1px solid var(--blue);
-      color:var(--text); padding:4px 8px; font-size:11px; outline:none;
-      width:200px; min-height:48px; resize:both; }
-  </style>
-</head>
-<body>
-<div class="container">
-  <div class="page-header fade-in">
-    <div>
-      <div class="page-label">01 / Master Data</div>
-      <div class="page-title" style="color:#f87171;">Problem List</div>
-      <div class="page-title-ja">Problem List</div>
-    </div>
-    {% if selected_textbook %}
-    <a class="page-header-back" href="/textbooks/{{ selected_textbook }}/sections">Sections</a>
-    {% else %}
-    <a class="page-header-back" href="/">TOP</a>
-    {% endif %}
-  </div>
+{% extends "base.html" %}
+{% set page_label = "01 / Master" %}
+{% set page_title = "Problem List" %}
+{% set page_title_ja = "問題一覧" %}
+{% set title_color = "var(--red)" %}
+{% set back_href = ("/textbooks/" ~ selected_textbook ~ "/sections") if selected_textbook else "/" %}
+{% set back_label = "SECTIONS" if selected_textbook else "TOP" %}
 
+{% block title %}Problem List — Study Planner{% endblock %}
+
+{% block style %}
+<style>
+  /* ── フィルター行 ── */
+  .filter-form { display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+  .filter-form label { margin-top:0; }
+  .filter-form select { width:auto; min-width:140px; }
+  #filter-subject  { min-width:130px; }
+  #filter-textbook { min-width:200px; }
+  .filter-count { margin-left:auto; align-self:center; white-space:nowrap; }
+
+  /* ── 一括登録カード ── */
+  .card-accent-blue { border-left:2px solid var(--blue); padding:16px 20px; }
+  .card-accent-blue .card-title { color:var(--blue); }
+  .student-checks { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:4px; }
+  .student-checks label {
+    display:flex; align-items:center; gap:8px; margin:0; cursor:pointer;
+    font-family:var(--font-ja); font-size:13px; font-weight:300;
+    color:var(--text); text-transform:none; letter-spacing:0;
+  }
+  .bulk-actions { margin-top:14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .label-note { color:var(--text-dim); text-transform:none; letter-spacing:0; }
+
+  /* ── 編集方法の案内 ── */
+  .edit-hint {
+    background:var(--blue-bg); border:1px solid var(--border);
+    border-left:2px solid var(--blue);
+    padding:10px 16px; margin-bottom:10px;
+    font-size:12px; color:var(--text-muted); line-height:1.8;
+  }
+  .edit-hint .edit-hint-label {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--blue); margin-right:10px;
+  }
+  .edit-hint strong { color:var(--text); font-weight:500; }
+
+  /* ── 行内アクション ── */
+  .btn-xs {
+    padding:3px 9px; font-size:10px; letter-spacing:1px;
+    min-height:24px; line-height:1.2;
+  }
+  .row-actions { display:flex; gap:6px; justify-content:center; align-items:center; }
+  .row-del { opacity:0; pointer-events:none; transition:opacity 0.12s; }
+  .data-table tbody tr:hover .row-del,
+  .data-table tbody tr:focus-within .row-del { opacity:1; pointer-events:auto; }
+  @media (hover:none) {
+    .row-del { opacity:1; pointer-events:auto; }
+  }
+
+  /* ── インライン編集 ── */
+  .editable {
+    cursor:pointer; padding:2px 6px; border-radius:2px;
+    border:1px dashed transparent;
+    transition:border-color 0.12s, background 0.12s;
+  }
+  .editable:hover { border-color:var(--border-light); background:var(--surface3); }
+  .editable.editing { display:none; }
+  .inline-input {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:3px 6px; font-size:12px; width:auto;
+  }
+  .inline-textarea {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:4px 8px; font-size:11px;
+    width:200px; min-height:48px; resize:both;
+  }
+  .inline-select {
+    background:var(--surface2); border:1px solid var(--blue);
+    color:var(--text); padding:3px 6px; font-size:11px;
+    width:auto; min-width:160px;
+  }
+
+  /* ── セル ── */
+  .cell-num { font-family:var(--font-mono); font-size:11px; }
+  .cell-clip {
+    font-size:11px; display:block; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap;
+  }
+  .col-textbook { max-width:140px; position:relative; }
+  .col-problem  { max-width:160px; }
+  .col-instr    { max-width:180px; }
+
+  /* ── 出題予定追加モーダル ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0;
+    background:rgba(0,0,0,0.7); z-index:1000;
+    align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal-box {
+    background:var(--surface); border:1px solid var(--border-light);
+    padding:28px 32px; min-width:320px; max-width:500px; width:100%;
+  }
+  .modal-title {
+    font-family:var(--font-mono); font-size:10px; letter-spacing:2px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:16px;
+    padding-bottom:10px; border-bottom:1px solid var(--border);
+  }
+  .modal-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
+
+  @media (max-width:640px) {
+    .filter-count { margin-left:0; width:100%; }
+    .filter-form select { width:100%; min-width:0; }
+    .filter-form > div { flex:1 1 100%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
   <!-- フィルター -->
   <div class="card fade-in" style="padding:16px 20px;">
-    <form method="GET" id="filter-form"
-          style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+    <form method="GET" id="filter-form" class="filter-form">
       <div>
-        <label>Subject</label>
-        <select name="subject" id="filter-subject" style="width:130px;"
+        <label for="filter-subject">Subject</label>
+        <select name="subject" id="filter-subject"
                 onchange="updateTextbooks(); this.form.submit();">
           <option value="">— All Subjects —</option>
           {% for subj in all_subjects %}
@@ -150,8 +133,8 @@
         </select>
       </div>
       <div>
-        <label>Textbook</label>
-        <select name="textbook_id" id="filter-textbook" style="width:200px;" onchange="this.form.submit();">
+        <label for="filter-textbook">Textbook</label>
+        <select name="textbook_id" id="filter-textbook" onchange="this.form.submit();">
           <option value="">— All Textbooks —</option>
           {% for t in all_textbooks %}
           <option value="{{ t.textbook_id }}"
@@ -165,23 +148,18 @@
       {% if selected_subject or selected_textbook %}
       <a href="/problems/list" class="btn btn-ghost btn-sm">Clear</a>
       {% endif %}
-      <span class="meta-text" style="margin-left:auto;align-self:center;">
-        {{ problems|length }} problems
-      </span>
+      <span class="meta-text filter-count">{{ problems|length }} problems</span>
     </form>
   </div>
 
   <!-- 一括Assignment登録 -->
-  <div class="card fade-in" id="bulk-assign-card"
-    style="border-left:2px solid var(--blue);padding:16px 20px;">
-    <div class="card-title" style="color:var(--blue);">Bulk Assign — まとめてAssignment登録</div>
+  <div class="card card-accent-blue fade-in" id="bulk-assign-card">
+    <div class="card-title">Bulk Assign — まとめてAssignment登録</div>
 
     <label style="margin-top:0;">Students</label>
-    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
+    <div class="student-checks">
       {% for s in students %}
-      <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
-        font-size:13px;font-weight:300;color:var(--text);cursor:pointer;margin:0;
-        text-transform:none;letter-spacing:0;">
+      <label>
         <input type="checkbox" class="bulk-student" value="{{ s.student_id }}">
         {{ s.name }}
       </label>
@@ -190,7 +168,7 @@
 
     <div class="grid-2">
       <div>
-        <label>Category</label>
+        <label for="bulk-category">Category</label>
         <select id="bulk-category">
           <option value="New">New</option>
           <option value="Recall">Recall</option>
@@ -199,23 +177,27 @@
         </select>
       </div>
       <div>
-        <label>Date <span style="color:var(--text-dim);text-transform:none;letter-spacing:0;">(任意・空欄=次回授業日/未定)</span></label>
+        <label for="bulk-date">Date <span class="label-note">(任意・空欄=次回授業日/未定)</span></label>
         <input type="date" id="bulk-date">
       </div>
     </div>
 
-    <div style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div class="bulk-actions">
       <button type="button" class="btn btn-success btn-sm" onclick="submitProblemsBulkAssign()">
         + Add Selected to Assignments</button>
       <span id="bulk-selected-count" class="meta-text">0 problems selected</span>
     </div>
   </div>
 
-  <div class="meta-text fade-in" style="margin-bottom:8px;">
-    ※ Double-click to edit: No. / Textbook / Problem name / Imp / Dif / RV / Min / Total / Instruction
+  <!-- 編集方法の案内 -->
+  <div class="edit-hint fade-in">
+    <span class="edit-hint-label">Inline Edit</span>
+    各行の <strong>EDIT</strong> ボタン、またはセルの<strong>ダブルクリック</strong>で直接編集できます
+    — No. / Textbook / Problem / Imp / Dif / RV / Min / Total / Instruction
   </div>
 
-  <div class="fade-in" style="overflow-x:auto;">
+  {% if problems %}
+  <div class="table-scroll fade-in">
   <table class="data-table" id="problem-table">
     <thead>
       <tr>
@@ -232,24 +214,20 @@
         onchange="updateBulkSelectedCount()"></td>
       <td class="editable-cell" data-problem="{{ p.problem_id }}"
         data-field="order_in_textbook">
-        <span class="editable" ondblclick="startNumEdit(this, 1, 9999, 1)"
-          style="font-family:'DM Mono',monospace;font-size:11px;">
+        <span class="editable cell-num" ondblclick="startNumEdit(this, 1, 9999, 1)">
           {{ p.order_in_textbook or '—' }}
         </span>
       </td>
       <td class="meta-text">{{ p.subject }}</td>
-      <td class="editable-cell left" data-problem="{{ p.problem_id }}"
-        data-field="textbook" style="max-width:140px;position:relative;">
-        <span class="editable" ondblclick="startTextbookEdit(this)"
-          style="font-size:11px;display:block;overflow:hidden;
-            text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
+      <td class="editable-cell left col-textbook" data-problem="{{ p.problem_id }}"
+        data-field="textbook">
+        <span class="editable cell-clip" ondblclick="startTextbookEdit(this)">
           {{ p.textbook }}
         </span>
       </td>
-      <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="problem_number"
-        style="max-width:160px;">
-        <span class="editable" ondblclick="startTextLineEdit(this)"
-          style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;">
+      <td class="editable-cell left col-problem" data-problem="{{ p.problem_id }}"
+        data-field="problem_number">
+        <span class="editable cell-clip" ondblclick="startTextLineEdit(this)">
           {{ p.problem_number }}
         </span>
       </td>
@@ -265,83 +243,70 @@
       <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="estimated_minutes">
         <span class="editable" ondblclick="startNumEdit(this, 5, 120, 5)">{{ p.estimated_minutes }}</span>
       </td>
-      <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="total_minutes"><span class="editable" ondblclick="startNumEdit(this, 5, 999, 5)" style="color:var(--text-dim);">{{ p.total_minutes if p.total_minutes else '—' }}</span></td>
-      <td class="editable-cell left" data-problem="{{ p.problem_id }}" data-field="instruction"
-        style="max-width:180px;">
-        <span class="editable" ondblclick="startTextEdit(this)"
-          style="font-size:11px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;">
+      <td class="editable-cell" data-problem="{{ p.problem_id }}" data-field="total_minutes">
+        <span class="editable" ondblclick="startNumEdit(this, 5, 999, 5)"
+          style="color:var(--text-dim);">{{ p.total_minutes if p.total_minutes else '—' }}</span>
+      </td>
+      <td class="editable-cell left col-instr" data-problem="{{ p.problem_id }}"
+        data-field="instruction">
+        <span class="editable cell-clip" ondblclick="startTextEdit(this)">
           {{ p.instruction or '—' }}
         </span>
       </td>
       <td>
-        <button class="btn btn-ghost btn-sm"
-          onclick="showAddAssignment({{ p.problem_id }})"
-          title="Add to assignments">+</button>
-        <button class="btn btn-danger btn-sm"
-          onclick="deleteProblem({{ p.problem_id }}, this)">×</button>
+        <div class="row-actions">
+          <button type="button" class="btn btn-ghost btn-xs"
+            onclick="editRow(this)" title="問題名を編集（ダブルクリックと同じ）">Edit</button>
+          <button type="button" class="btn btn-ghost btn-xs"
+            onclick="showAddAssignment({{ p.problem_id }})"
+            title="Add to assignments">+</button>
+          <button type="button" class="btn btn-danger btn-xs row-del"
+            onclick="deleteProblem({{ p.problem_id }}, this)"
+            title="Delete">×</button>
+        </div>
       </td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
   </div>
+  {% else %}
+  <div class="card fade-in">
+    <div class="empty-state">
+      <div class="empty-title">No Problems</div>
+      条件に合う問題がありません。フィルターを変更するか、問題を登録してください。
+    </div>
+  </div>
+  {% endif %}
 
   <div style="margin-top:16px;">
     <a href="/problems" class="btn btn-primary">+ Add Problem</a>
   </div>
+{% endblock %}
 
-<div id="toast"></div>
-
-<!-- 削除確認モーダル -->
-<div id="confirm-modal">
-  <div class="confirm-box">
-    <div class="confirm-title">Confirm Delete</div>
-    <div class="confirm-message" id="confirm-message"></div>
-    <div class="confirm-actions">
-      <button class="btn btn-ghost btn-sm" id="cancel-btn">Cancel</button>
-      <button class="btn btn-danger btn-sm" id="confirm-ok">Delete</button>
-    </div>
-  </div>
-</div>
-
+{% block after_container %}
 <!-- 出題予定追加モーダル -->
-<div id="assign-modal" style="display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;">
-  <div style="background:var(--surface);border:1px solid var(--border-light);
-    padding:28px 32px;min-width:360px;max-width:500px;width:90%;">
-    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;
-      text-transform:uppercase;color:var(--text-muted);margin-bottom:16px;
-      padding-bottom:10px;border-bottom:1px solid var(--border);">
-      Add Assignment
-    </div>
+<div id="assign-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Add Assignment</div>
     <form method="POST" action="/assignments/add">
       <input type="hidden" name="problem_id" id="modal-problem-id">
       <input type="hidden" name="redirect_to" value="/problems/list">
       <div style="margin-bottom:14px;">
-        <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-          text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-          Students
-        </label>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <label style="margin-top:0;">Students</label>
+        <div class="student-checks">
           {% for s in students %}
-          <label style="display:flex;align-items:center;gap:8px;font-family:'Noto Serif JP',serif;
-            font-size:13px;font-weight:300;color:var(--text);cursor:pointer;">
-            <input type="checkbox" name="student_ids" value="{{ s.student_id }}"
-              style="accent-color:var(--blue);width:14px;height:14px;">
+          <label>
+            <input type="checkbox" name="student_ids" value="{{ s.student_id }}">
             {{ s.name }}
           </label>
           {% endfor %}
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div class="grid-2" style="margin-bottom:14px;">
         <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-            Category
-          </label>
-          <select name="category"
-            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
-              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+          <label style="margin-top:0;">Category</label>
+          <select name="category">
             <option value="New">New</option>
             <option value="Recall">Recall</option>
             <option value="Drill">Drill</option>
@@ -349,102 +314,58 @@
           </select>
         </div>
         <div>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;
-            text-transform:uppercase;color:var(--text-muted);display:block;margin-bottom:6px;">
-            Date
-          </label>
-          <input type="date" name="scheduled_date"
-            style="width:100%;background:var(--surface2);border:1px solid var(--border-light);
-              color:var(--text);padding:8px 10px;font-size:13px;outline:none;">
+          <label style="margin-top:0;">Date</label>
+          <input type="date" name="scheduled_date">
         </div>
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button type="button" class="btn btn-ghost btn-sm"
-          onclick="closeModal()">Cancel</button>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm">Add →</button>
       </div>
     </form>
   </div>
 </div>
+{% endblock %}
 
+{% block script %}
 <script>
+// ── 出題予定追加モーダル ──
 function showAddAssignment(problemId) {
   document.getElementById('modal-problem-id').value = problemId;
-  const modal = document.getElementById('assign-modal');
-  modal.style.display = 'flex';
+  document.getElementById('assign-modal').classList.add('show');
 }
 
 function closeModal() {
-  document.getElementById('assign-modal').style.display = 'none';
+  document.getElementById('assign-modal').classList.remove('show');
 }
 
-// モーダル外クリックで閉じる
-document.getElementById('assign-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
-
-// 教科変更時にテキストを絞り込む
+// ── 教科変更時にテキストを絞り込む ──
 function updateTextbooks() {
   const subject = document.getElementById('filter-subject').value;
   const tbSel   = document.getElementById('filter-textbook');
-  let hasVisible = false;
   for (const opt of tbSel.options) {
     if (!opt.value) continue;  // 「全テキスト」は常に表示
-    const show = !subject || opt.dataset.subject === subject;
-    opt.hidden = !show;
-    if (show) hasVisible = true;
+    opt.hidden = !(!subject || opt.dataset.subject === subject);
   }
   // 現在選択中のテキストが非表示になった場合はリセット
   const current = tbSel.options[tbSel.selectedIndex];
   if (current && current.hidden) {
-    tbSel.value = "";
+    tbSel.value = '';
   }
 }
 
-// 初期化：ページ読み込み時に教科フィルターを適用
-document.addEventListener('DOMContentLoaded', () => {
-  updateTextbooks();
-});
-
-// 教科変更時にテキストを絞り込む
-function updateTextbooks() {
-  const subject = document.getElementById('filter-subject').value;
-  const tbSel   = document.getElementById('filter-textbook');
-  let hasVisible = false;
-  for (const opt of tbSel.options) {
-    if (!opt.value) continue;  // 「全テキスト」は常に表示
-    const show = !subject || opt.dataset.subject === subject;
-    opt.hidden = !show;
-    if (show) hasVisible = true;
-  }
-  // 現在選択中のテキストが非表示になった場合はリセット
-  const current = tbSel.options[tbSel.selectedIndex];
-  if (current && current.hidden) {
-    tbSel.value = "";
-  }
+// ── 行内の EDIT ボタン（ダブルクリック編集と同じ処理を呼ぶ）──
+function editRow(btn) {
+  const row = btn.closest('tr');
+  if (!row) return;
+  const cell = row.querySelector('.editable-cell[data-field="problem_number"]');
+  if (!cell) return;
+  const span = cell.querySelector('.editable');
+  if (span) startTextLineEdit(span);
 }
 
-// 初期化：ページ読み込み時に教科フィルターを適用
-document.addEventListener('DOMContentLoaded', () => {
-  updateTextbooks();
-});
-
-function showToast(msg, type='success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-</script>
-</div>
-
-<script>
-function showToast(msg, type='success') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show ' + type;
-  setTimeout(() => { t.className = ''; }, 3000);
-}
-
-function startNumEdit(span, min=1, max=5, step=1) {
+// ── インライン編集：数値 ──
+function startNumEdit(span, min = 1, max = 5, step = 1) {
   const cell = span.closest('.editable-cell');
   const field = cell.dataset.field;
   const problemId = cell.dataset.problem;
@@ -488,6 +409,7 @@ function startNumEdit(span, min=1, max=5, step=1) {
   });
 }
 
+// ── インライン編集：学習指示（テキストエリア）──
 function startTextEdit(span) {
   const cell = span.closest('.editable-cell');
   const problemId = cell.dataset.problem;
@@ -519,6 +441,7 @@ function startTextEdit(span) {
   });
 }
 
+// ── インライン編集：テキスト所属（セレクト）──
 function startTextbookEdit(span) {
   const cell = span.closest('.editable-cell');
   const problemId = cell.dataset.problem;
@@ -530,8 +453,6 @@ function startTextbookEdit(span) {
     .then(textbooks => {
       const sel = document.createElement('select');
       sel.className = 'inline-select';
-      sel.style.minWidth = '160px';
-      sel.style.fontSize = '11px';
       textbooks.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t.textbook_id;
@@ -570,6 +491,7 @@ function startTextbookEdit(span) {
     });
 }
 
+// ── インライン編集：問題名（1行テキスト）──
 function startTextLineEdit(span) {
   const cell = span.closest('.editable-cell');
   const problemId = cell.dataset.problem;
@@ -606,37 +528,25 @@ function startTextLineEdit(span) {
   });
 }
 
-function deleteProblem(id) {
-  openConfirm('Delete Problem ' + id + '?', async () => {
-    const res = await fetch('/problems/delete/' + id, { method: 'POST' });
-    if (res.ok) {
-      document.getElementById('prow-' + id)?.remove();
-      showToast('Deleted.', 'success');
-    } else { showToast('Delete failed.', 'warn'); }
+// ── 削除 ──
+async function deleteProblem(id) {
+  const ok = await showConfirm({
+    title: 'Confirm Delete',
+    message: '問題 ID ' + id + ' を削除しますか？\nこの操作は取り消せません。',
+    okLabel: 'Delete',
+    danger: true
   });
-}
-
-function openConfirm(message, onOk) {
-  const modal = document.getElementById('confirm-modal');
-  document.getElementById('confirm-message').textContent = message;
-  modal.classList.add('show');
-  const okBtn = document.getElementById('confirm-ok');
-  const newOk = okBtn.cloneNode(true);
-  okBtn.parentNode.replaceChild(newOk, okBtn);
-  newOk.onclick = () => { closeConfirm(); onOk(); };
-}
-
-function closeConfirm() {
-  document.getElementById('confirm-modal').classList.remove('show');
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = document.getElementById('confirm-modal');
-  if (modal) {
-    modal.addEventListener('click', e => { if (e.target === modal) closeConfirm(); });
-    document.getElementById('cancel-btn').onclick = closeConfirm;
+  if (!ok) return;
+  const res = await fetch('/problems/delete/' + id, { method: 'POST' });
+  if (res.ok) {
+    const row = document.getElementById('prow-' + id);
+    if (row) row.remove();
+    updateBulkSelectedCount();
+    showToast('Deleted.', 'success');
+  } else {
+    showToast('Delete failed.', 'warn');
   }
-});
+}
 
 // ── 一括Assignment登録 ──
 function toggleAllProbs(cb) {
@@ -690,6 +600,18 @@ async function submitProblemsBulkAssign() {
     showToast('Error: ' + (data.message || 'failed'), 'warn');
   }
 }
+
+// ── 初期化 ──
+document.addEventListener('DOMContentLoaded', () => {
+  updateTextbooks();
+  updateBulkSelectedCount();
+
+  const assignModal = document.getElementById('assign-modal');
+  if (assignModal) {
+    assignModal.addEventListener('click', function (e) {
+      if (e.target === assignModal) closeModal();
+    });
+  }
+});
 </script>
-</body>
-</html>
+{% endblock %}
