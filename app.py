@@ -1721,6 +1721,17 @@ def student_update(student_id):
     return redirect(f"/students/{student_id}#profile")
 
 
+@app.route("/students/<student_id>/delete", methods=["POST"])
+def student_delete(student_id):
+    from tool_handlers import delete_student
+    result = delete_student(student_id, confirm=True)
+    if result.get("error"):
+        flash(result["error"], "error")
+        return redirect(f"/students/{student_id}#profile")
+    flash(f"{result['deleted_student']['name']}（{student_id}）を削除しました", "success")
+    return redirect("/students")
+
+
 @app.route("/students/add", methods=["POST"])
 def students_add():
     student_id = request.form.get("student_id", "").strip()

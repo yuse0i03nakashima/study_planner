@@ -118,6 +118,19 @@
       </table>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-title">Delete Student</div>
+      <p class="meta-text">退会時に使用。授業記録・出題予定・計画履歴・スケジュールも削除します（問題マスタ・テキストは残ります）。実行前にDBのバックアップを作成します。</p>
+      <form method="POST" action="/students/{{ student.student_id }}/delete"
+            data-confirm-title="Delete Student"
+            data-confirm-ok="Delete"
+            data-confirm="{{ student.name }}（{{ student.student_id }}）と関連データをすべて削除しますか？この操作は取り消せません。">
+        <div class="form-actions">
+          <button type="submit" class="btn btn-danger btn-sm">Delete Student</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- ─── Tab: Schedule ─── -->

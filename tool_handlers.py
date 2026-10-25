@@ -144,13 +144,67 @@ SUPPORTED_TOOLS = [
     "add_record", "add_records",
     "update_problem", "update_assignment_date", "update_assignment_category",
     "update_mastery", "update_review_value",
-    "delete_assignment", "delete_problem", "delete_record",
+    "delete_assignment", "delete_problem", "delete_record", "delete_student",
     "set_class_schedule", "set_next_class_date", "clear_suppression",
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
     "set_problem_sections", "get_linked_problems",
 ]
 
-SERVER_VERSION = "2026-09-30-srs-linked-v2"
+SERVER_VERSION = "2026-10-25-delete-student"
+
+# 生徒に紐づくテーブル（delete_student が削除する順。students は最後）
+STUDENT_TABLES = [
+    "history", "assignments", "suppression", "plan_history",
+    "schedule_base", "schedule_override", "schedule_base_subject", "schedule_override_subject",
+    "class_schedule_base", "class_schedule_override", "student_textbooks",
+]
+
+
+def delete_student(student_id: str, confirm: bool = False):
+    """生徒と、その生徒に紐づく全データを削除する。問題マスタ・テキストは残す。
+    confirm=False なら件数のプレビューだけを返す。実行前に DB を .bak_日時 へバックアップする。"""
+    if not student_id:
+        return {"error": "student_id is required"}
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT student_id, name, subjects FROM students WHERE student_id=?", (student_id,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return {"error": f"student_id {student_id} not found"}
+    student = dict(row)
+    counts = {}
+    for t in STUDENT_TABLES:
+        c.execute(f"SELECT COUNT(*) FROM {t} WHERE student_id=?", (student_id,))
+        counts[t] = c.fetchone()[0]
+    if not confirm:
+        conn.close()
+        return {
+            "requires_confirm": True,
+            "message": "以下の生徒と関連データを削除します（問題マスタ・テキストは残ります）。"
+                       "実行するには confirm=true を付けて再度呼んでください。",
+            "student": student,
+            "counts": counts,
+        }
+    # バックアップ（WAL の内容も含めるため sqlite の backup API を使う）
+    import sqlite3
+    from datetime import datetime as _dt
+    backup = f"{DB_PATH}.bak_{_dt.now():%Y%m%d_%H%M%S}"
+    dst = sqlite3.connect(backup)
+    conn.backup(dst)
+    dst.close()
+    try:
+        for t in STUDENT_TABLES:
+            c.execute(f"DELETE FROM {t} WHERE student_id=?", (student_id,))
+        c.execute("DELETE FROM students WHERE student_id=?", (student_id,))
+        conn.commit()
+    except Exception as ex:
+        conn.rollback()
+        conn.close()
+        return {"error": f"削除に失敗しました（ロールバック済み）: {ex}", "backup": backup}
+    conn.close()
+    return {"status": "ok", "deleted_student": student, "deleted_counts": counts, "backup": backup}
+
 
 
 def handle_tool(name: str, arguments: dict):
@@ -1004,6 +1058,9 @@ def handle_tool(name: str, arguments: dict):
         conn.commit()
         conn.close()
         return {"status": "ok", "deleted": info}
+
+    elif name == "delete_student":
+        return delete_student(arguments.get("student_id"), bool(arguments.get("confirm", False)))
 
     elif name == "delete_problem":
         problem_id = arguments["problem_id"]

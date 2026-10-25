@@ -407,6 +407,23 @@ async def list_tools():
             }
         ),
         Tool(
+            name="delete_student",
+            description=(
+                "生徒を削除する（退会時）。授業記録・出題予定・計画履歴・スケジュール・テキスト紐付けなど"
+                "その生徒に紐づく全データも削除する。問題マスタ・テキストは残る。"
+                "confirm=true を付けない限り削除は実行せず、削除件数のプレビューだけを返す（安全確認）。"
+                "実行前にDBのバックアップを作成する。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string",  "description": "削除する生徒ID"},
+                    "confirm":    {"type": "boolean", "description": "true=削除を実行。省略時はプレビューのみ"}
+                },
+                "required": ["student_id"]
+            }
+        ),
+        Tool(
             name="delete_assignment",
             description="出題予定を削除する。問題マスタは削除されない。",
             inputSchema={

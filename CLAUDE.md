@@ -202,3 +202,10 @@ planner.py assign_days_v2 を再設計した。設計思想：予復習が大半
 - 計画表の出力はブラウザUIまたは `/api/export_plan`（X-API-Key認証）から行う。
   Claude Codeからの出力は講師のプレビュー承認後のみ実行する（tutor側 `/plan-export` スキル参照）
 - 削除操作は必ず確認を取ってから実行する
+## 生徒の削除（2026-10-25 追加）
+- MCPツール `delete_student`（student_id, confirm）。confirm なしは関連テーブルごとの削除件数プレビューのみ。
+  confirm=true で DB を `.bak_日時` にバックアップ（sqlite backup API）してから、tool_handlers.py の
+  `STUDENT_TABLES`（history・assignments・suppression・plan_history・各スケジュール・student_textbooks）と
+  students 行を1トランザクションで削除する。問題マスタ・テキストは残す。
+- Web UI: 生徒詳細の Profile タブ末尾「Delete Student」（確認モーダル経由で POST /students/<id>/delete）。
+- 生徒IDを参照するテーブルを増やしたら `STUDENT_TABLES` に追加すること。
