@@ -407,6 +407,23 @@ async def list_tools():
             }
         ),
         Tool(
+            name="add_student",
+            description=(
+                "生徒を新規登録する。既存のstudent_idなら登録せずエラーを返す。"
+                "授業曜日は登録後に set_class_schedule で設定する。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID（例: S006）"},
+                    "name":       {"type": "string", "description": "氏名"},
+                    "subjects":   {"type": "string", "description": "教科（カンマ区切り。例: 数学,国語）"},
+                    "plan_mode":  {"type": "string", "description": "計画モード all（全教科まとめて）/ per_subject（教科別）。省略時 all"}
+                },
+                "required": ["student_id", "name", "subjects"]
+            }
+        ),
+        Tool(
             name="delete_student",
             description=(
                 "生徒を削除する（退会時）。授業記録・出題予定・計画履歴・スケジュール・テキスト紐付けなど"

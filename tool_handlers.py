@@ -140,7 +140,7 @@ SUPPORTED_TOOLS = [
     "get_all_students", "get_student_summary", "get_problems", "get_assignments",
     "get_series", "get_textbooks", "get_class_schedule", "get_sections",
     "get_suppression_list", "get_plan_days", "get_plan_history", "get_history",
-    "add_series", "add_textbook", "add_problem", "add_assignment",
+    "add_student", "add_series", "add_textbook", "add_problem", "add_assignment",
     "add_record", "add_records",
     "update_problem", "update_assignment_date", "update_assignment_category",
     "update_mastery", "update_review_value",
@@ -150,7 +150,7 @@ SUPPORTED_TOOLS = [
     "set_problem_sections", "get_linked_problems",
 ]
 
-SERVER_VERSION = "2026-10-25-delete-student"
+SERVER_VERSION = "2026-10-26-add-delete-student"
 
 # 生徒に紐づくテーブル（delete_student が削除する順。students は最後）
 STUDENT_TABLES = [
@@ -1058,6 +1058,32 @@ def handle_tool(name: str, arguments: dict):
         conn.commit()
         conn.close()
         return {"status": "ok", "deleted": info}
+
+    elif name == "add_student":
+        student_id = (arguments.get("student_id") or "").strip()
+        sname      = (arguments.get("name") or "").strip()
+        subjects   = arguments.get("subjects") or ""
+        if isinstance(subjects, list):
+            subjects = ",".join(s.strip() for s in subjects if s and s.strip())
+        subjects   = ",".join(s.strip() for s in subjects.split(",") if s.strip())
+        plan_mode  = arguments.get("plan_mode") or "all"
+        if not student_id or not sname:
+            return {"error": "student_id と name は必須です"}
+        if plan_mode not in ("all", "per_subject"):
+            return {"error": "plan_mode は 'all' または 'per_subject'"}
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT student_id, name FROM students WHERE student_id=?", (student_id,))
+        row = c.fetchone()
+        if row:
+            conn.close()
+            return {"error": f"student_id {student_id} は既に存在します（{row['name']}）"}
+        c.execute("INSERT INTO students (student_id, name, subjects, plan_mode) VALUES (?, ?, ?, ?)",
+                  (student_id, sname, subjects, plan_mode))
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "student": {"student_id": student_id, "name": sname,
+                                            "subjects": subjects, "plan_mode": plan_mode}}
 
     elif name == "delete_student":
         return delete_student(arguments.get("student_id"), bool(arguments.get("confirm", False)))
