@@ -210,3 +210,4 @@ planner.py assign_days_v2 を再設計した。設計思想：予復習が大半
 - Web UI: 生徒詳細の Profile タブ末尾「Delete Student」（確認モーダル経由で POST /students/<id>/delete）。
 - 生徒IDを参照するテーブルを増やしたら `STUDENT_TABLES` に追加すること。
 - 生徒の登録は MCPツール `add_student`（student_id, name, subjects, plan_mode=all/per_subject）。既存IDはエラー。2026-10-26 追加。
+- 既存生徒の更新は MCPツール `update_student`（student_id 必須。name / subjects / plan_mode のうち渡した項目だけ上書きし、before/after を返す）。subjects は全列指定（教科追加時も現在値+新教科のカンマ区切り全体を渡す。空にはできない）。これにより従来「Web UIからのみ」だった教科列の修正がMCPから可能。2026-10-30 追加。

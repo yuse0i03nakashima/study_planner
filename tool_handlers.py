@@ -143,14 +143,14 @@ SUPPORTED_TOOLS = [
     "add_student", "add_series", "add_textbook", "add_problem", "add_assignment",
     "add_record", "add_records",
     "update_problem", "update_assignment_date", "update_assignment_category",
-    "update_mastery", "update_review_value",
+    "update_mastery", "update_review_value", "update_student",
     "delete_assignment", "delete_problem", "delete_record", "delete_student",
     "set_class_schedule", "set_next_class_date", "clear_suppression",
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
     "set_problem_sections", "get_linked_problems",
 ]
 
-SERVER_VERSION = "2026-10-26-add-delete-student"
+SERVER_VERSION = "2026-10-30-update-student"
 
 # 生徒に紐づくテーブル（delete_student が削除する順。students は最後）
 STUDENT_TABLES = [
@@ -1084,6 +1084,46 @@ def handle_tool(name: str, arguments: dict):
         conn.close()
         return {"status": "ok", "student": {"student_id": student_id, "name": sname,
                                             "subjects": subjects, "plan_mode": plan_mode}}
+
+    elif name == "update_student":
+        student_id = (arguments.get("student_id") or "").strip()
+        if not student_id:
+            return {"error": "student_id is required"}
+        fields = {}
+        if arguments.get("name") is not None:
+            sname = str(arguments["name"]).strip()
+            if not sname:
+                return {"error": "name が空です"}
+            fields["name"] = sname
+        if arguments.get("subjects") is not None:
+            subjects = arguments["subjects"]
+            if isinstance(subjects, list):
+                subjects = ",".join(s.strip() for s in subjects if s and s.strip())
+            subjects = ",".join(s.strip() for s in str(subjects).split(",") if s.strip())
+            if not subjects:
+                return {"error": "subjects が空です（教科を外すのではなく全列を渡す）"}
+            fields["subjects"] = subjects
+        if arguments.get("plan_mode") is not None:
+            if arguments["plan_mode"] not in ("all", "per_subject"):
+                return {"error": "plan_mode は 'all' または 'per_subject'"}
+            fields["plan_mode"] = arguments["plan_mode"]
+        if not fields:
+            return {"error": "更新する項目（name / subjects / plan_mode）を1つ以上指定してください"}
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT student_id, name, subjects, plan_mode FROM students WHERE student_id=?", (student_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return {"error": f"student_id {student_id} not found"}
+        before = dict(row)
+        sets = ", ".join(f"{k}=?" for k in fields)
+        c.execute(f"UPDATE students SET {sets} WHERE student_id=?", (*fields.values(), student_id))
+        conn.commit()
+        c.execute("SELECT student_id, name, subjects, plan_mode FROM students WHERE student_id=?", (student_id,))
+        after = dict(c.fetchone())
+        conn.close()
+        return {"status": "ok", "before": before, "after": after}
 
     elif name == "delete_student":
         return delete_student(arguments.get("student_id"), bool(arguments.get("confirm", False)))

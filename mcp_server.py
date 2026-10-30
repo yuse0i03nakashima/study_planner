@@ -424,6 +424,23 @@ async def list_tools():
             }
         ),
         Tool(
+            name="update_student",
+            description=(
+                "既存生徒の氏名・教科・計画モードを更新する。指定した項目だけを上書きする。"
+                "subjects は全列を渡す（教科を1つ足すときも現在値+新教科のカンマ区切り全体を指定）。"
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID（例: S006）"},
+                    "name":       {"type": "string", "description": "氏名（変更するときのみ）"},
+                    "subjects":   {"type": "string", "description": "教科の全列（カンマ区切り。例: 数学,国語,英語）"},
+                    "plan_mode":  {"type": "string", "description": "all / per_subject（変更するときのみ）"}
+                },
+                "required": ["student_id"]
+            }
+        ),
+        Tool(
             name="delete_student",
             description=(
                 "生徒を削除する（退会時）。授業記録・出題予定・計画履歴・スケジュール・テキスト紐付けなど"
