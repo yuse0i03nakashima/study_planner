@@ -148,9 +148,10 @@ SUPPORTED_TOOLS = [
     "set_class_schedule", "set_next_class_date", "clear_suppression",
     "auto_record_session", "recalc_mastery", "get_server_info", "run_migration",
     "set_problem_sections", "get_linked_problems",
+    "set_pinned_dates", "update_assignment_dates", "get_study_schedule", "set_day_capacity",
 ]
 
-SERVER_VERSION = "2026-10-30-update-student"
+SERVER_VERSION = "2026-11-11-pinned-dates"
 
 # 生徒に紐づくテーブル（delete_student が削除する順。students は最後）
 STUDENT_TABLES = [
@@ -205,6 +206,18 @@ def delete_student(student_id: str, confirm: bool = False):
     conn.close()
     return {"status": "ok", "deleted_student": student, "deleted_counts": counts, "backup": backup}
 
+
+
+def _is_iso_date(v):
+    """YYYY-MM-DD 形式の実在日付か"""
+    if not isinstance(v, str) or len(v) != 10:
+        return False
+    try:
+        from datetime import date as _date
+        _date.fromisoformat(v)
+        return True
+    except ValueError:
+        return False
 
 
 def handle_tool(name: str, arguments: dict):
@@ -307,7 +320,7 @@ def handle_tool(name: str, arguments: dict):
         conn = get_connection()
         c = conn.cursor()
         c.execute("""
-            SELECT a.assignment_id, a.scheduled_date, a.category,
+            SELECT a.assignment_id, a.scheduled_date, a.category, a.pinned_date,
                    p.problem_id, p.subject, p.textbook, p.problem_number,
                    p.importance, p.review_value, p.estimated_minutes, p.order_in_textbook,
                    (SELECT mastery FROM history h
@@ -481,6 +494,8 @@ def handle_tool(name: str, arguments: dict):
                         "estimated_minutes": it.get("estimated_minutes"),
                         "session_index":     it.get("session_index", 1),
                         "session_total":     it.get("session_total", 1),
+                        "assignment_id":     it.get("assignment_id"),
+                        "pinned":            bool(it.get("pinned")),
                     })
 
         unassigned = []
@@ -518,6 +533,7 @@ def handle_tool(name: str, arguments: dict):
             "unassigned":   unassigned,
             "carried_over": carried,
             "empty_days":   data.get("empty_days", []),
+            "pin_warnings": data.get("pin_warnings", []),
         }
 
     elif name == "get_plan_history":
@@ -1244,6 +1260,178 @@ def handle_tool(name: str, arguments: dict):
         conn.commit()
         conn.close()
         return {"status": "ok", "assignment_id": assignment_id, "scheduled_date": scheduled_date}
+
+    elif name == "set_pinned_dates":
+        # 固定配置日の設定・解除（まとめて。1件でも不正なら何も書き込まない）2026-11-11
+        items = arguments.get("items") or []
+        if not items:
+            return {"error": "items は1件以上必要です"}
+        conn = get_connection()
+        c = conn.cursor()
+        errors, plan_rows, warnings = [], [], []
+        for i, it in enumerate(items):
+            aid = it.get("assignment_id")
+            pd = it.get("pinned_date")
+            if pd in ("", None):
+                pd = None
+            elif not _is_iso_date(pd):
+                errors.append({"index": i, "assignment_id": aid,
+                               "error": f"pinned_date は YYYY-MM-DD か null: {pd}"})
+                continue
+            c.execute("""SELECT a.assignment_id, a.student_id, a.problem_id, a.category,
+                                a.scheduled_date, a.pinned_date,
+                                p.estimated_minutes, p.total_minutes
+                         FROM assignments a JOIN problems p ON a.problem_id=p.problem_id
+                         WHERE a.assignment_id=?""", (aid,))
+            r = c.fetchone()
+            if not r:
+                errors.append({"index": i, "assignment_id": aid, "error": "assignment が見つかりません"})
+                continue
+            if (pd and r["category"] == "New" and r["total_minutes"]
+                    and int(r["total_minutes"]) > int(r["estimated_minutes"] or 15)):
+                errors.append({"index": i, "assignment_id": aid,
+                               "error": "複数回に分けて配置する予習問題（total_minutes > estimated_minutes）は固定できません"})
+                continue
+            if pd and r["scheduled_date"] == "2099-12-31":
+                warnings.append({"assignment_id": aid,
+                                 "warning": "出題日が未定（2099-12-31）のため計画に出ず、固定は効きません"})
+            elif pd and pd > r["scheduled_date"] and r["scheduled_date"] >= date.today().isoformat():
+                # 期限超過（過去日）の課題は計画期間全体が窓になるので警告しない
+                warnings.append({"assignment_id": aid,
+                                 "warning": "固定日 " + pd + " が出題日（締切）" + r["scheduled_date"] + " より後です"})
+            plan_rows.append((aid, pd, dict(r)))
+        if errors:
+            conn.close()
+            return {"error": "不正な項目があるため何も変更していません", "errors": errors}
+        results = []
+        for aid, pd, r in plan_rows:
+            c.execute("UPDATE assignments SET pinned_date=? WHERE assignment_id=?", (pd, aid))
+            results.append({"assignment_id": aid, "student_id": r["student_id"],
+                            "problem_id": r["problem_id"], "category": r["category"],
+                            "scheduled_date": r["scheduled_date"],
+                            "before": r["pinned_date"], "after": pd})
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "updated": len(results), "results": results,
+                "warnings": warnings}
+
+    elif name == "update_assignment_dates":
+        # 出題日（scheduled_date）の一括変更。1件でも不正なら何も書き込まない 2026-11-11
+        items = arguments.get("items") or []
+        if not items:
+            return {"error": "items は1件以上必要です"}
+        conn = get_connection()
+        c = conn.cursor()
+        errors, plan_rows = [], []
+        for i, it in enumerate(items):
+            aid = it.get("assignment_id")
+            sd = it.get("scheduled_date")
+            if not _is_iso_date(sd):
+                errors.append({"index": i, "assignment_id": aid,
+                               "error": f"scheduled_date は YYYY-MM-DD: {sd}"})
+                continue
+            c.execute("SELECT assignment_id, student_id, problem_id, category, scheduled_date "
+                      "FROM assignments WHERE assignment_id=?", (aid,))
+            r = c.fetchone()
+            if not r:
+                errors.append({"index": i, "assignment_id": aid, "error": "assignment が見つかりません"})
+                continue
+            plan_rows.append((aid, sd, dict(r)))
+        if errors:
+            conn.close()
+            return {"error": "不正な項目があるため何も変更していません", "errors": errors}
+        results = []
+        for aid, sd, r in plan_rows:
+            c.execute("UPDATE assignments SET scheduled_date=? WHERE assignment_id=?", (sd, aid))
+            results.append({"assignment_id": aid, "student_id": r["student_id"],
+                            "problem_id": r["problem_id"], "category": r["category"],
+                            "before": r["scheduled_date"], "after": sd})
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "updated": len(results), "results": results}
+
+    elif name == "get_study_schedule":
+        # 勉強時間（日別キャパ・全体）の確認。計画の配置に実際に使う値（effective）を返す
+        from database import get_schedule
+        student_id = arguments["student_id"]
+        start_date = arguments["start_date"]
+        end_date = arguments["end_date"]
+        if not (_is_iso_date(start_date) and _is_iso_date(end_date)):
+            return {"error": "start_date / end_date は YYYY-MM-DD"}
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM students WHERE student_id=?", (student_id,))
+        if not c.fetchone():
+            conn.close()
+            return {"error": f"student not found: {student_id}"}
+        c.execute("SELECT dow, available_minutes FROM schedule_base WHERE student_id=?",
+                  (student_id,))
+        base = {str(r["dow"]): r["available_minutes"] for r in c.fetchall()
+                if str(r["dow"]) in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")}
+        c.execute("""SELECT date, available_minutes FROM schedule_override
+                     WHERE student_id=? AND date BETWEEN ? AND ? ORDER BY date""",
+                  (student_id, start_date, end_date))
+        overrides = [dict(r) for r in c.fetchall()]
+        c.execute("""SELECT subject, date, available_minutes FROM schedule_override_subject
+                     WHERE student_id=? AND date BETWEEN ? AND ? ORDER BY subject, date""",
+                  (student_id, start_date, end_date))
+        subject_overrides = [dict(r) for r in c.fetchall()]
+        conn.close()
+        eff = get_schedule(student_id, start_date, end_date)
+        result = {"student_id": student_id, "start_date": start_date, "end_date": end_date,
+                  "base": base, "overrides": overrides,
+                  "effective": [{"date": d, "minutes": m} for d, m in sorted(eff.items())]}
+        if subject_overrides:
+            result["subject_overrides"] = subject_overrides
+            result["note"] = ("教科別の日別上書きがあります。その教科は全体の勉強時間ではなく"
+                              "教科別の値で配置されることがあります")
+        return result
+
+    elif name == "set_day_capacity":
+        # 日単位の勉強時間（全体）の上書き・解除。minutes=null で上書きを消して曜日の既定に戻す
+        from database import get_schedule
+        student_id = arguments["student_id"]
+        items = arguments.get("items") or []
+        if not items:
+            return {"error": "items は1件以上必要です"}
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM students WHERE student_id=?", (student_id,))
+        found = c.fetchone()
+        conn.close()
+        if not found:
+            return {"error": f"student not found: {student_id}"}
+        errors = []
+        for i, it in enumerate(items):
+            d = it.get("date")
+            m = it.get("minutes")
+            if not _is_iso_date(d):
+                errors.append({"index": i, "error": f"date は YYYY-MM-DD: {d}"})
+            elif m is not None and (not isinstance(m, int) or isinstance(m, bool) or m < 0):
+                errors.append({"index": i, "date": d, "error": f"minutes は0以上の整数か null: {m}"})
+        if errors:
+            return {"error": "不正な項目があるため何も変更していません", "errors": errors}
+        before = {it["date"]: get_schedule(student_id, it["date"], it["date"]).get(it["date"])
+                  for it in items}
+        conn = get_connection()
+        c = conn.cursor()
+        for it in items:
+            if it.get("minutes") is None:
+                c.execute("DELETE FROM schedule_override WHERE student_id=? AND date=?",
+                          (student_id, it["date"]))
+            else:
+                c.execute("""INSERT OR REPLACE INTO schedule_override
+                             (student_id, date, available_minutes) VALUES (?, ?, ?)""",
+                          (student_id, it["date"], it["minutes"]))
+        conn.commit()
+        conn.close()
+        results = []
+        for it in items:
+            d = it["date"]
+            results.append({"date": d, "before": before[d],
+                            "after": get_schedule(student_id, d, d).get(d),
+                            "override": "deleted" if it.get("minutes") is None else it["minutes"]})
+        return {"status": "ok", "student_id": student_id, "results": results}
 
     elif name == "update_assignment_category":
         assignment_id = arguments["assignment_id"]

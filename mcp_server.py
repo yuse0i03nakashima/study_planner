@@ -492,6 +492,87 @@ async def list_tools():
             }
         ),
         Tool(
+            name="update_assignment_dates",
+            description="出題予定の日付(scheduled_date)をまとめて変更する。1件でも不正なら何も変更しない。各件の before/after を返す",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "変更する出題予定の一覧",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "assignment_id":  {"type": "integer", "description": "出題予定ID"},
+                                "scheduled_date": {"type": "string",  "description": "新しい出題日YYYY-MM-DD（未定は2099-12-31）"}
+                            },
+                            "required": ["assignment_id", "scheduled_date"]
+                        }
+                    }
+                },
+                "required": ["items"]
+            }
+        ),
+        Tool(
+            name="set_pinned_dates",
+            description=("計画表で問題を置く日（固定配置日）をまとめて設定・解除する。出題日(scheduled_date＝締切・記録上の出題日)は変えない。"
+                         "固定した問題は計画表の生成時に最初にその日へ置かれ、勉強時間を超えても動かない（超過は get_plan_days の pin_warnings に出る）。"
+                         "pinned_date=null で解除。授業記録で出題予定が作り直されると固定も消える。1件でも不正なら何も変更しない"),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "設定する出題予定の一覧（assignment_id は get_assignments / get_plan_days で確認）",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "assignment_id": {"type": "integer", "description": "出題予定ID"},
+                                "pinned_date":   {"type": ["string", "null"], "description": "置く日YYYY-MM-DD。null で解除"}
+                            },
+                            "required": ["assignment_id", "pinned_date"]
+                        }
+                    }
+                },
+                "required": ["items"]
+            }
+        ),
+        Tool(
+            name="get_study_schedule",
+            description="生徒の日別の勉強時間（計画表の配置に使う全体のキャパ）を確認する。曜日の既定値・日別の上書き・実際に使われる値(effective)を返す。読み取り専用",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID"},
+                    "start_date": {"type": "string", "description": "開始日YYYY-MM-DD"},
+                    "end_date":   {"type": "string", "description": "終了日YYYY-MM-DD"}
+                },
+                "required": ["student_id", "start_date", "end_date"]
+            }
+        ),
+        Tool(
+            name="set_day_capacity",
+            description="日単位で生徒の勉強時間（全体のキャパ・分）を上書き・解除する。minutes=null で上書きを消して曜日の既定値に戻す。1件でも不正なら何も変更しない。各日の before/after を返す",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "student_id": {"type": "string", "description": "生徒ID"},
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "date":    {"type": "string", "description": "日付YYYY-MM-DD"},
+                                "minutes": {"type": ["integer", "null"], "description": "その日の勉強時間（分）。null で上書き解除"}
+                            },
+                            "required": ["date", "minutes"]
+                        }
+                    }
+                },
+                "required": ["student_id", "items"]
+            }
+        ),
+        Tool(
             name="update_assignment_category",
             description="出題予定のカテゴリを変更する",
             inputSchema={

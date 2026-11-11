@@ -187,6 +187,8 @@ def init_db():
         ("assignments", "progress_after REAL"),
         ("assignments", "session_index INTEGER DEFAULT 1"),
         ("assignments", "session_total INTEGER DEFAULT 1"),
+        # 固定配置日（計画表でこの日に置く。scheduled_date=締切とは別。NULL=指定なし）2026-11-11
+        ("assignments", "pinned_date TEXT"),
         ("plan_history","pdf_path TEXT DEFAULT ''"),
         ("plan_history","subject TEXT DEFAULT ''"),
         ("plan_history","confirmed INTEGER DEFAULT 0"),
@@ -469,6 +471,8 @@ def get_plan_v2(student_id, start_date_str, end_date_str, subject_filter=None):
             "textbook_id": r["textbook_id"],
             "order_in_textbook": r["order_in_textbook"] or r["problem_id"],
             "scheduled_date": r["scheduled_date"],
+            "assignment_id": r["assignment_id"],
+            "pinned_date": r["pinned_date"],
         })
     return plan
 

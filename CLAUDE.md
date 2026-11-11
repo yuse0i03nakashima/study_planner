@@ -146,6 +146,26 @@ planner.py assign_days_v2 を再設計した。設計思想：予復習が大半
   フォールバックする（tool_handlers.py / database.py の get_auto_next_class_date。
   get_class_schedule は失効した設定を expired_override として返す）。
 
+## 固定配置日・日別キャパのMCP操作（2026-11-11 追加）
+
+S004統括の申し送り（計画表で問題ごとに配置日を決めたい）を受けて追加した。
+
+- `assignments.pinned_date`（NULL=指定なし）。**scheduled_date（締切・記録上の出題日）とは別の欄**で、計画表の配置日だけを決める。
+  assign_days_v2 は固定のある問題を最初にその日へ置き、残りを従来ロジックで配る。キャパを超えても動かさず、
+  coverage_pass でも動かさない（`_cov=("pinned", 日付)`）。固定日が計画期間外なら通常配置、期間内でもキャパ0の日なら固定を無視して通常配置する。
+  固定した定着系は週上限（TEICHAKU_CAP_RATIO）に数える。抑制中の定着系は固定があってもスキップ。
+- build_plan_data は `pin_warnings`（`ignored_no_capacity` / `over_capacity`）を返し、get_plan_days にも載る。
+  get_plan_days の days には `assignment_id` と `pinned` が付く（スナップショットにも `pinned`）。
+- 授業記録で出題予定は DELETE→INSERT で作り直されるので、固定も自動で消える。代表問題連動などの UPDATE では残る。
+- MCPツール: `set_pinned_dates`（items=[{assignment_id, pinned_date|null}]）/ `update_assignment_dates`（scheduled_date の一括変更）/
+  `get_study_schedule`（全体キャパの曜日既定・日別上書き・実効値。読み取り）/ `set_day_capacity`（schedule_override の日別上書き・null で解除）。
+  書き込み3つは**1件でも不正なら何も書き込まず**、before/after を返す。分割配置される予習（total_minutes > estimated_minutes）は固定できない。
+- 固定だけでは重い日は軽くならない（空いたキャパに他の問題が入る）。重い日を軽くしたいときは `set_day_capacity` でその日の上限を下げる。
+- **既知の不具合（未修正・講師判断待ち）**: 教科別スケジュールの曜日既定（schedule_base_subject）は Web UI が dow を 'mon' 等の文字列で保存するが、
+  get_schedule_subject は `current.weekday()`（整数）で引くため常に0になり、教科別の曜日設定は効いていない（全体キャパにフォールバック）。
+  教科別の日別上書き（schedule_override_subject）だけは効くので、Web UI で教科別の日別上書きを入れると、その教科がその日だけのスケジュールで配置される。
+  直すと既存の教科別設定（例: S004 英語 30〜60分）が突然効き始め計画が変わるため、修正は講師の判断後に行う。MCPの set_day_capacity は全体キャパのみ扱う。
+
 ## 計画スナップショット（2026-09-20 追加）
 - ブラウザUIから Excel/PDF を出力すると、出力時点の日別配置が plan_history.plan_data に
   days_v1 形式で保存される（app.py /preview → planner.plan_days_snapshot）。

@@ -96,6 +96,8 @@ def _cov_can_move(ctx, item, target):
     """割当時に付与した _cov 制約の範囲内で target へ移動できるか"""
     cov = item.get("_cov") or ("any", None)
     kind = cov[0]
+    if kind == "pinned":
+        return False  # 固定配置日の問題は動かさない
     if kind == "until":
         return target <= cov[1]
     if kind == "seq":
@@ -277,6 +279,40 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
     def day_before(date_str):
         return (date.fromisoformat(date_str) - timedelta(days=1)).isoformat()
 
+    # ── 固定配置日：指定のある問題を最初にその日へ置く（2026-11-11） ──────
+    # キャパを超えても指定どおりに置き（超過は build_plan_data が警告する）、
+    # coverage_pass でも動かさない。固定日がこの計画期間の外なら通常どおり配置し、
+    # 期間内でもキャパ0の日（勉強日でない日）なら無視して通常配置する（pin_ignored に残す）
+    pin_ignored = []
+    pinned_teichaku_minutes = 0
+    pinned_obj_ids = set()
+    for item in plan:
+        pd = item.get("pinned_date")
+        if not pd or pd < start_date_str or pd > end_date_str:
+            continue
+        is_teichaku = item["category"] in ("Drill", "Reinforce")
+        if is_teichaku and item.get("problem_id") in suppressed_ids:
+            continue  # 抑制中は通常どおりスキップ
+        if pd not in remaining:
+            pin_ignored.append(item)
+            continue
+        minutes = (get_adjusted_minutes(item) if is_teichaku
+                   else (item.get("estimated_minutes", 15) or 15))
+        remaining[pd] -= minutes
+        item["assigned_date"] = pd
+        item["pinned"] = True
+        item["_cov"] = ("pinned", pd)
+        item["_charged_minutes"] = minutes
+        item.setdefault("session_index", 1)
+        item.setdefault("session_total", 1)
+        day_item_counts[pd] += 1
+        assigned.append(item)
+        pinned_obj_ids.add(id(item))
+        if is_teichaku:
+            pinned_teichaku_minutes += minutes
+    if pinned_obj_ids:
+        plan = [p for p in plan if id(p) not in pinned_obj_ids]
+
     # ── 復習：授業前日まで（授業日出題の場合）／締切までに余裕均し配置 ──
     fukusyu_items = [p for p in plan if p["category"] == "Recall"]
 
@@ -445,7 +481,7 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
         key=teichaku_priority)
 
     teichaku_cap = sum(original_time.values()) * TEICHAKU_CAP_RATIO
-    teichaku_used = 0
+    teichaku_used = pinned_teichaku_minutes  # 固定配置した定着系も週上限に数える
     carried = []
     for item in teichaku_items:
         minutes = get_adjusted_minutes(item)
@@ -461,7 +497,8 @@ def assign_days_v2(plan, schedule, student_id, start_date_str, end_date_str):
             unassigned.append(item)
 
     context = {"assigned": assigned, "remaining": remaining,
-               "original_time": original_time, "carried": carried}
+               "original_time": original_time, "carried": carried,
+               "pin_ignored": pin_ignored}
     return assigned, unassigned, context
 
 
@@ -537,6 +574,34 @@ def build_plan_data(student_id, start_date_str, target_date_str,
     # 空き日（キャパはあるのに割当0問の日）を、制約の範囲で解消する
     coverage_pass(contexts, dates_with_time)
 
+    # 固定配置日の警告：キャパ0の日で無視した固定／固定で超過した日
+    pin_warnings = []
+    for ctx in contexts:
+        for it in ctx.get("pin_ignored", []):
+            pin_warnings.append({
+                "type": "ignored_no_capacity",
+                "assignment_id": it.get("assignment_id"),
+                "problem_id": it.get("problem_id"),
+                "subject": it.get("subject"),
+                "pinned_date": it.get("pinned_date"),
+                "message": "固定日の勉強時間が0分のため固定を無視して通常配置した",
+            })
+        for d, r in sorted(ctx.get("remaining", {}).items()):
+            if r >= 0:
+                continue
+            pinned_here = [it for it in ctx["assigned"]
+                           if it.get("pinned") and it.get("assigned_date") == d]
+            if not pinned_here:
+                continue
+            pin_warnings.append({
+                "type": "over_capacity",
+                "date": d,
+                "capacity": ctx["original_time"].get(d, 0),
+                "over_minutes": -r,
+                "pinned_problem_ids": [it.get("problem_id") for it in pinned_here],
+                "message": "固定した問題でこの日の勉強時間を超えている",
+            })
+
     rows = []
     for d in dates_with_time:
         d_obj = date.fromisoformat(d)
@@ -577,6 +642,7 @@ def build_plan_data(student_id, start_date_str, target_date_str,
         "carried_over": carried_by_subject,
         "schedule":     global_schedule,
         "empty_days":   empty_days,
+        "pin_warnings": pin_warnings,
     }
 
 
@@ -604,6 +670,7 @@ def plan_days_snapshot(data):
                     "estimated_minutes": it.get("estimated_minutes"),
                     "session_index":     it.get("session_index", 1),
                     "session_total":     it.get("session_total", 1),
+                    "pinned":            bool(it.get("pinned")),
                 })
     unassigned = []
     for subj, items in data["unassigned"].items():
